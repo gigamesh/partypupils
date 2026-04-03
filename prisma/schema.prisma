@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,89 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum ProductType {
+  track
+  release
+}
+
+enum OrderStatus {
+  pending
+  completed
+  failed
+}
+
+model Product {
+  id            Int       @id @default(autoincrement())
+  name          String
+  slug          String    @unique
+  description   String?
+  price         Int // cents
+  type          ProductType
+  coverImageUrl String?
+  releasedAt    DateTime?
+  isPublished   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  files      ProductFile[]
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+model ProductFile {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  format     String // wav, mp3
+  fileName   String
+  storageKey String
+  fileSize   Int?
+  createdAt  DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_files")
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  stripeSessionId String?     @unique
+  stripePaymentId String?
+  email           String
+  amountTotal     Int // cents
+  status          OrderStatus @default(pending)
+  createdAt       DateTime    @default(now())
+
+  items          OrderItem[]
+  downloadTokens DownloadToken[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  price     Int // cents, snapshot at purchase time
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model DownloadToken {
+  id            Int      @id @default(autoincrement())
+  orderId       Int
+  token         String   @unique @default(uuid())
+  expiresAt     DateTime
+  downloadCount Int      @default(0)
+  maxDownloads  Int      @default(10)
+  createdAt     DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("download_tokens")
 }
