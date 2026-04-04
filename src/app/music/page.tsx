@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { ProductCard } from "@/components/ProductCard";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Music | Party Pupils",
   description: "Browse and buy music from Party Pupils.",

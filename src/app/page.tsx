@@ -5,6 +5,8 @@ import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const featuredProducts = await prisma.product.findMany({
     where: { isPublished: true },
