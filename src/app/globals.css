@@ -182,26 +182,78 @@
 
 /* Seated tour widget overrides */
 .seated-events-table {
-  font-family: 'Space Mono', monospace !important;
+  @apply font-mono border-t border-white/30;
 }
 
 .seated-event-row {
-  border-color: transparent !important;
+  @apply flex justify-between py-3.5 px-2.5 transition-colors cursor-pointer;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.seated-event-row:hover {
+  @apply bg-black/5;
+}
+
+.seated-event-date-cell {
+  @apply font-bold uppercase;
+}
+
+.seated-event-details-cell {
+  @apply block opacity-70;
+}
+
+.seated-event-link-cells {
+  @apply flex items-center;
 }
 
 .seated-event-link1,
-.seated-follow-link {
-  background-color: var(--color-magenta) !important;
-  border: 1px solid var(--color-neon) !important;
-  color: white !important;
-  border-radius: 5px !important;
-  padding: 8px 16px !important;
-  font-family: 'Space Mono', monospace !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.1em !important;
+.seated-event-link1:visited,
+.seated-event-link2,
+.seated-event-link2:visited {
+  @apply block text-xs text-center overflow-hidden truncate whitespace-nowrap no-underline uppercase min-w-[120px] rounded-sm;
+  color: #000 !important;
+  background: #fff !important;
+  border: 2px solid #000 !important;
+  padding: 6px 3px !important;
+  margin: 4px 0 4px 9px !important;
   box-shadow: -0.05em -0.05em var(--color-magenta), 0.25em 0.25em 0.5em var(--color-magenta) !important;
+  border-color: var(--color-neon) !important;
+}
+
+.seated-event-link1:hover,
+.seated-event-link2:hover {
+  color: #fff !important;
+  background: #000 !important;
+  border-color: #fff !important;
+  @apply transition-colors;
+}
+
+.seated-follow-box {
+  @apply py-8 mt-2.5 text-center;
+}
+
+.seated-follow-text {
+  @apply font-bold text-center;
+}
+
+.seated-follow-link,
+.seated-follow-link:visited {
+  @apply inline-block mt-2.5 text-xs overflow-hidden truncate whitespace-nowrap no-underline uppercase px-5 py-3 rounded-sm;
+  color: #000 !important;
+  background: #fff !important;
+  border: 2px solid #000 !important;
+  box-shadow: -0.05em -0.05em var(--color-magenta), 0.25em 0.25em 0.5em var(--color-magenta) !important;
+  border-color: var(--color-neon) !important;
+}
+
+.seated-follow-link:hover {
+  color: #fff !important;
+  background: #000 !important;
+  border-color: #fff !important;
+  @apply transition-colors;
 }
 
 .seated-events-table > :last-child {
-  display: none;
+  @apply hidden;
 }
