@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ProductCard } from "@/components/ProductCard";
+import { ReleaseCard } from "@/components/ReleaseCard";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const featuredProducts = await prisma.product.findMany({
+  const featuredReleases = await prisma.release.findMany({
     where: { isPublished: true },
     orderBy: { releasedAt: "desc" },
     take: 4,
@@ -39,26 +39,26 @@ export default async function HomePage() {
         <SocialLinks className="neon-glow mt-2" />
       </section>
 
-      {featuredProducts.length > 0 && (
+      {featuredReleases.length > 0 && (
         <section className="mx-auto max-w-5xl px-4 pb-16">
           <h2 className="neon-glow text-center uppercase">Latest Releases</h2>
           <div className="mb-6 text-center">
             <Link
               href="/music"
-              className="text-neon/70 hover:text-neon hover:drop-shadow-[0_0_6px_rgba(173,253,2,0.5)] transition-colors text-sm uppercase tracking-wider"
+              className="neon-link text-sm uppercase tracking-wider"
             >
               View All Music →
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {featuredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                name={product.name}
-                slug={product.slug}
-                price={product.price}
-                type={product.type}
-                coverImageUrl={product.coverImageUrl}
+            {featuredReleases.map((release) => (
+              <ReleaseCard
+                key={release.id}
+                name={release.name}
+                slug={release.slug}
+                price={release.price}
+                type={release.type}
+                coverImageUrl={release.coverImageUrl}
                 showPrice={false}
               />
             ))}

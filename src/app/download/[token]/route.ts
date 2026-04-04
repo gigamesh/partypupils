@@ -7,11 +7,11 @@ interface RouteContext {
 
 export async function GET(req: NextRequest, context: RouteContext) {
   const { token } = await context.params;
-  const productId = parseInt(req.nextUrl.searchParams.get("productId") || "0");
+  const trackId = parseInt(req.nextUrl.searchParams.get("trackId") || "0");
   const format = req.nextUrl.searchParams.get("format") || "mp3";
 
-  if (!productId) {
-    return NextResponse.json({ error: "Missing productId" }, { status: 400 });
+  if (!trackId) {
+    return NextResponse.json({ error: "Missing trackId" }, { status: 400 });
   }
 
   const downloadToken = await prisma.downloadToken.findUnique({
@@ -19,7 +19,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
     include: {
       order: {
         include: {
-          items: true,
+          items: {
+            include: {
+              release: { include: { tracks: true } },
+            },
+          },
         },
       },
     },
@@ -37,15 +41,18 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Download limit reached" }, { status: 429 });
   }
 
-  const orderHasProduct = downloadToken.order.items.some(
-    (item) => item.productId === productId
-  );
-  if (!orderHasProduct) {
-    return NextResponse.json({ error: "Product not in order" }, { status: 403 });
+  const orderHasTrack = downloadToken.order.items.some((item) => {
+    if (item.trackId === trackId) return true;
+    if (item.release?.tracks.some((t) => t.id === trackId)) return true;
+    return false;
+  });
+
+  if (!orderHasTrack) {
+    return NextResponse.json({ error: "Track not in order" }, { status: 403 });
   }
 
-  const file = await prisma.productFile.findFirst({
-    where: { productId, format },
+  const file = await prisma.trackFile.findFirst({
+    where: { trackId, format },
   });
 
   if (!file) {
@@ -57,7 +64,5 @@ export async function GET(req: NextRequest, context: RouteContext) {
     data: { downloadCount: { increment: 1 } },
   });
 
-  // In production, the storageKey is a Vercel Blob URL. Redirect to it.
-  // For additional security, you could generate a signed URL with a short expiry.
   return NextResponse.redirect(file.storageKey);
 }

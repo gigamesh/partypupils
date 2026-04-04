@@ -22,7 +22,12 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
   const order = await prisma.order.findUnique({
     where: { stripeSessionId: session_id },
     include: {
-      items: { include: { product: true } },
+      items: {
+        include: {
+          release: { include: { tracks: true } },
+          track: true,
+        },
+      },
       downloadTokens: true,
     },
   });
@@ -50,22 +55,40 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
           Download links expire in {DOWNLOAD_TOKEN_EXPIRY_HOURS} hours (up to {DOWNLOAD_TOKEN_MAX} downloads).
         </p>
 
-        {order.items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0"
-          >
-            <div>
-              <p className="font-medium">{item.product.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {formatCurrency(item.price)}
-              </p>
-            </div>
-            {token && (
-              <DownloadButtons token={token} productId={item.productId} />
-            )}
-          </div>
-        ))}
+        {order.items.map((item) => {
+          if (item.release) {
+            return (
+              <div key={item.id} className="space-y-2">
+                <p className="font-medium">{item.release.name}</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                {token && item.release.tracks.map((track) => (
+                  <div
+                    key={track.id}
+                    className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
+                  >
+                    <span className="text-sm">{track.trackNumber}. {track.name}</span>
+                    <DownloadButtons token={token} trackId={track.id} />
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          if (item.track) {
+            return (
+              <div
+                key={item.id}
+                className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0"
+              >
+                <div>
+                  <p className="font-medium">{item.track.name}</p>
+                  <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                </div>
+                {token && <DownloadButtons token={token} trackId={item.track.id} />}
+              </div>
+            );
+          }
+          return null;
+        })}
 
         <div className="pt-3 flex justify-between font-semibold">
           <span>Total</span>

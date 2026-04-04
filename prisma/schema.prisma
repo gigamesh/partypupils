@@ -7,9 +7,9 @@ datasource db {
   provider = "postgresql"
 }
 
-enum ProductType {
-  track
-  release
+enum ReleaseType {
+  album
+  single
 }
 
 enum OrderStatus {
@@ -18,37 +18,52 @@ enum OrderStatus {
   failed
 }
 
-model Product {
-  id            Int       @id @default(autoincrement())
+model Release {
+  id            Int         @id @default(autoincrement())
   name          String
-  slug          String    @unique
+  slug          String      @unique
   description   String?
-  price         Int // cents
-  type          ProductType
+  price         Int // cents — price for the full release
+  type          ReleaseType
   coverImageUrl String?
   releasedAt    DateTime?
-  isPublished   Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isPublished   Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  files      ProductFile[]
+  tracks     Track[]
   orderItems OrderItem[]
 
-  @@map("products")
+  @@map("releases")
 }
 
-model ProductFile {
+model Track {
+  id          Int      @id @default(autoincrement())
+  releaseId   Int
+  name        String
+  price       Int // cents — price for individual track purchase
+  trackNumber Int
+  createdAt   DateTime @default(now())
+
+  release    Release     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  files      TrackFile[]
+  orderItems OrderItem[]
+
+  @@map("tracks")
+}
+
+model TrackFile {
   id         Int      @id @default(autoincrement())
-  productId  Int
+  trackId    Int
   format     String // wav, mp3
   fileName   String
   storageKey String
   fileSize   Int?
   createdAt  DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
-  @@map("product_files")
+  @@map("track_files")
 }
 
 model Order {
@@ -68,13 +83,15 @@ model Order {
 }
 
 model OrderItem {
-  id        Int @id @default(autoincrement())
+  id        Int  @id @default(autoincrement())
   orderId   Int
-  productId Int
+  releaseId Int?
+  trackId   Int?
   price     Int // cents, snapshot at purchase time
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  release Release? @relation(fields: [releaseId], references: [id])
+  track   Track?   @relation(fields: [trackId], references: [id])
 
   @@map("order_items")
 }

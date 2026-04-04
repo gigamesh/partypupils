@@ -13,9 +13,9 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
   const { id } = await context.params;
   const body = await req.json();
-  const { name, slug, description, price, type, coverImageUrl, isPublished, files } = body;
+  const { name, slug, description, price, type, coverImageUrl, isPublished, tracks } = body;
 
-  const product = await prisma.product.update({
+  const release = await prisma.release.update({
     where: { id: parseInt(id) },
     data: {
       name,
@@ -25,13 +25,22 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       type,
       coverImageUrl,
       isPublished,
-      ...(files && files.length > 0
-        ? { files: { create: files } }
+      ...(tracks && tracks.length > 0
+        ? {
+            tracks: {
+              create: tracks.map((t: { name: string; price: number; trackNumber: number; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
+                name: t.name,
+                price: t.price,
+                trackNumber: t.trackNumber,
+                files: { create: t.files },
+              })),
+            },
+          }
         : {}),
     },
   });
 
-  return NextResponse.json(product);
+  return NextResponse.json(release);
 }
 
 export async function DELETE(_req: NextRequest, context: RouteContext) {
@@ -40,7 +49,7 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  await prisma.product.delete({ where: { id: parseInt(id) } });
+  await prisma.release.delete({ where: { id: parseInt(id) } });
 
   return NextResponse.json({ ok: true });
 }

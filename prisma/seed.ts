@@ -5,64 +5,92 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  await prisma.product.upsert({
-    where: { slug: "love-me-again" },
+  await prisma.release.upsert({
+    where: { slug: "come-alive" },
     update: {},
     create: {
-      name: "Love Me Again",
-      slug: "love-me-again",
-      description: "A high-energy dance track with infectious vocal chops and a driving bassline.",
-      price: 199,
-      type: "track",
-      coverImageUrl: null,
-      releasedAt: new Date("2024-06-15"),
-      isPublished: true,
-      files: {
-        create: [
-          { format: "mp3", fileName: "Love Me Again.mp3", storageKey: "audio/love-me-again/mp3/love-me-again.mp3", fileSize: 8500000 },
-          { format: "wav", fileName: "Love Me Again.wav", storageKey: "audio/love-me-again/wav/love-me-again.wav", fileSize: 42000000 },
-        ],
-      },
-    },
-  });
-
-  await prisma.product.upsert({
-    where: { slug: "come-alive-ep" },
-    update: {},
-    create: {
-      name: "Come Alive EP",
-      slug: "come-alive-ep",
-      description: "A four-track EP blending future bass, house, and pop sensibilities.",
+      name: "Come Alive",
+      slug: "come-alive",
+      description: "A four-track album blending future bass, house, and pop sensibilities.",
       price: 599,
-      type: "release",
-      coverImageUrl: null,
+      type: "album",
       releasedAt: new Date("2024-09-01"),
       isPublished: true,
-      files: {
+      tracks: {
         create: [
-          { format: "mp3", fileName: "Come Alive EP.zip", storageKey: "audio/come-alive-ep/mp3/come-alive-ep.zip", fileSize: 32000000 },
-          { format: "wav", fileName: "Come Alive EP.zip", storageKey: "audio/come-alive-ep/wav/come-alive-ep.zip", fileSize: 160000000 },
+          {
+            name: "Come Alive",
+            price: 199,
+            trackNumber: 1,
+            files: {
+              create: [
+                { format: "mp3", fileName: "Come Alive.mp3", storageKey: "audio/come-alive/01/come-alive.mp3", fileSize: 8500000 },
+                { format: "wav", fileName: "Come Alive.wav", storageKey: "audio/come-alive/01/come-alive.wav", fileSize: 42000000 },
+              ],
+            },
+          },
+          {
+            name: "Love Me Again",
+            price: 199,
+            trackNumber: 2,
+            files: {
+              create: [
+                { format: "mp3", fileName: "Love Me Again.mp3", storageKey: "audio/come-alive/02/love-me-again.mp3", fileSize: 8200000 },
+                { format: "wav", fileName: "Love Me Again.wav", storageKey: "audio/come-alive/02/love-me-again.wav", fileSize: 40000000 },
+              ],
+            },
+          },
+          {
+            name: "Sunset Drive",
+            price: 199,
+            trackNumber: 3,
+            files: {
+              create: [
+                { format: "mp3", fileName: "Sunset Drive.mp3", storageKey: "audio/come-alive/03/sunset-drive.mp3", fileSize: 9200000 },
+                { format: "wav", fileName: "Sunset Drive.wav", storageKey: "audio/come-alive/03/sunset-drive.wav", fileSize: 45000000 },
+              ],
+            },
+          },
+          {
+            name: "Night Shift",
+            price: 199,
+            trackNumber: 4,
+            files: {
+              create: [
+                { format: "mp3", fileName: "Night Shift.mp3", storageKey: "audio/come-alive/04/night-shift.mp3", fileSize: 7800000 },
+                { format: "wav", fileName: "Night Shift.wav", storageKey: "audio/come-alive/04/night-shift.wav", fileSize: 38000000 },
+              ],
+            },
+          },
         ],
       },
     },
   });
 
-  await prisma.product.upsert({
-    where: { slug: "sunset-drive" },
+  await prisma.release.upsert({
+    where: { slug: "neon-lights" },
     update: {},
     create: {
-      name: "Sunset Drive",
-      slug: "sunset-drive",
-      description: "Smooth summer vibes with lush synths and a groovy rhythm section.",
+      name: "Neon Lights",
+      slug: "neon-lights",
+      description: "A high-energy single with infectious vocal chops and a driving bassline.",
       price: 199,
-      type: "track",
-      coverImageUrl: null,
+      type: "single",
       releasedAt: new Date("2025-01-20"),
       isPublished: true,
-      files: {
+      tracks: {
         create: [
-          { format: "mp3", fileName: "Sunset Drive.mp3", storageKey: "audio/sunset-drive/mp3/sunset-drive.mp3", fileSize: 9200000 },
-          { format: "wav", fileName: "Sunset Drive.wav", storageKey: "audio/sunset-drive/wav/sunset-drive.wav", fileSize: 45000000 },
+          {
+            name: "Neon Lights",
+            price: 199,
+            trackNumber: 1,
+            files: {
+              create: [
+                { format: "mp3", fileName: "Neon Lights.mp3", storageKey: "audio/neon-lights/01/neon-lights.mp3", fileSize: 9200000 },
+                { format: "wav", fileName: "Neon Lights.wav", storageKey: "audio/neon-lights/01/neon-lights.wav", fileSize: 45000000 },
+              ],
+            },
+          },
         ],
       },
     },

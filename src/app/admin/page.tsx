@@ -2,9 +2,8 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -15,18 +14,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export default async function AdminProductsPage() {
-  const products = await prisma.product.findMany({
+export default async function AdminReleasesPage() {
+  const releases = await prisma.release.findMany({
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { files: true } } },
+    include: { _count: { select: { tracks: true } } },
   });
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <Link href="/admin/products/new" className={cn(buttonVariants())}>
-          New Product
+        <h1 className="text-2xl font-bold">Releases</h1>
+        <Link href="/admin/releases/new" className={cn(buttonVariants())}>
+          New Release
         </Link>
       </div>
 
@@ -36,26 +35,26 @@ export default async function AdminProductsPage() {
             <TableHead>Name</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Price</TableHead>
-            <TableHead>Files</TableHead>
+            <TableHead>Tracks</TableHead>
             <TableHead>Status</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {products.map((product) => (
-            <TableRow key={product.id}>
-              <TableCell className="font-medium">{product.name}</TableCell>
-              <TableCell>{product.type}</TableCell>
-              <TableCell>{formatCurrency(product.price)}</TableCell>
-              <TableCell>{product._count.files}</TableCell>
+          {releases.map((release) => (
+            <TableRow key={release.id}>
+              <TableCell className="font-medium">{release.name}</TableCell>
+              <TableCell>{release.type}</TableCell>
+              <TableCell>{formatCurrency(release.price)}</TableCell>
+              <TableCell>{release._count.tracks}</TableCell>
               <TableCell>
-                <Badge variant={product.isPublished ? "default" : "secondary"}>
-                  {product.isPublished ? "Published" : "Draft"}
+                <Badge variant={release.isPublished ? "default" : "secondary"}>
+                  {release.isPublished ? "Published" : "Draft"}
                 </Badge>
               </TableCell>
               <TableCell>
                 <Link
-                  href={`/admin/products/${product.id}/edit`}
+                  href={`/admin/releases/${release.id}/edit`}
                   className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
                 >
                   Edit
@@ -63,10 +62,10 @@ export default async function AdminProductsPage() {
               </TableCell>
             </TableRow>
           ))}
-          {products.length === 0 && (
+          {releases.length === 0 && (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                No products yet.
+                No releases yet.
               </TableCell>
             </TableRow>
           )}

@@ -4,23 +4,23 @@ import { useCart, type CartItem } from "./CartProvider";
 import { Button } from "@/components/ui/button";
 
 interface AddToCartButtonProps {
-  product: CartItem;
+  item: CartItem;
 }
 
-export function AddToCartButton({ product }: AddToCartButtonProps) {
-  const { items, addItem, removeItem } = useCart();
-  const inCart = items.some((i) => i.productId === product.productId);
+export function AddToCartButton({ item }: AddToCartButtonProps) {
+  const { addItem, removeItem, isInCart } = useCart();
+  const inCart = isInCart(item);
 
   if (inCart) {
     return (
-      <Button variant="secondary" onClick={() => removeItem(product.productId)}>
+      <Button variant="secondary" onClick={() => removeItem(item)}>
         Remove from Cart
       </Button>
     );
   }
 
   return (
-    <Button onClick={() => addItem(product)}>
+    <Button onClick={() => addItem(item)}>
       Add to Cart
     </Button>
   );

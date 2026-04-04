@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { ProductCard } from "@/components/ProductCard";
+import { ReleaseCard } from "@/components/ReleaseCard";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +8,8 @@ export const metadata = {
   description: "Browse and buy music from Party Pupils.",
 };
 
-export default async function StorePage() {
-  const products = await prisma.product.findMany({
+export default async function MusicPage() {
+  const releases = await prisma.release.findMany({
     where: { isPublished: true },
     orderBy: { releasedAt: "desc" },
   });
@@ -17,18 +17,18 @@ export default async function StorePage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="neon-glow text-3xl mb-8 uppercase">Music</h1>
-      {products.length === 0 ? (
+      {releases.length === 0 ? (
         <p className="text-muted-foreground">No music available yet. Check back soon!</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              name={product.name}
-              slug={product.slug}
-              price={product.price}
-              type={product.type}
-              coverImageUrl={product.coverImageUrl}
+          {releases.map((release) => (
+            <ReleaseCard
+              key={release.id}
+              name={release.name}
+              slug={release.slug}
+              price={release.price}
+              type={release.type}
+              coverImageUrl={release.coverImageUrl}
             />
           ))}
         </div>

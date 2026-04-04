@@ -15,7 +15,7 @@ import {
 export default async function AdminOrdersPage() {
   const orders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
-    include: { items: { include: { product: true } } },
+    include: { items: { include: { release: true, track: true } } },
   });
 
   return (
@@ -40,7 +40,7 @@ export default async function AdminOrdersPage() {
               </TableCell>
               <TableCell className="text-sm">{order.email}</TableCell>
               <TableCell className="text-sm">
-                {order.items.map((i) => i.product.name).join(", ")}
+                {order.items.map((i) => i.release?.name || i.track?.name || "—").join(", ")}
               </TableCell>
               <TableCell className="text-sm">
                 {formatCurrency(order.amountTotal)}

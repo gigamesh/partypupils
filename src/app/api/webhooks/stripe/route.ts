@@ -26,17 +26,26 @@ export async function POST(req: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    const productIds: number[] = JSON.parse(
-      session.metadata?.product_ids || "[]"
-    );
+    const releaseIds: number[] = JSON.parse(session.metadata?.release_ids || "[]");
+    const trackIds: number[] = JSON.parse(session.metadata?.track_ids || "[]");
 
-    if (productIds.length === 0) {
+    if (releaseIds.length === 0 && trackIds.length === 0) {
       return NextResponse.json({ received: true });
     }
 
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds } },
-    });
+    const [releases, tracks] = await Promise.all([
+      releaseIds.length > 0
+        ? prisma.release.findMany({ where: { id: { in: releaseIds } } })
+        : [],
+      trackIds.length > 0
+        ? prisma.track.findMany({ where: { id: { in: trackIds } } })
+        : [],
+    ]);
+
+    const orderItems = [
+      ...releases.map((r) => ({ releaseId: r.id, price: r.price })),
+      ...tracks.map((t) => ({ trackId: t.id, price: t.price })),
+    ];
 
     await prisma.order.create({
       data: {
@@ -45,12 +54,7 @@ export async function POST(req: NextRequest) {
         email: session.customer_details?.email || "",
         amountTotal: session.amount_total || 0,
         status: "completed",
-        items: {
-          create: products.map((p) => ({
-            productId: p.id,
-            price: p.price,
-          })),
-        },
+        items: { create: orderItems },
         downloadTokens: {
           create: {
             expiresAt: new Date(Date.now() + DOWNLOAD_TOKEN_EXPIRY_MS),

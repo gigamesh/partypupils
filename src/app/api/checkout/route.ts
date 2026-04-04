@@ -4,38 +4,67 @@ import { stripe } from "@/lib/stripe";
 import { getBaseUrl } from "@/lib/utils";
 import { DEFAULT_CURRENCY } from "@/lib/constants";
 
-export async function POST(req: NextRequest) {
-  const { productIds } = (await req.json()) as { productIds: number[] };
+interface CartItem {
+  releaseId?: number;
+  trackId?: number;
+}
 
-  if (!productIds || productIds.length === 0) {
-    return NextResponse.json({ error: "No products provided" }, { status: 400 });
+export async function POST(req: NextRequest) {
+  const { items } = (await req.json()) as { items: CartItem[] };
+
+  if (!items || items.length === 0) {
+    return NextResponse.json({ error: "No items provided" }, { status: 400 });
   }
 
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, isPublished: true },
-  });
+  const releaseIds = items.filter((i) => i.releaseId).map((i) => i.releaseId!);
+  const trackIds = items.filter((i) => i.trackId).map((i) => i.trackId!);
 
-  if (products.length === 0) {
-    return NextResponse.json({ error: "No valid products found" }, { status: 400 });
+  const [releases, tracks] = await Promise.all([
+    releaseIds.length > 0
+      ? prisma.release.findMany({ where: { id: { in: releaseIds }, isPublished: true } })
+      : [],
+    trackIds.length > 0
+      ? prisma.track.findMany({ where: { id: { in: trackIds } }, include: { release: true } })
+      : [],
+  ]);
+
+  const lineItems = [
+    ...releases.map((r) => ({
+      price_data: {
+        currency: DEFAULT_CURRENCY,
+        product_data: {
+          name: r.name,
+          ...(r.coverImageUrl ? { images: [r.coverImageUrl] } : {}),
+        },
+        unit_amount: r.price,
+      },
+      quantity: 1 as const,
+    })),
+    ...tracks.map((t) => ({
+      price_data: {
+        currency: DEFAULT_CURRENCY,
+        product_data: {
+          name: `${t.release.name} — ${t.name}`,
+          ...(t.release.coverImageUrl ? { images: [t.release.coverImageUrl] } : {}),
+        },
+        unit_amount: t.price,
+      },
+      quantity: 1 as const,
+    })),
+  ];
+
+  if (lineItems.length === 0) {
+    return NextResponse.json({ error: "No valid items found" }, { status: 400 });
   }
 
   const baseUrl = getBaseUrl();
 
   const session = await stripe().checkout.sessions.create({
     mode: "payment",
-    line_items: products.map((product) => ({
-      price_data: {
-        currency: DEFAULT_CURRENCY,
-        product_data: {
-          name: product.name,
-          ...(product.coverImageUrl ? { images: [product.coverImageUrl] } : {}),
-        },
-        unit_amount: product.price,
-      },
-      quantity: 1,
-    })),
+    line_items: lineItems,
     metadata: {
-      product_ids: JSON.stringify(products.map((p) => p.id)),
+      release_ids: JSON.stringify(releases.map((r) => r.id)),
+      track_ids: JSON.stringify(tracks.map((t) => t.id)),
     },
     success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/cart`,

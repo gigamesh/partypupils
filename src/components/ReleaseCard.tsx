@@ -3,7 +3,7 @@ import Image from "next/image";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-interface ProductCardProps {
+interface ReleaseCardProps {
   name: string;
   slug: string;
   price: number;
@@ -12,7 +12,7 @@ interface ProductCardProps {
   showPrice?: boolean;
 }
 
-export function ProductCard({ name, slug, price, type, coverImageUrl, showPrice = true }: ProductCardProps) {
+export function ReleaseCard({ name, slug, price, type, coverImageUrl, showPrice = true }: ReleaseCardProps) {
   return (
     <Link
       href={`/music/${slug}`}

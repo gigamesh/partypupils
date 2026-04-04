@@ -52,7 +52,12 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
   const orders = await prisma.order.findMany({
     where: { email, status: "completed" },
     include: {
-      items: { include: { product: true } },
+      items: {
+        include: {
+          release: { include: { tracks: true } },
+          track: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -93,22 +98,42 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
               <span>{formatCurrency(order.amountTotal)}</span>
             </div>
 
-            {order.items.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0"
-              >
-                <div>
-                  <p className="font-medium">{item.product.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatCurrency(item.price)}
-                  </p>
-                </div>
-                {order.downloadToken && (
-                  <DownloadButtons token={order.downloadToken} productId={item.productId} />
-                )}
-              </div>
-            ))}
+            {order.items.map((item) => {
+              if (item.release && order.downloadToken) {
+                return (
+                  <div key={item.id} className="space-y-2">
+                    <p className="font-medium">{item.release.name}</p>
+                    <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                    {item.release.tracks.map((track) => (
+                      <div
+                        key={track.id}
+                        className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
+                      >
+                        <span className="text-sm">{track.trackNumber}. {track.name}</span>
+                        <DownloadButtons token={order.downloadToken!} trackId={track.id} />
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              if (item.track) {
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="font-medium">{item.track.name}</p>
+                      <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                    </div>
+                    {order.downloadToken && (
+                      <DownloadButtons token={order.downloadToken} trackId={item.track.id} />
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })}
           </div>
         ))}
       </div>

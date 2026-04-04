@@ -11,33 +11,40 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const product = await prisma.product.findUnique({ where: { slug } });
-  if (!product) return { title: "Not Found" };
+  const release = await prisma.release.findUnique({ where: { slug } });
+  if (!release) return { title: "Not Found" };
   return {
-    title: `${product.name} | Party Pupils`,
-    description: product.description || `Buy ${product.name} by Party Pupils.`,
+    title: `${release.name} | Party Pupils`,
+    description: release.description || `Buy ${release.name} by Party Pupils.`,
   };
 }
 
-export default async function ProductPage({ params }: Props) {
+export default async function ReleasePage({ params }: Props) {
   const { slug } = await params;
-  const product = await prisma.product.findUnique({
+  const release = await prisma.release.findUnique({
     where: { slug, isPublished: true },
-    include: { files: true },
+    include: {
+      tracks: {
+        orderBy: { trackNumber: "asc" },
+        include: { files: true },
+      },
+    },
   });
 
-  if (!product) notFound();
+  if (!release) notFound();
 
-  const formats = [...new Set(product.files.map((f) => f.format.toUpperCase()))];
+  const formats = [
+    ...new Set(release.tracks.flatMap((t) => t.files.map((f) => f.format.toUpperCase()))),
+  ];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <div className="grid gap-8 md:grid-cols-2">
         <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
-          {product.coverImageUrl ? (
+          {release.coverImageUrl ? (
             <Image
-              src={product.coverImageUrl}
-              alt={product.name}
+              src={release.coverImageUrl}
+              alt={release.name}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -53,16 +60,16 @@ export default async function ProductPage({ params }: Props) {
         <div className="flex flex-col gap-4">
           <div>
             <Badge variant="secondary" className="mb-2">
-              {product.type}
+              {release.type}
             </Badge>
-            <h1 className="text-3xl font-bold">{product.name}</h1>
+            <h1 className="text-3xl font-bold">{release.name}</h1>
             <p className="mt-1 text-2xl font-semibold">
-              {formatCurrency(product.price)}
+              {formatCurrency(release.price)}
             </p>
           </div>
 
-          {product.description && (
-            <p className="text-muted-foreground">{product.description}</p>
+          {release.description && (
+            <p className="text-muted-foreground">{release.description}</p>
           )}
 
           {formats.length > 0 && (
@@ -72,14 +79,50 @@ export default async function ProductPage({ params }: Props) {
           )}
 
           <AddToCartButton
-            product={{
-              productId: product.id,
-              name: product.name,
-              slug: product.slug,
-              price: product.price,
-              coverImageUrl: product.coverImageUrl,
+            item={{
+              releaseId: release.id,
+              name: release.name,
+              slug: release.slug,
+              price: release.price,
+              coverImageUrl: release.coverImageUrl,
             }}
           />
+
+          {release.tracks.length > 1 && (
+            <div className="mt-4">
+              <h2 className="text-lg font-semibold mb-3">Tracklist</h2>
+              <div className="space-y-2">
+                {release.tracks.map((track) => (
+                  <div
+                    key={track.id}
+                    className="flex items-center justify-between rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-muted-foreground w-6 text-right">
+                        {track.trackNumber}
+                      </span>
+                      <span className="text-sm font-medium">{track.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-neon">
+                        {formatCurrency(track.price)}
+                      </span>
+                      <AddToCartButton
+                        item={{
+                          trackId: track.id,
+                          name: track.name,
+                          slug: release.slug,
+                          price: track.price,
+                          coverImageUrl: release.coverImageUrl,
+                          releaseName: release.name,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
