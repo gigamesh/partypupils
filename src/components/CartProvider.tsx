@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
 export interface CartItem {
   releaseId?: number;
@@ -41,7 +41,11 @@ function loadInitialItems(): CartItem[] {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItemsRaw] = useState<CartItem[]>(loadInitialItems);
+  const [items, setItemsRaw] = useState<CartItem[]>([]);
+
+  useEffect(() => {
+    setItemsRaw(loadInitialItems());
+  }, []);
 
   const setItems = useCallback((updater: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
     setItemsRaw((prev) => {
