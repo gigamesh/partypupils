@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
+import { DOWNLOAD_TOKEN_EXPIRY_MS } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
         },
         downloadTokens: {
           create: {
-            expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000), // 72 hours
+            expiresAt: new Date(Date.now() + DOWNLOAD_TOKEN_EXPIRY_MS),
           },
         },
       },

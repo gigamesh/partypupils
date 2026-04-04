@@ -2,6 +2,9 @@ export const SITE_NAME = "Party Pupils";
 export const SITE_DESCRIPTION =
   "Music by Party Pupils — buy and download tracks and releases.";
 
+export const DOWNLOAD_TOKEN_EXPIRY_MS = 72 * 60 * 60 * 1000; // 72 hours
+export const DOWNLOAD_TOKEN_MAX = 10;
+
 export const SEATED_ARTIST_ID = "f5bd3ef2-2234-4972-8124-93f835758465";
 
 export const MERCH_URL =

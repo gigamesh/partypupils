@@ -9,13 +9,14 @@ interface ProductCardProps {
   price: number;
   type: string;
   coverImageUrl: string | null;
+  showPrice?: boolean;
 }
 
-export function ProductCard({ name, slug, price, type, coverImageUrl }: ProductCardProps) {
+export function ProductCard({ name, slug, price, type, coverImageUrl, showPrice = true }: ProductCardProps) {
   return (
     <Link
-      href={`/store/${slug}`}
-      className="group block overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-muted-foreground/30"
+      href={`/music/${slug}`}
+      className="group block overflow-hidden rounded-lg border border-border bg-card transition-all hover:border-neon/40 hover:shadow-[0_0_15px_rgba(173,253,2,0.15)]"
     >
       <div className="relative aspect-square bg-muted">
         {coverImageUrl ? (
@@ -27,7 +28,7 @@ export function ProductCard({ name, slug, price, type, coverImageUrl }: ProductC
             sizes="(max-width: 768px) 50vw, 25vw"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-4xl text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-4xl text-neon/30">
             ♪
           </div>
         )}
@@ -39,9 +40,11 @@ export function ProductCard({ name, slug, price, type, coverImageUrl }: ProductC
             {type}
           </Badge>
         </div>
-        <p className="mt-1 text-sm font-semibold text-muted-foreground">
-          {formatCurrency(price)}
-        </p>
+        {showPrice && (
+          <p className="mt-1 text-sm font-semibold text-neon">
+            {formatCurrency(price)}
+          </p>
+        )}
       </div>
     </Link>
   );

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { ProductCard } from "@/components/ProductCard";
 
 export const metadata = {
-  title: "Store | Party Pupils",
+  title: "Music | Party Pupils",
   description: "Browse and buy music from Party Pupils.",
 };
 
@@ -14,7 +14,7 @@ export default async function StorePage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="text-3xl font-bold mb-8">Store</h1>
+      <h1 className="neon-glow text-3xl mb-8 uppercase">Music</h1>
       {products.length === 0 ? (
         <p className="text-muted-foreground">No music available yet. Check back soon!</p>
       ) : (

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import { ClearCart } from "./ClearCart";
 
@@ -16,7 +16,7 @@ export const metadata = {
 
 export default async function CheckoutSuccessPage({ searchParams }: Props) {
   const { session_id } = await searchParams;
-  if (!session_id) redirect("/store");
+  if (!session_id) redirect("/music");
 
   const order = await prisma.order.findUnique({
     where: { stripeSessionId: session_id },
@@ -26,7 +26,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
     },
   });
 
-  if (!order) redirect("/store");
+  if (!order) redirect("/music");
 
   const token = order.downloadTokens[0]?.token;
 
@@ -35,7 +35,12 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
       <ClearCart />
       <h1 className="text-3xl font-bold mb-2">Thank you for your purchase!</h1>
       <p className="text-muted-foreground mb-8">
-        A confirmation has been sent to {order.email}.
+        Your order is confirmed. Downloads are available below. You can also
+        access your downloads anytime from{" "}
+        <Link href="/orders/lookup" className="underline hover:text-foreground">
+          My Orders
+        </Link>
+        .
       </p>
 
       <div className="rounded-lg border border-border p-6 space-y-4">
@@ -81,7 +86,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
       </div>
 
       <div className="mt-8 text-center">
-        <Link href="/store" className={cn(buttonVariants({ variant: "outline" }))}>
+        <Link href="/music" className={cn(buttonVariants({ variant: "outline" }))}>
           Continue Shopping
         </Link>
       </div>

@@ -9,7 +9,7 @@ export function CartButton() {
   return (
     <Link
       href="/cart"
-      className="relative inline-flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors"
+      className="relative inline-flex items-center gap-1.5 text-sm font-medium text-neon/70 transition-colors hover:text-neon hover:drop-shadow-[0_0_6px_rgba(173,253,2,0.5)]"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -27,7 +27,7 @@ export function CartButton() {
         <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
       </svg>
       {itemCount > 0 && (
-        <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+        <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-magenta text-[10px] font-bold text-white">
           {itemCount}
         </span>
       )}

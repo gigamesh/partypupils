@@ -34,9 +34,9 @@ interface SocialLinksProps {
   iconSize?: number;
 }
 
-export function SocialLinks({ className = "", iconSize = 20 }: SocialLinksProps) {
+export function SocialLinks({ className = "", iconSize = 28 }: SocialLinksProps) {
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex items-center gap-4 ${className}`}>
       {SOCIAL_LINKS.map((link) => (
         <a
           key={link.name}
@@ -44,7 +44,7 @@ export function SocialLinks({ className = "", iconSize = 20 }: SocialLinksProps)
           target="_blank"
           rel="noopener noreferrer"
           aria-label={link.name}
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          className="text-neon/70 transition-colors hover:text-neon hover:drop-shadow-[0_0_6px_rgba(173,253,2,0.5)]"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

@@ -32,7 +32,7 @@ export default function CartPage() {
       <div className="mx-auto max-w-2xl px-4 py-10 text-center">
         <h1 className="text-3xl font-bold mb-4">Your Cart</h1>
         <p className="text-muted-foreground mb-6">Your cart is empty.</p>
-        <Link href="/store" className={cn(buttonVariants())}>
+        <Link href="/music" className={cn(buttonVariants())}>
           Browse Music
         </Link>
       </div>
@@ -65,7 +65,7 @@ export default function CartPage() {
             </div>
             <div className="flex-1 min-w-0">
               <Link
-                href={`/store/${item.slug}`}
+                href={`/music/${item.slug}`}
                 className="font-medium text-sm hover:underline"
               >
                 {item.name}
