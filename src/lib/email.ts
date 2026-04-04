@@ -1,10 +1,17 @@
 import { Resend } from "resend";
 import { SITE_NAME } from "./constants";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend;
+
+function resend() {
+  if (!_resend) {
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
 
 export async function sendOrderLookupEmail(email: string, verifyUrl: string) {
-  await resend.emails.send({
+  await resend().emails.send({
     from: process.env.EMAIL_FROM || "onboarding@resend.dev",
     to: email,
     subject: `Your ${SITE_NAME} Downloads`,
