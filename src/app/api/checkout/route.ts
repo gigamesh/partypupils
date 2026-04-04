@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   const baseUrl = getBaseUrl();
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await stripe().checkout.sessions.create({
     mode: "payment",
     line_items: products.map((product) => ({
       price_data: {
