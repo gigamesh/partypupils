@@ -16,6 +16,9 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   title: SITE_NAME,
   description: SITE_DESCRIPTION,
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
