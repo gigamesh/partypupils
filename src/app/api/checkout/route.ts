@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
+import { getBaseUrl } from "@/lib/utils";
+import { DEFAULT_CURRENCY } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   const { productIds } = (await req.json()) as { productIds: number[] };
@@ -17,13 +19,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No valid products found" }, { status: 400 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const baseUrl = getBaseUrl();
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: products.map((product) => ({
       price_data: {
-        currency: "usd",
+        currency: DEFAULT_CURRENCY,
         product_data: {
           name: product.name,
           ...(product.coverImageUrl ? { images: [product.coverImageUrl] } : {}),

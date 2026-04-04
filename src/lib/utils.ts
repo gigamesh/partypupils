@@ -18,3 +18,7 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
 }
+
+export function getBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+}

@@ -4,25 +4,32 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useState } from "react";
 
 export default function CartPage() {
   const { items, removeItem, total } = useCart();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleCheckout() {
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productIds: items.map((i) => i.productId) }),
       });
+      if (!res.ok) {
+        setError("Checkout failed. Please try again.");
+        setLoading(false);
+        return;
+      }
       const { url } = await res.json();
       if (url) window.location.href = url;
     } catch {
+      setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   }
@@ -84,6 +91,7 @@ export default function CartPage() {
           </div>
         ))}
       </div>
+      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
       <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
         <p className="text-lg font-semibold">Total: {formatCurrency(total)}</p>
         <Button onClick={handleCheckout} disabled={loading} size="lg">

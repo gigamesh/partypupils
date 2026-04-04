@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
+import { DownloadButtons } from "@/components/DownloadButtons";
 import { ClearCart } from "./ClearCart";
+import { DOWNLOAD_TOKEN_EXPIRY_HOURS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
 
 interface Props {
   searchParams: Promise<{ session_id?: string }>;
@@ -46,7 +47,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
       <div className="rounded-lg border border-border p-6 space-y-4">
         <h2 className="font-semibold text-lg">Your Downloads</h2>
         <p className="text-sm text-muted-foreground">
-          Download links expire in 72 hours (up to 10 downloads).
+          Download links expire in {DOWNLOAD_TOKEN_EXPIRY_HOURS} hours (up to {DOWNLOAD_TOKEN_MAX} downloads).
         </p>
 
         {order.items.map((item) => (
@@ -61,20 +62,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
               </p>
             </div>
             {token && (
-              <div className="flex gap-2">
-                <a
-                  href={`/download/${token}?productId=${item.productId}&format=mp3`}
-                  className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}
-                >
-                  MP3
-                </a>
-                <a
-                  href={`/download/${token}?productId=${item.productId}&format=wav`}
-                  className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}
-                >
-                  WAV
-                </a>
-              </div>
+              <DownloadButtons token={token} productId={item.productId} />
             )}
           </div>
         ))}

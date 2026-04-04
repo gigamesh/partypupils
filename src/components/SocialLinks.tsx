@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { SOCIAL_LINKS } from "@/lib/constants";
 
 const iconPaths: Record<string, React.ReactNode> = {
@@ -36,7 +37,7 @@ interface SocialLinksProps {
 
 export function SocialLinks({ className = "", iconSize = 28 }: SocialLinksProps) {
   return (
-    <div className={`flex items-center gap-4 ${className}`}>
+    <div className={cn("flex items-center gap-4", className)}>
       {SOCIAL_LINKS.map((link) => (
         <a
           key={link.name}
@@ -44,7 +45,7 @@ export function SocialLinks({ className = "", iconSize = 28 }: SocialLinksProps)
           target="_blank"
           rel="noopener noreferrer"
           aria-label={link.name}
-          className="text-neon/70 transition-colors hover:text-neon hover:drop-shadow-[0_0_6px_rgba(173,253,2,0.5)]"
+          className="neon-link"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

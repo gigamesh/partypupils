@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { SEATED_ARTIST_ID } from "@/lib/constants";
+import { SEATED_ARTIST_ID, SEATED_WIDGET_ID } from "@/lib/constants";
 
 export function SeatedTourWidget() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,13 +16,13 @@ export function SeatedTourWidget() {
     document.head.appendChild(link);
 
     const widgetScript = document.createElement("script");
-    widgetScript.id = `seated-55fdf2c0-script-${SEATED_ARTIST_ID}`;
+    widgetScript.id = `${SEATED_WIDGET_ID}-script-${SEATED_ARTIST_ID}`;
     widgetScript.setAttribute("data-artist-id", SEATED_ARTIST_ID);
     widgetScript.src = "https://widget.seated.com/widget.js";
     container.appendChild(widgetScript);
 
     const widgetDiv = document.createElement("div");
-    widgetDiv.id = "seated-55fdf2c0";
+    widgetDiv.id = SEATED_WIDGET_ID;
     widgetDiv.setAttribute("data-artist-id", SEATED_ARTIST_ID);
     widgetDiv.setAttribute("data-css-version", "2");
     widgetDiv.setAttribute("data-start-load", "true");

@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { verifyOrderVerificationToken } from "@/lib/order-auth";
 import { formatCurrency, cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { DOWNLOAD_TOKEN_EXPIRY_MS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
+import { DownloadButtons } from "@/components/DownloadButtons";
+import { DOWNLOAD_TOKEN_EXPIRY_MS, DOWNLOAD_TOKEN_EXPIRY_HOURS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
 
 interface Props {
   searchParams: Promise<{ token?: string }>;
@@ -78,7 +79,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
     <div className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="text-2xl font-bold mb-2">Your Orders</h1>
       <p className="text-muted-foreground mb-8">
-        Showing all orders for {email}. Download links expire in 72 hours.
+        Showing all orders for {email}. Download links expire in {DOWNLOAD_TOKEN_EXPIRY_HOURS} hours.
       </p>
 
       <div className="space-y-6">
@@ -104,24 +105,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
                   </p>
                 </div>
                 {order.downloadToken && (
-                  <div className="flex gap-2">
-                    <a
-                      href={`/download/${order.downloadToken}?productId=${item.productId}&format=mp3`}
-                      className={cn(
-                        buttonVariants({ size: "sm", variant: "secondary" })
-                      )}
-                    >
-                      MP3
-                    </a>
-                    <a
-                      href={`/download/${order.downloadToken}?productId=${item.productId}&format=wav`}
-                      className={cn(
-                        buttonVariants({ size: "sm", variant: "secondary" })
-                      )}
-                    >
-                      WAV
-                    </a>
-                  </div>
+                  <DownloadButtons token={order.downloadToken} productId={item.productId} />
                 )}
               </div>
             ))}
@@ -130,10 +114,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
       </div>
 
       <div className="mt-8 text-center">
-        <Link
-          href="/music"
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
+        <Link href="/music" className={cn(buttonVariants({ variant: "outline" }))}>
           Continue Shopping
         </Link>
       </div>
@@ -148,10 +129,7 @@ function InvalidLink() {
       <p className="text-muted-foreground mb-6">
         This link is no longer valid. Please request a new one.
       </p>
-      <Link
-        href="/orders/lookup"
-        className={cn(buttonVariants())}
-      >
+      <Link href="/orders/lookup" className={cn(buttonVariants())}>
         Request New Link
       </Link>
     </div>

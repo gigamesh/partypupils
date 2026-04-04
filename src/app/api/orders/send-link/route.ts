@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createOrderVerificationToken } from "@/lib/order-auth";
 import { sendOrderLookupEmail } from "@/lib/email";
+import { getBaseUrl } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   const { email } = (await req.json()) as { email: string };
@@ -19,8 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const token = await createOrderVerificationToken(email);
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const verifyUrl = `${baseUrl}/orders/verify?token=${token}`;
+  const verifyUrl = `${getBaseUrl()}/orders/verify?token=${token}`;
 
   await sendOrderLookupEmail(email, verifyUrl);
 

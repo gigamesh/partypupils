@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       where: { id: { in: productIds } },
     });
 
-    const order = await prisma.order.create({
+    await prisma.order.create({
       data: {
         stripeSessionId: session.id,
         stripePaymentId: session.payment_intent as string | null,
@@ -58,8 +58,6 @@ export async function POST(req: NextRequest) {
         },
       },
     });
-
-    console.log(`Order ${order.id} created for session ${session.id}`);
   }
 
   return NextResponse.json({ received: true });

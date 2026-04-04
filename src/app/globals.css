@@ -170,6 +170,16 @@
   100% { transform: translateX(-50%); }
 }
 
+/* Neon link hover */
+.neon-link {
+  @apply text-neon/70 transition-colors;
+}
+
+.neon-link:hover {
+  color: var(--color-neon);
+  filter: drop-shadow(0 0 6px rgba(173, 253, 2, 0.5));
+}
+
 /* Neon glow effect */
 .neon-glow {
   color: var(--color-neon);

@@ -9,7 +9,7 @@ export function CartButton() {
   return (
     <Link
       href="/cart"
-      className="relative inline-flex items-center gap-1.5 text-sm font-medium text-neon/70 transition-colors hover:text-neon hover:drop-shadow-[0_0_6px_rgba(173,253,2,0.5)]"
+      className="neon-link relative inline-flex items-center gap-1.5 text-sm font-medium"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
