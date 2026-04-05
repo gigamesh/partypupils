@@ -5,96 +5,90 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  // Virtual Clarity (Deluxe) — Album, January 17, 2025
   await prisma.release.upsert({
-    where: { slug: "come-alive" },
+    where: { slug: "virtual-clarity-deluxe" },
     update: {},
     create: {
-      name: "Come Alive",
-      slug: "come-alive",
-      description: "A four-track album blending future bass, house, and pop sensibilities.",
-      price: 599,
+      name: "Virtual Clarity (Deluxe)",
+      slug: "virtual-clarity-deluxe",
+      description: "The deluxe edition of Virtual Clarity featuring 8 original tracks plus extended club mixes of each.",
+      price: 999,
       type: "album",
-      releasedAt: new Date("2024-09-01"),
+      releasedAt: new Date("2025-01-17"),
       isPublished: true,
       tracks: {
         create: [
-          {
-            name: "Come Alive",
-            price: 199,
-            trackNumber: 1,
-            files: {
-              create: [
-                { format: "mp3", fileName: "Come Alive.mp3", storageKey: "audio/come-alive/01/come-alive.mp3", fileSize: 8500000 },
-                { format: "wav", fileName: "Come Alive.wav", storageKey: "audio/come-alive/01/come-alive.wav", fileSize: 42000000 },
-              ],
-            },
-          },
-          {
-            name: "Love Me Again",
-            price: 199,
-            trackNumber: 2,
-            files: {
-              create: [
-                { format: "mp3", fileName: "Love Me Again.mp3", storageKey: "audio/come-alive/02/love-me-again.mp3", fileSize: 8200000 },
-                { format: "wav", fileName: "Love Me Again.wav", storageKey: "audio/come-alive/02/love-me-again.wav", fileSize: 40000000 },
-              ],
-            },
-          },
-          {
-            name: "Sunset Drive",
-            price: 199,
-            trackNumber: 3,
-            files: {
-              create: [
-                { format: "mp3", fileName: "Sunset Drive.mp3", storageKey: "audio/come-alive/03/sunset-drive.mp3", fileSize: 9200000 },
-                { format: "wav", fileName: "Sunset Drive.wav", storageKey: "audio/come-alive/03/sunset-drive.wav", fileSize: 45000000 },
-              ],
-            },
-          },
-          {
-            name: "Night Shift",
-            price: 199,
-            trackNumber: 4,
-            files: {
-              create: [
-                { format: "mp3", fileName: "Night Shift.mp3", storageKey: "audio/come-alive/04/night-shift.mp3", fileSize: 7800000 },
-                { format: "wav", fileName: "Night Shift.wav", storageKey: "audio/come-alive/04/night-shift.wav", fileSize: 38000000 },
-              ],
-            },
-          },
+          { name: "Believe In Love", price: 199, trackNumber: 1 },
+          { name: "Tokyo Blur", price: 199, trackNumber: 2 },
+          { name: "Hiya", price: 199, trackNumber: 3 },
+          { name: "White Light", price: 199, trackNumber: 4 },
+          { name: "E.P.C.O.T.", price: 199, trackNumber: 5 },
+          { name: "Are We Dreaming?", price: 199, trackNumber: 6 },
+          { name: "Circuit", price: 199, trackNumber: 7 },
+          { name: "Get Down", price: 199, trackNumber: 8 },
         ],
       },
     },
   });
 
+  // Neon From Now On — Album, May 15, 2020
   await prisma.release.upsert({
-    where: { slug: "neon-lights" },
+    where: { slug: "neon-from-now-on" },
     update: {},
     create: {
-      name: "Neon Lights",
-      slug: "neon-lights",
-      description: "A high-energy single with infectious vocal chops and a driving bassline.",
-      price: 199,
-      type: "single",
-      releasedAt: new Date("2025-01-20"),
+      name: "Neon From Now On",
+      slug: "neon-from-now-on",
+      description: "Party Pupils' debut EP blending house, disco, and pop with collaborations from Ashe, TOBi, Alna, and more.",
+      price: 799,
+      type: "album",
+      releasedAt: new Date("2020-05-15"),
       isPublished: true,
       tracks: {
         create: [
-          {
-            name: "Neon Lights",
-            price: 199,
-            trackNumber: 1,
-            files: {
-              create: [
-                { format: "mp3", fileName: "Neon Lights.mp3", storageKey: "audio/neon-lights/01/neon-lights.mp3", fileSize: 9200000 },
-                { format: "wav", fileName: "Neon Lights.wav", storageKey: "audio/neon-lights/01/neon-lights.wav", fileSize: 45000000 },
-              ],
-            },
-          },
+          { name: "Lonelier (feat. Alna)", price: 199, trackNumber: 1 },
+          { name: "West Coast Tears (feat. Gary Go)", price: 199, trackNumber: 2 },
+          { name: "Rock The Party", price: 199, trackNumber: 3 },
+          { name: "The Plug (feat. Drelli)", price: 199, trackNumber: 4 },
+          { name: "Love Me For The Weekend (feat. Ashe)", price: 199, trackNumber: 5 },
+          { name: "One Two Things (feat. TOBi)", price: 199, trackNumber: 6 },
+          { name: "Bite My Tongue", price: 199, trackNumber: 7 },
+          { name: "Sax On The Beach", price: 199, trackNumber: 8 },
         ],
       },
     },
   });
+
+  // Recent singles
+  const singles: { name: string; slug: string; date: string }[] = [
+    { name: "Ride Like The Wind (Yacht House Mix)", slug: "ride-like-the-wind", date: "2026-03-06" },
+    { name: "Never Too Much", slug: "never-too-much", date: "2025-09-01" },
+    { name: "Little Lies", slug: "little-lies", date: "2025-07-01" },
+    { name: "Here We Are", slug: "here-we-are", date: "2025-05-01" },
+    { name: "Missin My Window", slug: "missin-my-window", date: "2025-03-01" },
+    { name: "Touch", slug: "touch", date: "2025-02-01" },
+    { name: "Dance with You", slug: "dance-with-you", date: "2024-06-01" },
+  ];
+
+  for (const single of singles) {
+    await prisma.release.upsert({
+      where: { slug: single.slug },
+      update: {},
+      create: {
+        name: single.name,
+        slug: single.slug,
+        price: 199,
+        type: "single",
+        releasedAt: new Date(single.date),
+        isPublished: true,
+        tracks: {
+          create: [
+            { name: single.name, price: 199, trackNumber: 1 },
+          ],
+        },
+      },
+    });
+  }
 
   console.log("Seed data created successfully.");
 }

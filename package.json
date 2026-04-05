@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "prisma db push && prisma db seed && next dev",
+    "dev": "tsx scripts/guard-local-db.ts && prisma db push && prisma db seed && next dev",
     "dev:prod": "dotenv -e .env.prod -- next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "db:dev": "prisma dev"
+    "db:dev": "prisma dev",
+    "db:push:prod": "dotenv -e .env.prod -- prisma db push"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
