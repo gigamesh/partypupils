@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { ReleaseCard } from "@/components/ReleaseCard";
+import { CatalogBanner } from "@/components/CatalogBanner";
+import { getCatalogPrice } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -9,14 +11,20 @@ export const metadata = {
 };
 
 export default async function MusicPage() {
-  const releases = await prisma.release.findMany({
-    where: { isPublished: true },
-    orderBy: { releasedAt: "desc" },
-  });
+  const [releases, catalog] = await Promise.all([
+    prisma.release.findMany({
+      where: { isPublished: true },
+      orderBy: { releasedAt: "desc" },
+    }),
+    getCatalogPrice(),
+  ]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="neon-glow text-3xl mb-8 uppercase">Music</h1>
+
+      {catalog.releaseCount > 1 && <CatalogBanner catalog={catalog} />}
+
       {releases.length === 0 ? (
         <p className="text-muted-foreground">No music available yet. Check back soon!</p>
       ) : (

@@ -90,6 +90,13 @@ async function main() {
     });
   }
 
+  // Site settings
+  await prisma.siteSetting.upsert({
+    where: { key: "catalog_discount_percent" },
+    update: {},
+    create: { key: "catalog_discount_percent", value: "15" },
+  });
+
   console.log("Seed data created successfully.");
 }
 

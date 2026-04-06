@@ -19,6 +19,7 @@ export default function CartPage() {
       const cartItems = items.map((i) => ({
         releaseId: i.releaseId,
         trackId: i.trackId,
+        catalogPurchase: i.catalogPurchase,
       }));
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -55,7 +56,7 @@ export default function CartPage() {
       <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
       <div className="space-y-4">
         {items.map((item) => {
-          const key = item.releaseId ? `release-${item.releaseId}` : `track-${item.trackId}`;
+          const key = item.catalogPurchase ? "catalog" : item.releaseId ? `release-${item.releaseId}` : `track-${item.trackId}`;
           return (
             <div
               key={key}
@@ -77,12 +78,16 @@ export default function CartPage() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <Link
-                  href={`/music/${item.slug}`}
-                  className="font-medium text-sm hover:underline"
-                >
-                  {item.releaseName ? `${item.releaseName} — ${item.name}` : item.name}
-                </Link>
+                {item.catalogPurchase ? (
+                  <span className="font-medium text-sm">{item.name}</span>
+                ) : (
+                  <Link
+                    href={`/music/${item.slug}`}
+                    className="font-medium text-sm hover:underline"
+                  >
+                    {item.releaseName ? `${item.releaseName} — ${item.name}` : item.name}
+                  </Link>
+                )}
                 <p className="text-sm text-muted-foreground">
                   {formatCurrency(item.price)}
                 </p>

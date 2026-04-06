@@ -30,6 +30,12 @@ export default async function AdminLayout({
         >
           Orders
         </Link>
+        <Link
+          href="/admin/settings"
+          className="text-sm text-muted-foreground hover:underline"
+        >
+          Settings
+        </Link>
       </nav>
       {children}
     </div>
