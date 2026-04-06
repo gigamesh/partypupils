@@ -33,11 +33,11 @@ export default async function AdminReleasesPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
-            <TableHead />
-            <TableHead>Type</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Tracks</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="text-right" />
+            <TableHead className="text-right">Type</TableHead>
+            <TableHead className="text-right">Price</TableHead>
+            <TableHead className="text-right">Tracks</TableHead>
+            <TableHead className="text-right">Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -48,7 +48,7 @@ export default async function AdminReleasesPage() {
                   {release.name}
                 </a>
               </TableCell>
-              <TableCell>
+              <TableCell className="text-right">
                 <Link
                   href={`/admin/releases/${release.id}/edit`}
                   className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
@@ -56,10 +56,10 @@ export default async function AdminReleasesPage() {
                   Edit
                 </Link>
               </TableCell>
-              <TableCell>{release.type}</TableCell>
-              <TableCell>{formatCurrency(release.price)}</TableCell>
-              <TableCell>{release._count.tracks}</TableCell>
-              <TableCell>
+              <TableCell className="text-right">{release.type}</TableCell>
+              <TableCell className="text-right">{formatCurrency(release.price)}</TableCell>
+              <TableCell className="text-right">{release._count.tracks}</TableCell>
+              <TableCell className="text-right">
                 <Badge variant={release.isPublished ? "default" : "secondary"}>
                   {release.isPublished ? "Published" : "Draft"}
                 </Badge>

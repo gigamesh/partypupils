@@ -1,17 +1,22 @@
+import { AudioProvider } from "@/components/AudioProvider";
+import { CartProvider } from "@/components/CartProvider";
+import { Navigation } from "@/components/Navigation";
+
+import { SocialLinks } from "@/components/SocialLinks";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import type { Metadata } from "next";
-import { Space_Mono } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import Image from "next/image";
 import "./globals.css";
-import { Navigation } from "@/components/Navigation";
-import { CartProvider } from "@/components/CartProvider";
-import { AudioProvider } from "@/components/AudioProvider";
-import { SocialLinks } from "@/components/SocialLinks";
-import { SITE_NAME, SITE_DESCRIPTION } from "@/lib/constants";
 
-const spaceMono = Space_Mono({
-  weight: ["400", "700"],
+const outfit = Outfit({
   subsets: ["latin"],
-  variable: "--font-space-mono",
+  variable: "--font-heading-var",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-body-var",
 });
 
 export const metadata: Metadata = {
@@ -28,28 +33,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${spaceMono.variable} h-full antialiased dark`}>
+    <html
+      lang="en"
+      className={`${outfit.variable} ${inter.variable} h-full antialiased dark`}
+    >
       <body className="min-h-full flex flex-col">
-        <div className="bg-animate" aria-hidden="true">
+        <div className="bg-static" aria-hidden="true">
           <Image
-            src="/images/data.jpeg"
+            src="/images/ocean-bg.jpg"
             alt=""
-            width={3840}
-            height={1080}
-            className="opacity-40"
+            fill
+            className="object-cover opacity-40"
             priority
+            sizes="100vw"
           />
         </div>
         <CartProvider>
-        <AudioProvider>
-          <Navigation />
-          <main className="flex-1">{children}</main>
-          <footer className="border-t border-border py-8 bg-gradient-to-b from-transparent to-black">
-            <div className="mx-auto max-w-5xl px-4 flex flex-col items-center">
-              <SocialLinks iconSize={24} className="neon-glow" />
-            </div>
-          </footer>
-        </AudioProvider>
+          <AudioProvider>
+            <Navigation />
+            <main className="flex-1 bg-darkened">{children}</main>
+            <footer className="border-t border-white/10 py-8">
+              <div className="mx-auto max-w-5xl px-4 flex flex-col items-center">
+                <SocialLinks iconSize={24} className="neon-glow" />
+              </div>
+            </footer>
+          </AudioProvider>
         </CartProvider>
       </body>
     </html>

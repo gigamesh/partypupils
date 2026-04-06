@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import Image from "next/image";
+import { useState, useEffect } from "react";
 import { CartButton } from "./CartButton";
 import { MERCH_URL } from "@/lib/constants";
 
@@ -31,13 +32,27 @@ function NavLink({ item, onClick }: { item: (typeof NAV_ITEMS)[number]; onClick?
 
 export function Navigation() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-border bg-black/80 backdrop-blur-sm">
+      <header className={`sticky top-0 z-50 transition-colors duration-300 ${scrolled ? "bg-background/50 backdrop-blur-md border-b border-white/10" : "bg-transparent border-b border-transparent"}`}>
         <nav className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link href="/" className="text-lg font-bold tracking-tight text-neon">
-            Party Pupils
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/images/pp-logo.svg"
+              alt="Party Pupils"
+              width={120}
+              height={50}
+              className="h-8 w-auto"
+            />
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
@@ -62,13 +77,13 @@ export function Navigation() {
       </header>
 
       <div
-        className={`fixed inset-0 z-50 bg-black/60 transition-opacity duration-300 md:hidden ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-50 bg-background/60 transition-opacity duration-300 md:hidden ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-64 bg-black border-l border-border transition-transform duration-300 ease-in-out md:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed top-0 right-0 z-50 h-full w-64 bg-background border-l border-white/10 transition-transform duration-300 ease-in-out md:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
       >
         <div className="flex justify-end p-4">
           <button

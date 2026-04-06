@@ -26,10 +26,10 @@ export default async function AdminOrdersPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Date</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Items</TableHead>
-            <TableHead>Total</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Email</TableHead>
+            <TableHead className="text-right">Items</TableHead>
+            <TableHead className="text-right">Total</TableHead>
+            <TableHead className="text-right">Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -38,14 +38,14 @@ export default async function AdminOrdersPage() {
               <TableCell className="text-sm">
                 {order.createdAt.toLocaleDateString()}
               </TableCell>
-              <TableCell className="text-sm">{order.email}</TableCell>
-              <TableCell className="text-sm">
+              <TableCell className="text-sm text-right">{order.email}</TableCell>
+              <TableCell className="text-sm text-right">
                 {order.items.map((i) => i.release?.name || i.track?.name || "—").join(", ")}
               </TableCell>
-              <TableCell className="text-sm">
+              <TableCell className="text-sm text-right">
                 {formatCurrency(order.amountTotal)}
               </TableCell>
-              <TableCell>
+              <TableCell className="text-right">
                 <Badge
                   variant={order.status === "completed" ? "default" : "secondary"}
                 >

@@ -1,9 +1,11 @@
-import Link from "next/link";
-import Image from "next/image";
+import { HashScroll } from "@/components/HashScroll";
 import { ReleaseCard } from "@/components/ReleaseCard";
+import { ScrollOverlay } from "@/components/ScrollOverlay";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
+import Image from "next/image";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -15,28 +17,39 @@ export default async function HomePage() {
   });
 
   return (
-    <div>
-      <section className="flex min-h-[85vh] flex-col items-center justify-center gap-6 px-4 py-24 text-center">
-        <h1 className="flex flex-col items-center justify-center md:flex-row">
-          <div className="neon-glow font-heading text-4xl sm:text-5xl uppercase italic order-2 mt-4 md:hidden">
-            Party Pupils
+    <div className="bg-darkened-off">
+      <HashScroll />
+      <ScrollOverlay />
+      <section className="relative min-h-[85vh] flex items-center justify-center px-4 py-24">
+        <div className="relative w-full max-w-5xl min-h-[75vh] flex items-center justify-center border border-white/50 overflow-hidden">
+          <div className="relative z-10 flex w-full max-w-5xl items-center justify-center">
+            <div className="flex-1 flex justify-center md:-translate-x-[15%]">
+              <Image
+                src="/images/pp-logo.svg"
+                alt="Party Pupils"
+                width={500}
+                height={210}
+                className="w-full max-w-[280px] md:max-w-[420px] h-auto"
+                priority
+              />
+            </div>
           </div>
-          <span className="neon-glow font-heading text-6xl uppercase italic hidden md:block md:w-[5em] md:text-right md:-mr-[1em] md:z-0 md:relative">
-            Party
-          </span>
-          <Image
-            src="/images/partyman.png"
-            alt="Party Pupils Logo"
-            width={400}
-            height={480}
-            className="w-full max-w-75 h-auto order-1 md:order-0 md:max-w-120 md:z-10"
-            priority
-          />
-          <span className="neon-glow font-heading text-6xl uppercase italic hidden md:block md:w-[5em] md:text-left md:-ml-[1em] md:z-0 md:relative">
-            Pupils
-          </span>
-        </h1>
-        <SocialLinks className="neon-glow mt-2" />
+
+          <div className="hidden md:block absolute right-0 bottom-0 z-10">
+            <Image
+              src="/images/side-profile.png"
+              alt="Party Pupils"
+              width={600}
+              height={720}
+              className="h-[65vh] w-auto object-contain"
+              priority
+            />
+          </div>
+
+          <div className="absolute bottom-6 left-6 z-10">
+            <SocialLinks />
+          </div>
+        </div>
       </section>
 
       {featuredReleases.length > 0 && (
@@ -68,7 +81,7 @@ export default async function HomePage() {
 
       <section
         id="tour"
-        className="mx-auto max-w-5xl px-4 py-16 bg-linear-to-b from-transparent via-black/85 to-transparent"
+        className="mx-auto max-w-5xl px-4 py-16 scroll-mt-20"
       >
         <h2 className="neon-glow text-center uppercase">Tour Dates</h2>
         <SeatedTourWidget />
