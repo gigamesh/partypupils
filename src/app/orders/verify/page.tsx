@@ -4,6 +4,7 @@ import { verifyOrderVerificationToken } from "@/lib/order-auth";
 import { formatCurrency, cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { DownloadButtons } from "@/components/DownloadButtons";
+import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { DOWNLOAD_TOKEN_EXPIRY_MS, DOWNLOAD_TOKEN_EXPIRY_HOURS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
 
 interface Props {
@@ -102,8 +103,15 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
               if (item.release && order.downloadToken) {
                 return (
                   <div key={item.id} className="space-y-2">
-                    <p className="font-medium">{item.release.name}</p>
-                    <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{item.release.name}</p>
+                        <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                      </div>
+                      {item.release.tracks.length >= 2 && (
+                        <DownloadZipButtons token={order.downloadToken!} releaseId={item.release.id} />
+                      )}
+                    </div>
                     {item.release.tracks.map((track) => (
                       <div
                         key={track.id}
