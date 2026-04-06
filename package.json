@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "db:push:prod": "dotenv -e .env.prod -- prisma db push"
+    "db:push:prod": "dotenv -e .env.prod -- prisma db push",
+    "db:reset": "prisma db push --force-reset"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

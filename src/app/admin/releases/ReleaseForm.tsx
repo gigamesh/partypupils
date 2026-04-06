@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +13,20 @@ interface TrackInput {
   name: string;
   priceStr: string;
   trackNumber: number;
-  mp3File: File | null;
   wavFile: File | null;
+  existingWavName?: string;
+  existingWavStorageKey?: string;
+  existingWavFileSize?: number;
+  existingPreviewUrl?: string | null;
+}
+
+interface ExistingTrack {
+  id: number;
+  name: string;
+  price: number;
+  trackNumber: number;
+  previewUrl: string | null;
+  files: { format: string; fileName: string; storageKey: string; fileSize: number | null }[];
 }
 
 interface ReleaseFormProps {
@@ -26,12 +39,15 @@ interface ReleaseFormProps {
     type: string;
     coverImageUrl: string | null;
     isPublished: boolean;
+    tracks?: ExistingTrack[];
   };
 }
 
 export function ReleaseForm({ release }: ReleaseFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState("");
   const [name, setName] = useState(release?.name || "");
   const [slug, setSlug] = useState(release?.slug || "");
@@ -42,14 +58,35 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
   const [type, setType] = useState(release?.type || "single");
   const [isPublished, setIsPublished] = useState(release?.isPublished || false);
   const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [tracks, setTracks] = useState<TrackInput[]>([
-    { name: "", priceStr: "1.99", trackNumber: 1, mp3File: null, wavFile: null },
-  ]);
+  const [coverPreviewSrc, setCoverPreviewSrc] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const [tracks, setTracks] = useState<TrackInput[]>(() => {
+    if (release?.tracks && release.tracks.length > 0) {
+      return release.tracks.map((t) => {
+        const wav = t.files.find((f) => f.format === "wav");
+        return {
+          name: t.name,
+          priceStr: (t.price / 100).toFixed(2),
+          trackNumber: t.trackNumber,
+          wavFile: null,
+          existingWavName: wav?.fileName,
+          existingWavStorageKey: wav?.storageKey,
+          existingWavFileSize: wav?.fileSize ?? undefined,
+          existingPreviewUrl: t.previewUrl,
+        };
+      });
+    }
+    return [{ name: "", priceStr: "1.99", trackNumber: 1, wavFile: null }];
+  });
 
   function addTrack() {
     setTracks((prev) => [
       ...prev,
-      { name: "", priceStr: "1.99", trackNumber: prev.length + 1, mp3File: null, wavFile: null },
+      { name: "", priceStr: "1.99", trackNumber: prev.length + 1, wavFile: null },
     ]);
   }
 
@@ -59,6 +96,18 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
 
   function updateTrack(index: number, field: keyof TrackInput, value: string | File | null) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  }
+
+  async function uploadWav(file: File, prefix: string): Promise<{ url: string; previewUrl?: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("prefix", prefix);
+    formData.append("autoPreview", "true");
+    const res = await fetch("/api/admin/upload", {
+      method: "POST",
+      body: formData,
+    });
+    return res.json();
   }
 
   async function uploadFile(file: File, prefix: string): Promise<string> {
@@ -77,6 +126,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setStatus("");
 
     try {
       const price = Math.round(parseFloat(priceStr) * 100);
@@ -86,33 +136,60 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         return;
       }
 
+      const tracksWithFiles = tracks.filter((t) => t.wavFile);
+      const totalSteps = (coverImage ? 1 : 0) + tracksWithFiles.length + 1;
+      let currentStep = 0;
+      setProgress({ current: 0, total: totalSteps });
+
       let coverImageUrl = release?.coverImageUrl || null;
       if (coverImage) {
+        currentStep++;
+        setProgress({ current: currentStep, total: totalSteps });
+        setStatus("Uploading cover image...");
         coverImageUrl = await uploadFile(coverImage, "images/covers");
       }
 
-      const trackData = await Promise.all(
-        tracks.map(async (track) => {
-          const trackPrice = Math.round(parseFloat(track.priceStr) * 100);
-          const files: { format: string; fileName: string; storageKey: string; fileSize: number }[] = [];
+      const trackData = [];
+      for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
+        const trackPrice = Math.round(parseFloat(track.priceStr) * 100);
+        const files: { format: string; fileName: string; storageKey: string; fileSize: number }[] = [];
+        let previewUrl: string | undefined;
 
-          if (track.mp3File) {
-            const url = await uploadFile(track.mp3File, `audio/${slug}/${track.trackNumber}/mp3`);
-            files.push({ format: "mp3", fileName: track.mp3File.name, storageKey: url, fileSize: track.mp3File.size });
-          }
-          if (track.wavFile) {
-            const url = await uploadFile(track.wavFile, `audio/${slug}/${track.trackNumber}/wav`);
-            files.push({ format: "wav", fileName: track.wavFile.name, storageKey: url, fileSize: track.wavFile.size });
-          }
+        if (track.wavFile) {
+          currentStep++;
+          setProgress({ current: currentStep, total: totalSteps });
+          setStatus(`Uploading & generating preview for "${track.name || track.wavFile.name}"...`);
+          const result = await uploadWav(track.wavFile, `audio/${slug}/${track.trackNumber}`);
+          files.push({
+            format: "wav",
+            fileName: track.wavFile.name,
+            storageKey: result.url,
+            fileSize: track.wavFile.size,
+          });
+          previewUrl = result.previewUrl;
+        } else if (track.existingWavStorageKey) {
+          files.push({
+            format: "wav",
+            fileName: track.existingWavName || "track.wav",
+            storageKey: track.existingWavStorageKey,
+            fileSize: track.existingWavFileSize || 0,
+          });
+          previewUrl = track.existingPreviewUrl ?? undefined;
+        }
 
-          return {
-            name: track.name,
-            price: trackPrice,
-            trackNumber: track.trackNumber,
-            files,
-          };
-        })
-      );
+        trackData.push({
+          name: track.name,
+          price: trackPrice,
+          trackNumber: track.trackNumber,
+          previewUrl,
+          files,
+        });
+      }
+
+      currentStep++;
+      setProgress({ current: currentStep, total: totalSteps });
+      setStatus("Saving release...");
 
       const body = {
         name,
@@ -139,6 +216,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         const data = await res.json();
         setError(data.error || "Something went wrong");
         setLoading(false);
+        setStatus("");
         return;
       }
 
@@ -147,6 +225,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     } catch {
       setError("Something went wrong");
       setLoading(false);
+      setStatus("");
     }
   }
 
@@ -196,7 +275,30 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
 
       <div className="space-y-2">
         <Label htmlFor="cover">Cover Image</Label>
-        <Input id="cover" type="file" accept="image/*" onChange={(e) => setCoverImage(e.target.files?.[0] || null)} />
+        {mounted && (coverPreviewSrc || release?.coverImageUrl) && (
+          <div className="relative w-32 h-32 rounded-lg overflow-hidden bg-muted">
+            <Image
+              src={coverPreviewSrc || release?.coverImageUrl || ""}
+              alt="Cover preview"
+              fill
+              className="object-cover"
+            />
+          </div>
+        )}
+        <Input
+          id="cover"
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0] || null;
+            setCoverImage(file);
+            if (file) {
+              setCoverPreviewSrc(URL.createObjectURL(file));
+            } else {
+              setCoverPreviewSrc(null);
+            }
+          }}
+        />
       </div>
 
       <div className="space-y-4">
@@ -227,15 +329,30 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} required />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>MP3</Label>
-                <Input type="file" accept=".mp3" onChange={(e) => updateTrack(index, "mp3File", e.target.files?.[0] || null)} />
-              </div>
-              <div className="space-y-1">
-                <Label>WAV</Label>
-                <Input type="file" accept=".wav" onChange={(e) => updateTrack(index, "wavFile", e.target.files?.[0] || null)} />
-              </div>
+            <div className="space-y-1">
+              <Label>WAV File {!track.existingWavName && "(required)"}</Label>
+              <Input
+                type="file"
+                accept=".wav"
+                onChange={(e) => updateTrack(index, "wavFile", e.target.files?.[0] || null)}
+                required={!release && !track.existingWavName}
+              />
+              {track.existingWavName && !track.wavFile && (
+                <p className="text-xs text-muted-foreground">
+                  Current: {track.existingWavName}
+                  {track.existingPreviewUrl && " (preview generated)"}
+                </p>
+              )}
+              {!track.existingWavName && (
+                <p className="text-xs text-muted-foreground">
+                  A preview MP3 will be auto-generated from the WAV.
+                </p>
+              )}
+              {track.wavFile && (
+                <p className="text-xs text-muted-foreground">
+                  New file selected — preview will be regenerated.
+                </p>
+              )}
             </div>
           </div>
         ))}
@@ -246,6 +363,26 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         <Label htmlFor="published">Published</Label>
       </div>
 
+      {loading && status && (
+        <div className="space-y-2 rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{status}</span>
+            {progress.total > 0 && (
+              <span className="text-muted-foreground">
+                {progress.current}/{progress.total}
+              </span>
+            )}
+          </div>
+          {progress.total > 0 && (
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-neon rounded-full transition-all duration-300"
+                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex gap-3">

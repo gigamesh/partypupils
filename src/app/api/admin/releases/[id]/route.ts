@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
 
+interface TrackInput {
+  name: string;
+  price: number;
+  trackNumber: number;
+  previewUrl?: string | null;
+  files: { format: string; fileName: string; storageKey: string; fileSize: number }[];
+}
+
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
@@ -12,11 +20,15 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const releaseId = parseInt(id);
   const body = await req.json();
   const { name, slug, description, price, type, coverImageUrl, isPublished, tracks } = body;
 
+  // Delete existing tracks (cascade deletes their files too)
+  await prisma.track.deleteMany({ where: { releaseId } });
+
   const release = await prisma.release.update({
-    where: { id: parseInt(id) },
+    where: { id: releaseId },
     data: {
       name,
       slug,
@@ -28,11 +40,12 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       ...(tracks && tracks.length > 0
         ? {
             tracks: {
-              create: tracks.map((t: { name: string; price: number; trackNumber: number; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
+              create: (tracks as TrackInput[]).map((t) => ({
                 name: t.name,
                 price: t.price,
                 trackNumber: t.trackNumber,
-                files: { create: t.files },
+                previewUrl: t.previewUrl || null,
+                files: t.files.length > 0 ? { create: t.files } : undefined,
               })),
             },
           }

@@ -43,7 +43,11 @@ export default async function AdminReleasesPage() {
         <TableBody>
           {releases.map((release) => (
             <TableRow key={release.id}>
-              <TableCell className="font-medium">{release.name}</TableCell>
+              <TableCell className="font-medium">
+                <a href={`/music/${release.slug}`} className="hover:underline">
+                  {release.name}
+                </a>
+              </TableCell>
               <TableCell>{release.type}</TableCell>
               <TableCell>{formatCurrency(release.price)}</TableCell>
               <TableCell>{release._count.tracks}</TableCell>

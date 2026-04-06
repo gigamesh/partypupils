@@ -10,6 +10,12 @@ export default async function EditReleasePage({ params }: Props) {
   const { id } = await params;
   const release = await prisma.release.findUnique({
     where: { id: parseInt(id) },
+    include: {
+      tracks: {
+        orderBy: { trackNumber: "asc" },
+        include: { files: true },
+      },
+    },
   });
 
   if (!release) notFound();

@@ -43,6 +43,7 @@ model Track {
   name        String
   price       Int // cents — price for individual track purchase
   trackNumber Int
+  previewUrl  String?
   createdAt   DateTime @default(now())
 
   release    Release     @relation(fields: [releaseId], references: [id], onDelete: Cascade)

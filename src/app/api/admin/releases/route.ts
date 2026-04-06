@@ -25,10 +25,11 @@ export async function POST(req: NextRequest) {
       coverImageUrl,
       isPublished,
       tracks: {
-        create: (tracks || []).map((t: { name: string; price: number; trackNumber: number; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
+        create: (tracks || []).map((t: { name: string; price: number; trackNumber: number; previewUrl?: string; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
           name: t.name,
           price: t.price,
           trackNumber: t.trackNumber,
+          previewUrl: t.previewUrl || null,
           files: { create: t.files },
         })),
       },

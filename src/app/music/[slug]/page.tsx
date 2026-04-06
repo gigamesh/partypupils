@@ -3,6 +3,7 @@ import Image from "next/image";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { PlayButton } from "@/components/PlayButton";
 import { Badge } from "@/components/ui/badge";
 
 interface Props {
@@ -98,6 +99,7 @@ export default async function ReleasePage({ params }: Props) {
                     className="flex items-center justify-between rounded-lg border border-border p-3"
                   >
                     <div className="flex items-center gap-3">
+                      <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
                       <span className="text-sm text-muted-foreground w-6 text-right">
                         {track.trackNumber}
                       </span>

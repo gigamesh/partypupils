@@ -4,6 +4,7 @@ import Image from "next/image";
 import "./globals.css";
 import { Navigation } from "@/components/Navigation";
 import { CartProvider } from "@/components/CartProvider";
+import { AudioProvider } from "@/components/AudioProvider";
 import { SocialLinks } from "@/components/SocialLinks";
 import { SITE_NAME, SITE_DESCRIPTION } from "@/lib/constants";
 
@@ -40,6 +41,7 @@ export default function RootLayout({
           />
         </div>
         <CartProvider>
+        <AudioProvider>
           <Navigation />
           <main className="flex-1">{children}</main>
           <footer className="border-t border-border py-8 bg-gradient-to-b from-transparent to-black">
@@ -47,6 +49,7 @@ export default function RootLayout({
               <SocialLinks iconSize={24} className="neon-glow" />
             </div>
           </footer>
+        </AudioProvider>
         </CartProvider>
       </body>
     </html>
