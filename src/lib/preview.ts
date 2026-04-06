@@ -4,10 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
 
-const PREVIEW_DURATION = 100;
-const FADE_DURATION = 10;
-const FADE_START = PREVIEW_DURATION - FADE_DURATION;
-const BITRATE = "320k";
+const BITRATE = "128k";
 
 export async function generatePreview(wavBuffer: Buffer): Promise<Buffer> {
   const id = randomUUID();
@@ -19,8 +16,6 @@ export async function generatePreview(wavBuffer: Buffer): Promise<Buffer> {
   await new Promise<void>((resolve, reject) => {
     execFile("ffmpeg", [
       "-i", inputPath,
-      "-t", String(PREVIEW_DURATION),
-      "-af", `afade=t=out:st=${FADE_START}:d=${FADE_DURATION}:curve=esin`,
       "-b:a", BITRATE,
       "-y",
       outputPath,
@@ -32,7 +27,6 @@ export async function generatePreview(wavBuffer: Buffer): Promise<Buffer> {
 
   const previewBuffer = await readFile(outputPath);
 
-  // Clean up temp files
   await Promise.all([unlink(inputPath), unlink(outputPath)]).catch(() => {});
 
   return previewBuffer;
