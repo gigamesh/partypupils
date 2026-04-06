@@ -52,6 +52,7 @@ export function Navigation() {
               width={120}
               height={50}
               className="h-8 w-auto"
+              unoptimized
             />
           </Link>
 

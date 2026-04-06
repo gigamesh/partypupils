@@ -31,6 +31,7 @@ export default async function HomePage() {
                 height={210}
                 className="w-full max-w-[280px] md:max-w-[420px] h-auto"
                 priority
+                unoptimized
               />
             </div>
           </div>
@@ -43,6 +44,7 @@ export default async function HomePage() {
               height={720}
               className="h-[65vh] w-auto object-contain"
               priority
+              unoptimized
             />
           </div>
 

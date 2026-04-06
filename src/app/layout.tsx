@@ -46,6 +46,7 @@ export default function RootLayout({
             className="object-cover opacity-40"
             priority
             sizes="100vw"
+            unoptimized
           />
         </div>
         <CartProvider>
