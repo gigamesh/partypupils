@@ -33,11 +33,11 @@ export default async function AdminReleasesPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            <TableHead />
             <TableHead>Type</TableHead>
             <TableHead>Price</TableHead>
             <TableHead>Tracks</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -48,14 +48,6 @@ export default async function AdminReleasesPage() {
                   {release.name}
                 </a>
               </TableCell>
-              <TableCell>{release.type}</TableCell>
-              <TableCell>{formatCurrency(release.price)}</TableCell>
-              <TableCell>{release._count.tracks}</TableCell>
-              <TableCell>
-                <Badge variant={release.isPublished ? "default" : "secondary"}>
-                  {release.isPublished ? "Published" : "Draft"}
-                </Badge>
-              </TableCell>
               <TableCell>
                 <Link
                   href={`/admin/releases/${release.id}/edit`}
@@ -63,6 +55,14 @@ export default async function AdminReleasesPage() {
                 >
                   Edit
                 </Link>
+              </TableCell>
+              <TableCell>{release.type}</TableCell>
+              <TableCell>{formatCurrency(release.price)}</TableCell>
+              <TableCell>{release._count.tracks}</TableCell>
+              <TableCell>
+                <Badge variant={release.isPublished ? "default" : "secondary"}>
+                  {release.isPublished ? "Published" : "Draft"}
+                </Badge>
               </TableCell>
             </TableRow>
           ))}

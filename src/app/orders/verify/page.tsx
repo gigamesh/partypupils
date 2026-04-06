@@ -5,6 +5,8 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { DownloadButtons } from "@/components/DownloadButtons";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
+import { PlayButton } from "@/components/PlayButton";
+import { TrackProgress } from "@/components/TrackProgress";
 import { DOWNLOAD_TOKEN_EXPIRY_MS, DOWNLOAD_TOKEN_EXPIRY_HOURS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
 
 interface Props {
@@ -115,10 +117,16 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
                     {item.release.tracks.map((track) => (
                       <div
                         key={track.id}
-                        className="flex items-center justify-between border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
+                        className="border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
                       >
-                        <span className="text-sm">{track.trackNumber}. {track.name}</span>
-                        <DownloadButtons token={order.downloadToken!} trackId={track.id} />
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm">
+                            <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
+                            {track.trackNumber}. {track.name}
+                          </span>
+                          <DownloadButtons token={order.downloadToken!} trackId={track.id} />
+                        </div>
+                        <TrackProgress trackId={track.id} />
                       </div>
                     ))}
                   </div>
@@ -128,15 +136,21 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0"
+                    className="border-b border-border pb-3 last:border-0 last:pb-0"
                   >
-                    <div>
-                      <p className="font-medium">{item.track.name}</p>
-                      <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <PlayButton trackId={item.track.id} previewUrl={item.track.previewUrl} />
+                        <div>
+                          <p className="font-medium">{item.track.name}</p>
+                          <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                        </div>
+                      </div>
+                      {order.downloadToken && (
+                        <DownloadButtons token={order.downloadToken} trackId={item.track.id} />
+                      )}
                     </div>
-                    {order.downloadToken && (
-                      <DownloadButtons token={order.downloadToken} trackId={item.track.id} />
-                    )}
+                    <TrackProgress trackId={item.track.id} />
                   </div>
                 );
               }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { PlayButton } from "@/components/PlayButton";
+import { TrackProgress } from "@/components/TrackProgress";
 import { Badge } from "@/components/ui/badge";
 
 interface Props {
@@ -79,46 +80,53 @@ export default async function ReleasePage({ params }: Props) {
             </div>
           )}
 
-          <AddToCartButton
-            item={{
-              releaseId: release.id,
-              name: release.name,
-              slug: release.slug,
-              price: release.price,
-              coverImageUrl: release.coverImageUrl,
-            }}
-          />
-
           {release.tracks.length > 1 && (
+            <AddToCartButton
+              item={{
+                releaseId: release.id,
+                name: release.name,
+                slug: release.slug,
+                price: release.price,
+                coverImageUrl: release.coverImageUrl,
+              }}
+            />
+          )}
+
+          {release.tracks.length >= 1 && (
             <div className="mt-4">
               <h2 className="text-lg font-semibold mb-3">Tracklist</h2>
               <div className="space-y-2">
                 {release.tracks.map((track) => (
                   <div
                     key={track.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-3"
+                    className="rounded-lg border border-border p-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
-                      <span className="text-sm text-muted-foreground w-6 text-right">
-                        {track.trackNumber}
-                      </span>
-                      <span className="text-sm font-medium">{track.name}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground w-6 text-right">
+                          {track.trackNumber}
+                        </span>
+                        <span className="text-sm font-medium">{track.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-neon">
+                          {formatCurrency(track.price)}
+                        </span>
+                        <AddToCartButton
+                          item={{
+                            trackId: track.id,
+                            name: track.name,
+                            slug: release.slug,
+                            price: track.price,
+                            coverImageUrl: release.coverImageUrl,
+                            releaseName: release.name,
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-neon">
-                        {formatCurrency(track.price)}
-                      </span>
-                      <AddToCartButton
-                        item={{
-                          trackId: track.id,
-                          name: track.name,
-                          slug: release.slug,
-                          price: track.price,
-                          coverImageUrl: release.coverImageUrl,
-                          releaseName: release.name,
-                        }}
-                      />
+                    <div className="flex items-center gap-2 pt-2">
+                      <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
+                      <TrackProgress trackId={track.id} alwaysShow />
                     </div>
                   </div>
                 ))}

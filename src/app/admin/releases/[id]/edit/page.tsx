@@ -22,7 +22,10 @@ export default async function EditReleasePage({ params }: Props) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Edit: {release.name}</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-2xl font-bold">Edit: {release.name}</h1>
+        <a href={`/music/${release.slug}`} className="neon-link text-sm">View public page →</a>
+      </div>
       <ReleaseForm release={release} />
     </div>
   );

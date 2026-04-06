@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { slugify } from "@/lib/utils";
+import { PlayButton } from "@/components/PlayButton";
+import { TrackProgress } from "@/components/TrackProgress";
 
 interface TrackInput {
+  existingId?: number;
   name: string;
   priceStr: string;
   trackNumber: number;
@@ -59,16 +62,12 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
   const [isPublished, setIsPublished] = useState(release?.isPublished || false);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverPreviewSrc, setCoverPreviewSrc] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
   const [tracks, setTracks] = useState<TrackInput[]>(() => {
     if (release?.tracks && release.tracks.length > 0) {
       return release.tracks.map((t) => {
         const wav = t.files.find((f) => f.format === "wav");
         return {
+          existingId: t.id,
           name: t.name,
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
@@ -275,7 +274,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
 
       <div className="space-y-2">
         <Label htmlFor="cover">Cover Image</Label>
-        {mounted && (coverPreviewSrc || release?.coverImageUrl) && (
+        {(coverPreviewSrc || release?.coverImageUrl) && (
           <div className="relative w-32 h-32 rounded-lg overflow-hidden bg-muted">
             <Image
               src={coverPreviewSrc || release?.coverImageUrl || ""}
@@ -319,6 +318,12 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 </Button>
               )}
             </div>
+            {track.existingId && track.existingPreviewUrl && (
+              <div className="flex items-center gap-2 pt-1">
+                <PlayButton trackId={track.existingId} previewUrl={track.existingPreviewUrl} />
+                <TrackProgress trackId={track.existingId} alwaysShow />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Name</Label>

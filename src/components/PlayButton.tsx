@@ -16,7 +16,8 @@ export function PlayButton({ trackId, previewUrl }: PlayButtonProps) {
 
   return (
     <button
-      onClick={() => toggle(trackId, previewUrl)}
+      type="button"
+      onClick={(e) => { e.stopPropagation(); toggle(trackId, previewUrl); }}
       aria-label={isThisPlaying ? "Pause" : "Play"}
       className="neon-link shrink-0 p-1"
     >
