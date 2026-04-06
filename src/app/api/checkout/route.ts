@@ -59,16 +59,21 @@ export async function POST(req: NextRequest) {
 
   const baseUrl = getBaseUrl();
 
-  const session = await stripe().checkout.sessions.create({
-    mode: "payment",
-    line_items: lineItems,
-    metadata: {
-      release_ids: JSON.stringify(releases.map((r) => r.id)),
-      track_ids: JSON.stringify(tracks.map((t) => t.id)),
-    },
-    success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/cart`,
-  });
+  try {
+    const session = await stripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: lineItems,
+      metadata: {
+        release_ids: JSON.stringify(releases.map((r) => r.id)),
+        track_ids: JSON.stringify(tracks.map((t) => t.id)),
+      },
+      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/cart`,
+    });
 
-  return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    console.error("Stripe checkout error:", err);
+    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
+  }
 }

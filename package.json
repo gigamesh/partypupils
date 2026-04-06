@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx scripts/guard-local-db.ts && prisma db push && prisma db seed && next dev",
+    "dev": "concurrently -n db,stripe,next -c blue,magenta,green \"prisma dev\" \"./scripts/stripe-listen.sh\" \"sleep 3 && tsx scripts/guard-local-db.ts && prisma db push && prisma db seed && next dev\"",
     "dev:prod": "dotenv -e .env.prod -- next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "db:dev": "prisma dev",
     "db:push:prod": "dotenv -e .env.prod -- prisma db push"
   },
   "prisma": {
@@ -44,6 +43,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "concurrently": "^9.2.1",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
