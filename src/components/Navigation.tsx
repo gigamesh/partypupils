@@ -45,7 +45,7 @@ export function Navigation() {
     <>
       <header className={`sticky top-0 z-50 transition-colors duration-300 ${scrolled ? "bg-background/50 backdrop-blur-md border-b border-white/10" : "bg-transparent border-b border-transparent"}`}>
         <nav className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="neon-link flex items-center">
             <Image
               src="/images/pp-logo.svg"
               alt="Party Pupils"

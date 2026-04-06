@@ -94,7 +94,7 @@ export default function CartPage() {
               </div>
               <Button
                 variant="ghost"
-                size="sm"
+                size="lg"
                 onClick={() => removeItem(item)}
               >
                 Remove
