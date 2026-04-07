@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { verifyAdminSession } from "@/lib/admin-auth";
+import { uploadFile, uploadBuffer } from "@/lib/storage";
 import { generatePreview } from "@/lib/preview";
 
 export async function POST(req: NextRequest) {
@@ -17,11 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  const blob = await put(`${prefix}/${file.name}`, file, {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  const { url } = await uploadFile(file, `${prefix}/${file.name}`);
 
   let previewUrl: string | undefined;
 
@@ -30,17 +26,16 @@ export async function POST(req: NextRequest) {
       const wavBuffer = Buffer.from(await file.arrayBuffer());
       const previewBuffer = await generatePreview(wavBuffer);
       const previewName = file.name.replace(/\.wav$/i, "-preview.mp3");
-      const previewBlob = await put(`${prefix}/previews/${previewName}`, previewBuffer, {
-        access: "public",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-      });
-      previewUrl = previewBlob.url;
+      const result = await uploadBuffer(
+        previewBuffer,
+        `${prefix}/previews/${previewName}`,
+        "audio/mpeg"
+      );
+      previewUrl = result.url;
     } catch (err) {
       console.error("Preview generation failed:", err);
-      // Continue without preview — WAV upload still succeeds
     }
   }
 
-  return NextResponse.json({ url: blob.url, previewUrl });
+  return NextResponse.json({ url, previewUrl });
 }
