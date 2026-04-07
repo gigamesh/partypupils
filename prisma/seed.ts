@@ -97,6 +97,22 @@ async function main() {
     create: { key: "catalog_discount_percent", value: "15" },
   });
 
+  // Links
+  const seedLinks = [
+    { title: "New Single: Ride Like The Wind", url: "https://open.spotify.com/artist/4F61H4lx1js4wtWfb2Rfnt", position: 0 },
+    { title: "Spotify", url: "https://open.spotify.com/artist/4F61H4lx1js4wtWfb2Rfnt", position: 1 },
+    { title: "Apple Music", url: "https://music.apple.com/us/artist/party-pupils/1158467787", position: 2 },
+    { title: "SoundCloud", url: "https://soundcloud.com/partypupils", position: 3 },
+    { title: "Merch Store", url: "https://partypupils.threadless.com/designs/party-pupils", position: 4 },
+  ];
+
+  for (const link of seedLinks) {
+    const existing = await prisma.link.findFirst({ where: { title: link.title } });
+    if (!existing) {
+      await prisma.link.create({ data: link });
+    }
+  }
+
   console.log("Seed data created successfully.");
 }
 

@@ -1,4 +1,5 @@
 import { HashScroll } from "@/components/HashScroll";
+import { LinksList } from "@/components/LinksList";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { ScrollOverlay } from "@/components/ScrollOverlay";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
@@ -10,11 +11,17 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const featuredReleases = await prisma.release.findMany({
-    where: { isPublished: true },
-    orderBy: { releasedAt: "desc" },
-    take: 4,
-  });
+  const [featuredReleases, links] = await Promise.all([
+    prisma.release.findMany({
+      where: { isPublished: true },
+      orderBy: { releasedAt: "desc" },
+      take: 4,
+    }),
+    prisma.link.findMany({
+      where: { isVisible: true },
+      orderBy: { position: "asc" },
+    }),
+  ]);
 
   return (
     <div className="bg-darkened-off">
@@ -50,6 +57,10 @@ export default async function HomePage() {
 
           <div className="absolute bottom-6 left-6 z-10">
             <SocialLinks />
+          </div>
+
+          <div className="absolute top-6 left-6 z-10">
+            <LinksList links={links} />
           </div>
         </div>
       </section>
