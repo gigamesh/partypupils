@@ -42,7 +42,7 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10 text-center">
-        <h1 className="text-3xl font-bold mb-4">Your Cart</h1>
+        <h1>Your Cart</h1>
         <p className="text-muted-foreground mb-6">Your cart is empty.</p>
         <Link href="/music" className={cn(buttonVariants())}>
           Browse Music
@@ -53,7 +53,7 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-3xl font-bold mb-8">Your Cart</h1>
+      <h1>Your Cart</h1>
       <div className="space-y-4">
         {items.map((item) => {
           const key = item.catalogPurchase ? "catalog" : item.releaseId ? `release-${item.releaseId}` : `track-${item.trackId}`;

@@ -13,7 +13,7 @@ export function LinksList({ links }: LinksListProps) {
           href={link.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="neon-link text-sm uppercase tracking-wider whitespace-nowrap"
+          className="neon-link text-sm font-semibold uppercase tracking-wider whitespace-nowrap"
         >
           {link.title}
         </a>

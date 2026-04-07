@@ -10,7 +10,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <h1>Settings</h1>
       <SettingsForm
         catalogDiscount={discountSetting?.value || "15"}
       />

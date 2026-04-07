@@ -10,7 +10,7 @@ export default async function AdminLinksPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Links</h1>
+      <h1>Links</h1>
       <LinksForm initialLinks={links} />
     </div>
   );

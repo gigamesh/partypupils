@@ -21,7 +21,7 @@ export default async function MusicPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="neon-glow text-3xl mb-8 uppercase">Music</h1>
+      <h1 className="neon-glow uppercase">Music</h1>
 
       {catalog.releaseCount > 1 && <CatalogBanner catalog={catalog} />}
 

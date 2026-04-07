@@ -12,7 +12,7 @@ export default async function AdminLayout({
   if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-sm px-4 py-20">
-        <h1 className="text-2xl font-bold mb-6 text-center">Admin Login</h1>
+        <h1 className="text-center">Admin Login</h1>
         <AdminLoginForm />
       </div>
     );

@@ -27,8 +27,8 @@ export default async function HomePage() {
     <div className="bg-darkened-off">
       <HashScroll />
       <ScrollOverlay />
-      <section className="relative min-h-[85vh] flex items-center justify-center px-4 py-24">
-        <div className="relative w-full max-w-5xl min-h-[75vh] flex items-center justify-center border border-white/50 overflow-hidden">
+      <section className="relative min-h-[85vh] flex items-center justify-center px-4 pt-16 pb-32">
+        <div className="relative w-full max-w-5xl min-h-[75vh] flex items-center justify-center border border-white/50 overflow-hidden bg-background/30">
           <div className="relative z-10 flex w-full max-w-5xl items-center justify-center">
             <div className="flex-1 flex justify-center md:-translate-x-[15%]">
               <Image
@@ -92,10 +92,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      <section
-        id="tour"
-        className="mx-auto max-w-5xl px-4 py-16 scroll-mt-20"
-      >
+      <section id="tour" className="mx-auto max-w-5xl px-4 py-16 scroll-mt-20">
         <h2 className="neon-glow text-center uppercase">Tour Dates</h2>
         <SeatedTourWidget />
       </section>

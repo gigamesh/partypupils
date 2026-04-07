@@ -23,7 +23,7 @@ export default async function AdminReleasesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Releases</h1>
+        <h1>Releases</h1>
         <Link href="/admin/releases/new" className={cn(buttonVariants())}>
           New Release
         </Link>

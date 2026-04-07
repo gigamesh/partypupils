@@ -64,7 +64,7 @@ export default async function ReleasePage({ params }: Props) {
             <Badge variant="secondary" className="mb-2">
               {release.type}
             </Badge>
-            <h1 className="text-3xl font-bold">{release.name}</h1>
+            <h1>{release.name}</h1>
             <p className="mt-1 text-2xl font-semibold">
               {formatCurrency(release.price)}
             </p>
@@ -94,7 +94,7 @@ export default async function ReleasePage({ params }: Props) {
 
           {release.tracks.length >= 1 && (
             <div className="mt-4">
-              <h2 className="text-lg font-semibold mb-3">Tracklist</h2>
+              <h2>Tracklist</h2>
               <div className="space-y-2">
                 {release.tracks.map((track) => (
                   <div

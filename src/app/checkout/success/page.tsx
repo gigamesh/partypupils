@@ -42,7 +42,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
       <ClearCart />
-      <h1 className="text-3xl font-bold mb-2">Thank you for your purchase!</h1>
+      <h1>Thank you for your purchase!</h1>
       <p className="text-muted-foreground mb-8">
         Your order is confirmed. Downloads are available below. You can also
         access your downloads anytime from{" "}
@@ -53,7 +53,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
       </p>
 
       <div className="rounded-lg border border-border p-6 space-y-4">
-        <h2 className="font-semibold text-lg">Your Downloads</h2>
+        <h2>Your Downloads</h2>
         <p className="text-sm text-muted-foreground">
           Download links expire in {DOWNLOAD_TOKEN_EXPIRY_HOURS} hours (up to {DOWNLOAD_TOKEN_MAX} downloads).
         </p>

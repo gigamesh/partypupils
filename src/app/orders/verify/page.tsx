@@ -68,7 +68,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
   if (orders.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold mb-4">No Orders Found</h1>
+        <h1>No Orders Found</h1>
         <p className="text-muted-foreground">
           No completed orders found for this email.
         </p>
@@ -85,7 +85,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold mb-2">Your Orders</h1>
+      <h1>Your Orders</h1>
       <p className="text-muted-foreground mb-8">
         Showing all orders for {email}. Download links expire in {DOWNLOAD_TOKEN_EXPIRY_HOURS} hours.
       </p>
@@ -172,7 +172,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
 function InvalidLink() {
   return (
     <div className="mx-auto max-w-md px-4 py-20 text-center">
-      <h1 className="text-2xl font-bold mb-4">Invalid or Expired Link</h1>
+      <h1>Invalid or Expired Link</h1>
       <p className="text-muted-foreground mb-6">
         This link is no longer valid. Please request a new one.
       </p>

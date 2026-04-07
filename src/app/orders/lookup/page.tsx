@@ -35,7 +35,7 @@ export default function OrderLookupPage() {
   if (sent) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold mb-4">Check your inbox</h1>
+        <h1>Check your inbox</h1>
         <p className="text-muted-foreground">
           We sent a link to <span className="font-medium text-foreground">{email}</span>.
           Click it to access your orders and downloads. The link expires in 1 hour.
@@ -46,7 +46,7 @@ export default function OrderLookupPage() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-20">
-      <h1 className="text-2xl font-bold mb-2">Find Your Orders</h1>
+      <h1>Find Your Orders</h1>
       <p className="text-muted-foreground mb-6">
         Enter the email you used at checkout and we&apos;ll send you a link to access your downloads.
       </p>
