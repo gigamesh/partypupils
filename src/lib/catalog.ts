@@ -17,7 +17,7 @@ export async function getCatalogPrice() {
   ]);
 
   const originalPrice = releases.reduce((sum, r) => sum + r.price, 0);
-  const discountedPrice = Math.round(originalPrice * (1 - discountPercent / 100));
+  const discountedPrice = Math.round(originalPrice * (1 - discountPercent / 100) / 100) * 100;
 
   return {
     originalPrice,
