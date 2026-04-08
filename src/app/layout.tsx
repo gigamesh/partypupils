@@ -9,7 +9,11 @@ import { Inter, Outfit } from "next/font/google";
 import Image from "next/image";
 import "./globals.css";
 
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://partypupils.com";
+const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "https://partypupils.com";
 
 const outfit = Outfit({
   subsets: ["latin"],
