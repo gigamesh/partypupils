@@ -36,14 +36,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Invalid download link" }, { status: 404 });
     }
 
-    if (new Date() > downloadToken.expiresAt) {
-      return NextResponse.json({ error: "Download link has expired" }, { status: 410 });
-    }
-
-    if (downloadToken.downloadCount >= downloadToken.maxDownloads) {
-      return NextResponse.json({ error: "Download limit reached" }, { status: 429 });
-    }
-
     const orderHasRelease = downloadToken.order.items.some(
       (item) => item.releaseId === releaseId
     );
@@ -82,11 +74,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
         { status: 404 }
       );
     }
-
-    await prisma.downloadToken.update({
-      where: { id: downloadToken.id },
-      data: { downloadCount: { increment: 1 } },
-    });
 
     const passthrough = new PassThrough();
     const archive = archiver("zip", { zlib: { level: 0 } });

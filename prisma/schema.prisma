@@ -98,13 +98,10 @@ model OrderItem {
 }
 
 model DownloadToken {
-  id            Int      @id @default(autoincrement())
-  orderId       Int
-  token         String   @unique @default(uuid())
-  expiresAt     DateTime
-  downloadCount Int      @default(0)
-  maxDownloads  Int      @default(10)
-  createdAt     DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  token     String   @unique @default(uuid())
+  createdAt DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -124,8 +121,9 @@ model Link {
   title     String
   url       String
   position  Int      @default(0)
-  isVisible Boolean  @default(true)
-  createdAt DateTime @default(now())
+  isVisible  Boolean  @default(true)
+  showOnHero Boolean  @default(true)
+  createdAt  DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("links")

@@ -3,7 +3,8 @@ import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import Stripe from "stripe";
-import { DOWNLOAD_TOKEN_EXPIRY_MS } from "@/lib/constants";
+import { sendPurchaseConfirmationEmail } from "@/lib/email";
+import { createOrderVerificationToken } from "@/lib/order-auth";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -48,21 +49,29 @@ export async function POST(req: NextRequest) {
       ...tracks.map((t) => ({ trackId: t.id, price: t.price })),
     ];
 
+    const email = session.customer_details?.email || "";
+
     await prisma.order.create({
       data: {
         stripeSessionId: session.id,
         stripePaymentId: session.payment_intent as string | null,
-        email: session.customer_details?.email || "",
+        email,
         amountTotal: session.amount_total || 0,
         status: "completed",
         items: { create: orderItems },
-        downloadTokens: {
-          create: {
-            expiresAt: new Date(Date.now() + DOWNLOAD_TOKEN_EXPIRY_MS),
-          },
-        },
+        downloadTokens: { create: {} },
       },
     });
+
+    if (email) {
+      const itemNames = [
+        ...releases.map((r) => r.name),
+        ...tracks.map((t) => t.name),
+      ];
+      const verifyToken = await createOrderVerificationToken(email);
+      const verifyUrl = `${env.NEXT_PUBLIC_BASE_URL()}/orders/verify?token=${verifyToken}`;
+      await sendPurchaseConfirmationEmail(email, verifyUrl, itemNames);
+    }
   }
 
   return NextResponse.json({ received: true });

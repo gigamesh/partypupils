@@ -33,6 +33,40 @@ export async function sendOrderLookupEmail(email: string, verifyUrl: string) {
   });
 }
 
+/** Send a purchase confirmation email with a link to download music. */
+export async function sendPurchaseConfirmationEmail(
+  email: string,
+  verifyUrl: string,
+  itemNames: string[]
+) {
+  const itemList = itemNames
+    .map((name) => `<li style="padding: 4px 0;">${name}</li>`)
+    .join("");
+
+  await resend().emails.send({
+    from: env.EMAIL_FROM(),
+    to: email,
+    subject: `Your ${SITE_NAME} Purchase`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h1 style="font-size: 24px; margin-bottom: 16px;">${SITE_NAME}</h1>
+        <p style="font-size: 16px; color: #333; line-height: 1.5;">
+          Thank you for your purchase! Your music is ready to download.
+        </p>
+        <ul style="font-size: 15px; color: #333; line-height: 1.6; padding-left: 20px;">
+          ${itemList}
+        </ul>
+        <a href="${verifyUrl}" style="display: inline-block; margin: 24px 0; padding: 12px 24px; background-color: #000; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
+          Download My Music
+        </a>
+        <p style="font-size: 13px; color: #888; line-height: 1.5;">
+          You can always access your downloads from the <strong>My Orders</strong> page on our site.
+        </p>
+      </div>
+    `,
+  });
+}
+
 /** Forward a contact form submission to the site owner. */
 export async function sendContactEmail({
   name,

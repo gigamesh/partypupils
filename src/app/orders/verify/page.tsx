@@ -8,7 +8,6 @@ import { DownloadButtons } from "@/components/DownloadButtons";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
-import { DOWNLOAD_TOKEN_EXPIRY_MS, DOWNLOAD_TOKEN_EXPIRY_HOURS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
 
 interface Props {
   searchParams: Promise<{ token?: string }>;
@@ -19,23 +18,14 @@ export const metadata: Metadata = {
 };
 
 async function getOrCreateValidToken(orderId: number): Promise<string | null> {
-  const now = new Date();
-
   const existing = await prisma.downloadToken.findFirst({
-    where: {
-      orderId,
-      expiresAt: { gt: now },
-      downloadCount: { lt: DOWNLOAD_TOKEN_MAX },
-    },
+    where: { orderId },
   });
 
   if (existing) return existing.token;
 
   const created = await prisma.downloadToken.create({
-    data: {
-      orderId,
-      expiresAt: new Date(Date.now() + DOWNLOAD_TOKEN_EXPIRY_MS),
-    },
+    data: { orderId },
   });
 
   return created.token;
@@ -88,7 +78,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
     <div className="mx-auto max-w-2xl px-4 py-10">
       <h1>Your Orders</h1>
       <p className="text-muted-foreground mb-8">
-        Showing all orders for {email}. Download links expire in {DOWNLOAD_TOKEN_EXPIRY_HOURS} hours.
+        Showing all orders for {email}.
       </p>
 
       <div className="space-y-6">

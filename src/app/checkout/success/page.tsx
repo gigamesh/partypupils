@@ -9,7 +9,6 @@ import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import type { Metadata } from "next";
 import { ClearCart } from "./ClearCart";
-import { DOWNLOAD_TOKEN_EXPIRY_HOURS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
 
 interface Props {
   searchParams: Promise<{ session_id?: string }>;
@@ -55,10 +54,6 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
 
       <div className="rounded-lg border border-border p-6 space-y-4">
         <h2>Your Downloads</h2>
-        <p className="text-sm text-muted-foreground">
-          Download links expire in {DOWNLOAD_TOKEN_EXPIRY_HOURS} hours (up to {DOWNLOAD_TOKEN_MAX} downloads).
-        </p>
-
         {order.items.map((item) => {
           if (item.release) {
             return (
