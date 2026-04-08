@@ -31,7 +31,15 @@ export default async function LinksPage() {
         </div>
 
         <div className="text-center">
-          <p className="text-white font-semibold text-lg">@partypupils</p>
+          <a href="/" className="inline-block">
+            <Image
+              src="/images/pp-logo.svg"
+              alt="Party Pupils"
+              width={120}
+              height={50}
+              className="h-8 w-auto"
+            />
+          </a>
           <p className="text-white/60 text-sm mt-1">
             Yacht House, Funky House & Disco
             <br />

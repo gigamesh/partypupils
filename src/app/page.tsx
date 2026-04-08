@@ -53,7 +53,7 @@ export default async function HomePage() {
             />
           </div>
 
-          <div className="absolute bottom-6 inset-x-0 z-10 flex justify-center">
+          <div className="absolute bottom-6 inset-x-0 z-10 flex justify-center md:justify-start md:pl-10">
             <SocialLinks />
           </div>
 
@@ -65,27 +65,29 @@ export default async function HomePage() {
 
       {featuredReleases.length > 0 && (
         <section className="mx-auto max-w-5xl px-4 pb-16">
-          <h2 className="neon-glow text-center uppercase">Latest Releases</h2>
-          <div className="mb-6 text-center">
-            <Link
-              href="/music"
-              className="neon-link text-sm uppercase tracking-wider"
-            >
-              View All Music →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {featuredReleases.map((release) => (
-              <ReleaseCard
-                key={release.id}
-                name={release.name}
-                slug={release.slug}
-                price={release.price}
-                type={release.type}
-                coverImageUrl={release.coverImageUrl}
-                showPrice={false}
-              />
-            ))}
+          <div className="glass-panel px-4 py-8 sm:px-8">
+            <h2 className="neon-glow text-center uppercase">Latest Releases</h2>
+            <div className="mb-6 text-center">
+              <Link
+                href="/music"
+                className="neon-link text-sm uppercase tracking-wider"
+              >
+                View All Music →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {featuredReleases.map((release) => (
+                <ReleaseCard
+                  key={release.id}
+                  name={release.name}
+                  slug={release.slug}
+                  price={release.price}
+                  type={release.type}
+                  coverImageUrl={release.coverImageUrl}
+                  showPrice={false}
+                />
+              ))}
+            </div>
           </div>
         </section>
       )}

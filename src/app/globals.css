@@ -211,7 +211,8 @@
 
 /* Seated tour widget overrides */
 .seated-events-table {
-  @apply font-mono border-t border-white/30;
+  @apply font-mono;
+  border-top: none !important;
 }
 
 .seated-event-row {
@@ -280,6 +281,10 @@
   box-shadow: 0 0 12px rgba(173, 253, 2, 0.5) !important;
   border-color: var(--color-neon) !important;
   color: #000 !important;
+}
+
+.seated-event-row:last-of-type {
+  border-bottom: none !important;
 }
 
 .seated-events-table > :last-child {
