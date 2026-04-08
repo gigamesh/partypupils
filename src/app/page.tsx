@@ -27,8 +27,8 @@ export default async function HomePage() {
     <div className="bg-darkened-off">
       <HashScroll />
       <ScrollOverlay />
-      <section className="relative min-h-[85vh] flex items-center justify-center px-4 pt-16 pb-32">
-        <div className="relative w-full max-w-5xl min-h-[75vh] flex items-center justify-center glass-panel overflow-hidden">
+      <section className="relative min-h-[85dvh] flex items-center justify-center px-4 pt-16 pb-32">
+        <div className="relative w-full max-w-5xl min-h-[75dvh] flex items-center justify-center glass-panel overflow-hidden">
           <div className="relative z-10 flex w-full max-w-5xl items-center justify-center">
             <div className="flex-1 flex justify-center md:-translate-x-[15%]">
               <Image
@@ -55,7 +55,7 @@ export default async function HomePage() {
             />
           </div>
 
-          <div className="absolute bottom-6 left-6 z-10">
+          <div className="absolute bottom-6 inset-x-0 z-10 flex justify-center">
             <SocialLinks />
           </div>
 
