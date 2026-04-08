@@ -85,7 +85,7 @@
 }
 
 .dark {
-  --background: #0f3447;
+  --background: #1f70b2;
   --foreground: #ffffff;
   --card: rgba(20, 60, 80, 0.75);
   --card-foreground: #ffffff;
@@ -163,6 +163,11 @@
 
 .bg-darkened:has(> .bg-darkened-off)::before {
   display: none;
+}
+
+/* Frosted glass container */
+.glass-panel {
+  @apply border bg-background/20 backdrop-blur-sm;
 }
 
 /* Static background */

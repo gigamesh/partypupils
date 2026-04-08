@@ -1,5 +1,4 @@
 import { AudioProvider } from "@/components/AudioProvider";
-import { BgSwitcher } from "@/components/BgSwitcher";
 import { CartProvider } from "@/components/CartProvider";
 import { Navigation } from "@/components/Navigation";
 
@@ -7,6 +6,7 @@ import { SocialLinks } from "@/components/SocialLinks";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
+import Image from "next/image";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -38,7 +38,18 @@ export default function RootLayout({
       className={`${outfit.variable} ${inter.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col">
-        <BgSwitcher />
+        <div className="bg-static" aria-hidden="true">
+          <Image
+            src="/images/ocean-bg.jpg"
+            alt=""
+            fill
+            className="object-cover"
+            style={{ objectPosition: "50% 15%" }}
+            priority
+            sizes="100vw"
+            unoptimized
+          />
+        </div>
         <CartProvider>
           <AudioProvider>
             <Navigation />

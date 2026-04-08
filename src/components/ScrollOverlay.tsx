@@ -8,7 +8,7 @@ interface ScrollOverlayProps {
 }
 
 export function ScrollOverlay({
-  maxOpacity = 0.65,
+  maxOpacity = 0.5,
   scrollDistance = 0.85,
 }: ScrollOverlayProps) {
   const ref = useRef<HTMLDivElement>(null);
