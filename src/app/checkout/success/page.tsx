@@ -28,8 +28,8 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
     include: {
       items: {
         include: {
-          release: { include: { tracks: true } },
-          track: true,
+          release: { include: { tracks: { include: { files: true } } } },
+          track: { include: { files: true } },
         },
       },
       downloadTokens: true,
@@ -69,7 +69,11 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
                     <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
                   </div>
                   {token && item.release.tracks.length >= 2 && (
-                    <DownloadZipButtons token={token} releaseId={item.release.id} />
+                    <DownloadZipButtons
+                      token={token}
+                      releaseId={item.release.id}
+                      availableFormats={[...new Set(item.release.tracks.flatMap((t) => t.files.map((f) => f.format)))]}
+                    />
                   )}
                 </div>
                 {token && item.release.tracks.map((track) => (
@@ -82,7 +86,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
                         <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
                         {track.trackNumber}. {track.name}
                       </span>
-                      <DownloadButtons token={token} trackId={track.id} />
+                      <DownloadButtons token={token} trackId={track.id} availableFormats={track.files.map((f) => f.format)} />
                     </div>
                     <TrackProgress trackId={track.id} />
                   </div>
@@ -104,7 +108,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
                       <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
                     </div>
                   </div>
-                  {token && <DownloadButtons token={token} trackId={item.track.id} />}
+                  {token && <DownloadButtons token={token} trackId={item.track.id} availableFormats={item.track.files.map((f) => f.format)} />}
                 </div>
                 <TrackProgress trackId={item.track.id} />
               </div>

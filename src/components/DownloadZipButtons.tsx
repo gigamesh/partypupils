@@ -1,16 +1,16 @@
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
-import { AUDIO_FORMATS } from "@/lib/constants";
 
 interface DownloadZipButtonsProps {
   token: string;
   releaseId: number;
+  availableFormats: string[];
 }
 
-export function DownloadZipButtons({ token, releaseId }: DownloadZipButtonsProps) {
+export function DownloadZipButtons({ token, releaseId, availableFormats }: DownloadZipButtonsProps) {
   return (
     <div className="flex gap-2">
-      {AUDIO_FORMATS.map((format) => (
+      {availableFormats.map((format) => (
         <a
           key={format}
           href={`/download/${token}/zip?releaseId=${releaseId}&format=${format}`}

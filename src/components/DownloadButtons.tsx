@@ -1,16 +1,16 @@
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
-import { AUDIO_FORMATS } from "@/lib/constants";
 
 interface DownloadButtonsProps {
   token: string;
   trackId: number;
+  availableFormats: string[];
 }
 
-export function DownloadButtons({ token, trackId }: DownloadButtonsProps) {
+export function DownloadButtons({ token, trackId, availableFormats }: DownloadButtonsProps) {
   return (
     <div className="flex gap-2">
-      {AUDIO_FORMATS.map((format) => (
+      {availableFormats.map((format) => (
         <a
           key={format}
           href={`/download/${token}?trackId=${trackId}&format=${format}`}
