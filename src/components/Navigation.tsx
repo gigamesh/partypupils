@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/Image";
 import { useState, useEffect } from "react";
 import { CartButton } from "./CartButton";
 import { MERCH_URL } from "@/lib/constants";
@@ -53,7 +53,6 @@ export function Navigation() {
               width={120}
               height={50}
               className="h-8 w-auto"
-              unoptimized
             />
           </Link>
 

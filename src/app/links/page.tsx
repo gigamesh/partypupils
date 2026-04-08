@@ -1,7 +1,7 @@
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
 import type { Metadata } from "next";
-import Image from "next/image";
+import Image from "@/components/Image";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,6 @@ export default async function LinksPage() {
             height={400}
             className="w-full h-full object-cover"
             priority
-            unoptimized
           />
         </div>
 

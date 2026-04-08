@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/Image";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -26,7 +26,6 @@ export function ReleaseCard({ name, slug, price, type, coverImageUrl, showPrice 
             fill
             className="object-cover transition-transform group-hover:scale-105"
             sizes="(max-width: 768px) 50vw, 25vw"
-            unoptimized
           />
         ) : (
           <div className="flex h-full items-center justify-center text-4xl text-neon/30">

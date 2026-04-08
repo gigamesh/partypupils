@@ -5,7 +5,7 @@ import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import { env } from "@/lib/env";
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
-import Image from "next/image";
+import Image from "@/components/Image";
 import "./globals.css";
 
 const baseUrl = env.NEXT_PUBLIC_BASE_URL();
@@ -73,7 +73,6 @@ export default function RootLayout({
             style={{ objectPosition: "50% 15%" }}
             priority
             sizes="100vw"
-            unoptimized
           />
         </div>
         <CartProvider>

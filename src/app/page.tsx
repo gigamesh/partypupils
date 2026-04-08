@@ -5,7 +5,7 @@ import { ScrollOverlay } from "@/components/ScrollOverlay";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
-import Image from "next/image";
+import Image from "@/components/Image";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,6 @@ export default async function HomePage() {
                 height={210}
                 className="w-full max-w-[280px] md:max-w-[420px] h-auto"
                 priority
-                unoptimized
               />
             </div>
           </div>
@@ -51,7 +50,6 @@ export default async function HomePage() {
               height={720}
               className="h-[65vh] w-auto object-contain"
               priority
-              unoptimized
             />
           </div>
 

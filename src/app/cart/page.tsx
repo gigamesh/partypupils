@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/Image";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -70,7 +70,6 @@ export default function CartPage() {
                     fill
                     className="object-cover"
                     sizes="64px"
-                    unoptimized
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-xl text-muted-foreground">

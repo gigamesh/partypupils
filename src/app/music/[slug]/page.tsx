@@ -3,7 +3,7 @@ import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
-import Image from "next/image";
+import Image from "@/components/Image";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -59,7 +59,6 @@ export default async function ReleasePage({ params }: Props) {
                 className="object-cover"
                 sizes="160px"
                 priority
-                unoptimized
               />
             ) : (
               <div className="flex h-full items-center justify-center text-4xl text-muted-foreground">
