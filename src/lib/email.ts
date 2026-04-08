@@ -1,20 +1,19 @@
 import { Resend } from "resend";
 import { SITE_NAME } from "./constants";
-
-const CONTACT_EMAIL = process.env.CONTACT_EMAIL;
+import { env } from "./env";
 
 let _resend: Resend;
 
 function resend() {
   if (!_resend) {
-    _resend = new Resend(process.env.RESEND_API_KEY);
+    _resend = new Resend(env.RESEND_API_KEY());
   }
   return _resend;
 }
 
 export async function sendOrderLookupEmail(email: string, verifyUrl: string) {
   await resend().emails.send({
-    from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+    from: env.EMAIL_FROM(),
     to: email,
     subject: `Your ${SITE_NAME} Downloads`,
     html: `
@@ -44,13 +43,9 @@ export async function sendContactEmail({
   email: string;
   message: string;
 }) {
-  if (!CONTACT_EMAIL) {
-    throw new Error("CONTACT_EMAIL env var is not set");
-  }
-
   await resend().emails.send({
-    from: process.env.EMAIL_FROM || "onboarding@resend.dev",
-    to: CONTACT_EMAIL,
+    from: env.EMAIL_FROM(),
+    to: env.CONTACT_EMAIL(),
     replyTo: email,
     subject: `[${SITE_NAME}] Message from ${name}`,
     html: `

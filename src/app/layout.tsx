@@ -4,16 +4,13 @@ import { Navigation } from "@/components/Navigation";
 
 import { SocialLinks } from "@/components/SocialLinks";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
+import { env } from "@/lib/env";
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import Image from "next/image";
 import "./globals.css";
 
-const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-  : process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "https://partypupils.com";
+const baseUrl = env.NEXT_PUBLIC_BASE_URL();
 
 const outfit = Outfit({
   subsets: ["latin"],

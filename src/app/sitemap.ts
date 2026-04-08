@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://partypupils.com";
+  const baseUrl = env.NEXT_PUBLIC_BASE_URL();
 
   const releases = await prisma.release.findMany({
     where: { isPublished: true },

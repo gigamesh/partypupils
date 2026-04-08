@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
+import { env } from "./env";
 
-const secret = () => new TextEncoder().encode(process.env.ADMIN_SECRET!);
+const secret = () => new TextEncoder().encode(env.ADMIN_SECRET());
 
 export async function createOrderVerificationToken(email: string): Promise<string> {
   return new SignJWT({ email })

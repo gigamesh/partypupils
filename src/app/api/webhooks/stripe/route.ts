@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
 import Stripe from "stripe";
 import { DOWNLOAD_TOKEN_EXPIRY_MS } from "@/lib/constants";
 
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     event = stripe().webhooks.constructEvent(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      env.STRIPE_WEBHOOK_SECRET()
     );
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
