@@ -16,7 +16,6 @@ export const MERCH_URL =
   "https://partypupils.threadless.com/designs/party-pupils";
 
 export const SOCIAL_LINKS = [
-  { name: "Twitter", href: "https://twitter.com/partypupils", icon: "twitter" },
   {
     name: "Facebook",
     href: "https://www.facebook.com/PartyPupilsmusic/",
