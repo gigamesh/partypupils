@@ -70,6 +70,7 @@ export default function CartPage() {
                     fill
                     className="object-cover"
                     sizes="64px"
+                    unoptimized
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-xl text-muted-foreground">

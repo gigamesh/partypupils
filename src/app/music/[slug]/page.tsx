@@ -52,6 +52,7 @@ export default async function ReleasePage({ params }: Props) {
                 className="object-cover"
                 sizes="160px"
                 priority
+                unoptimized
               />
             ) : (
               <div className="flex h-full items-center justify-center text-4xl text-muted-foreground">
