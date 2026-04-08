@@ -41,6 +41,7 @@ interface ReleaseFormProps {
     price: number;
     type: string;
     coverImageUrl: string | null;
+    releasedAt: Date | string | null;
     isPublished: boolean;
     tracks?: ExistingTrack[];
   };
@@ -59,6 +60,11 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     release ? (release.price / 100).toFixed(2) : ""
   );
   const [type, setType] = useState(release?.type || "single");
+  const [releasedAt, setReleasedAt] = useState(() => {
+    if (!release?.releasedAt) return "";
+    const d = new Date(release.releasedAt);
+    return d.toISOString().slice(0, 10);
+  });
   const [isPublished, setIsPublished] = useState(release?.isPublished || false);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverPreviewSrc, setCoverPreviewSrc] = useState<string | null>(null);
@@ -197,6 +203,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         price,
         type,
         coverImageUrl,
+        releasedAt: releasedAt ? new Date(releasedAt + "T00:00:00Z").toISOString() : null,
         isPublished,
         tracks: trackData,
       };
@@ -229,7 +236,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+    <form onSubmit={handleSubmit} className="glass-panel p-6 space-y-6">
       <div className="space-y-2">
         <Label htmlFor="name">Release Name</Label>
         <Input
@@ -270,6 +277,16 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             <option value="album">Album</option>
           </select>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="releasedAt">Release Date</Label>
+        <Input
+          id="releasedAt"
+          type="date"
+          value={releasedAt}
+          onChange={(e) => setReleasedAt(e.target.value)}
+        />
       </div>
 
       <div className="space-y-2">

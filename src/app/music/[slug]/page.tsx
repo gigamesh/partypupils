@@ -5,7 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
-import { Badge } from "@/components/ui/badge";
+
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -40,100 +40,97 @@ export default async function ReleasePage({ params }: Props) {
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <div className="grid gap-8 md:grid-cols-2">
-        <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
-          {release.coverImageUrl ? (
-            <Image
-              src={release.coverImageUrl}
-              alt={release.name}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-              priority
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-6xl text-muted-foreground">
-              ♪
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <div>
-            <Badge variant="secondary" className="mb-2">
-              {release.type}
-            </Badge>
-            <h1>{release.name}</h1>
-            <p className="mt-1 text-2xl font-semibold">
-              {formatCurrency(release.price)}
-            </p>
+    <div className="mx-auto max-w-2xl px-4 py-10">
+      <div className="glass-panel rounded-xl p-5 space-y-5">
+        <div className="flex gap-5">
+          <div className="relative w-40 h-40 shrink-0 overflow-hidden rounded-lg bg-muted">
+            {release.coverImageUrl ? (
+              <Image
+                src={release.coverImageUrl}
+                alt={release.name}
+                fill
+                className="object-cover"
+                sizes="160px"
+                priority
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-4xl text-muted-foreground">
+                ♪
+              </div>
+            )}
           </div>
 
-          {release.description && (
-            <p className="text-muted-foreground">{release.description}</p>
-          )}
-
-          {formats.length > 0 && (
-            <div className="text-sm text-muted-foreground">
-              Includes: {formats.join(", ")}
+          <div className="flex flex-col justify-between min-w-0">
+            <div>
+              <h1 className="text-xl">{release.name}</h1>
+              <p className="text-lg font-semibold">
+                {formatCurrency(release.price)}
+              </p>
             </div>
-          )}
 
-          {release.tracks.length > 1 && (
-            <AddToCartButton
-              item={{
-                releaseId: release.id,
-                name: release.name,
-                slug: release.slug,
-                price: release.price,
-                coverImageUrl: release.coverImageUrl,
-              }}
-            />
-          )}
-
-          {release.tracks.length >= 1 && (
-            <div className="mt-4">
-              <h2>Tracklist</h2>
-              <div className="space-y-2">
-                {release.tracks.map((track) => (
-                  <div
-                    key={track.id}
-                    className="rounded-lg border border-border p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground w-6 text-right">
-                          {track.trackNumber}
-                        </span>
-                        <span className="text-sm font-medium">{track.name}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-neon">
-                          {formatCurrency(track.price)}
-                        </span>
-                        <AddToCartButton
-                          item={{
-                            trackId: track.id,
-                            name: track.name,
-                            slug: release.slug,
-                            price: track.price,
-                            coverImageUrl: release.coverImageUrl,
-                            releaseName: release.name,
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 pt-2">
-                      <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
-                      <TrackProgress trackId={track.id} alwaysShow />
-                    </div>
-                  </div>
-                ))}
+            {formats.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                Includes: {formats.join(", ")}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
+        {release.description && (
+          <p className="text-sm text-muted-foreground">{release.description}</p>
+        )}
+
+        {release.tracks.length > 1 && (
+          <AddToCartButton
+            item={{
+              releaseId: release.id,
+              name: release.name,
+              slug: release.slug,
+              price: release.price,
+              coverImageUrl: release.coverImageUrl,
+            }}
+          />
+        )}
+
+        {release.tracks.length >= 1 && (
+          <div className="space-y-2">
+            <h2 className="text-sm font-medium">Tracklist</h2>
+            {release.tracks.map((track) => (
+              <div
+                key={track.id}
+                className="rounded-lg border border-border p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground w-6 text-right">
+                      {track.trackNumber}
+                    </span>
+                    <span className="text-sm font-medium">{track.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-neon">
+                      {formatCurrency(track.price)}
+                    </span>
+                    <AddToCartButton
+                      item={{
+                        trackId: track.id,
+                        name: track.name,
+                        slug: release.slug,
+                        price: track.price,
+                        coverImageUrl: release.coverImageUrl,
+                        releaseName: release.name,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-2">
+                  <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
+                  <TrackProgress trackId={track.id} alwaysShow />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -60,7 +60,7 @@ export function LinksForm({ initialLinks }: LinksFormProps) {
         {links.map((link) => (
           <div
             key={link.id}
-            className="flex items-center gap-3 rounded-lg border border-border p-3"
+            className="flex items-center gap-3 rounded-lg glass-panel p-3"
           >
             <Input
               value={link.position}
@@ -106,7 +106,7 @@ export function LinksForm({ initialLinks }: LinksFormProps) {
         ))}
       </div>
 
-      <div className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3">
+      <div className="flex items-center gap-3 rounded-lg glass-panel border-dashed p-3">
         <Input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}

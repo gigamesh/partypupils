@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n db,stripe,next -c blue,magenta,green \"prisma dev\" \"./scripts/stripe-listen.sh\" \"sleep 3 && tsx scripts/guard-local-db.ts && prisma db push && prisma db seed && next dev\"",
+    "dev": "concurrently -n db,stripe,next -c blue,magenta,green \"prisma dev\" \"./scripts/stripe-listen.sh\" \"sleep 3 && tsx scripts/guard-local-db.ts && prisma db push && next dev\"",
     "dev:prod": "dotenv -e .env.prod -- next dev",
     "build": "next build",
     "start": "next start",

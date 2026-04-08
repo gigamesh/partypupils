@@ -87,15 +87,15 @@
 .dark {
   --background: #1f70b2;
   --foreground: #ffffff;
-  --card: rgba(20, 60, 80, 0.75);
+  --card: rgba(37, 102, 140, 0.75);
   --card-foreground: #ffffff;
   --popover: rgba(8, 28, 45, 0.95);
   --popover-foreground: #ffffff;
   --primary: #adfd02;
   --primary-foreground: #000000;
-  --secondary: rgba(10, 35, 55, 0.8);
+  --secondary: rgba(13, 44, 69, 0.8);
   --secondary-foreground: #ffffff;
-  --muted: rgba(10, 35, 55, 0.7);
+  --muted: rgba(17, 41, 80, 0.7);
   --muted-foreground: #8fb8c4;
   --accent: #adfd02;
   --accent-foreground: #ffffff;

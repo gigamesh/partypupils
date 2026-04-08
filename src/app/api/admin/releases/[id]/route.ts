@@ -22,7 +22,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const releaseId = parseInt(id);
   const body = await req.json();
-  const { name, slug, description, price, type, coverImageUrl, isPublished, tracks } = body;
+  const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, tracks } = body;
 
   // Delete existing tracks (cascade deletes their files too)
   await prisma.track.deleteMany({ where: { releaseId } });
@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       price,
       type,
       coverImageUrl,
+      releasedAt: releasedAt ? new Date(releasedAt) : null,
       isPublished,
       ...(tracks && tracks.length > 0
         ? {

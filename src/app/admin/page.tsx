@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DeleteReleaseButton } from "./releases/DeleteReleaseButton";
 
 export default async function AdminReleasesPage() {
   const releases = await prisma.release.findMany({
@@ -48,13 +49,14 @@ export default async function AdminReleasesPage() {
                   {release.name}
                 </a>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right space-x-2">
                 <Link
                   href={`/admin/releases/${release.id}/edit`}
                   className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
                 >
                   Edit
                 </Link>
+                <DeleteReleaseButton releaseId={release.id} releaseName={release.name} />
               </TableCell>
               <TableCell className="text-right">{release.type}</TableCell>
               <TableCell className="text-right">{formatCurrency(release.price)}</TableCell>
