@@ -45,11 +45,24 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   const file = await prisma.trackFile.findFirst({
     where: { trackId, format },
+    include: { track: true },
   });
 
   if (!file) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  return NextResponse.redirect(file.storageKey);
+  const res = await fetch(file.storageKey);
+  if (!res.ok || !res.body) {
+    return NextResponse.json({ error: "File unavailable" }, { status: 502 });
+  }
+
+  const fileName = `${file.track.name}.${format}`;
+
+  return new Response(res.body, {
+    headers: {
+      "Content-Type": format === "wav" ? "audio/wav" : "audio/mpeg",
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+    },
+  });
 }
