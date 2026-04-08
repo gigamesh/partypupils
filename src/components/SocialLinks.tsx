@@ -70,6 +70,20 @@ export function SocialLinks({ className = "", iconSize = 28 }: SocialLinksProps)
         >
           {link.icon === "soundcloud" ? (
             <SoundCloudIcon size={iconSize * 0.7} />
+          ) : link.icon === "youtube" ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width={iconSize * 1.2}
+              height={iconSize * 1.2}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {iconPaths[link.icon]}
+            </svg>
           ) : (
             <svg
               xmlns="http://www.w3.org/2000/svg"

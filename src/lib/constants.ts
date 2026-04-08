@@ -17,9 +17,9 @@ export const MERCH_URL =
 
 export const SOCIAL_LINKS = [
   {
-    name: "Facebook",
-    href: "https://www.facebook.com/PartyPupilsmusic/",
-    icon: "facebook",
+    name: "YouTube",
+    href: "https://www.youtube.com/c/partypupils",
+    icon: "youtube",
   },
   {
     name: "Instagram",
@@ -32,19 +32,19 @@ export const SOCIAL_LINKS = [
     icon: "spotify",
   },
   {
-    name: "SoundCloud",
-    href: "https://soundcloud.com/partypupils",
-    icon: "soundcloud",
-  },
-  {
     name: "Apple Music",
     href: "https://music.apple.com/us/artist/party-pupils/1158467787?app=itunes",
     icon: "apple",
   },
   {
-    name: "YouTube",
-    href: "https://www.youtube.com/c/partypupils",
-    icon: "youtube",
+    name: "Facebook",
+    href: "https://www.facebook.com/PartyPupilsmusic/",
+    icon: "facebook",
+  },
+  {
+    name: "SoundCloud",
+    href: "https://soundcloud.com/partypupils",
+    icon: "soundcloud",
   },
 ] as const;
 
