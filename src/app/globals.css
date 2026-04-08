@@ -167,7 +167,8 @@
 
 /* Frosted glass container */
 .glass-panel {
-  @apply border bg-background/20 backdrop-blur-sm;
+  @apply border bg-background/20 backdrop-blur-sm overflow-hidden;
+  border-radius: 6px;
 }
 
 /* Static background */
