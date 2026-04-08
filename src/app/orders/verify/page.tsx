@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { verifyOrderVerificationToken } from "@/lib/order-auth";
@@ -13,8 +14,8 @@ interface Props {
   searchParams: Promise<{ token?: string }>;
 }
 
-export const metadata = {
-  title: "Your Orders | Party Pupils",
+export const metadata: Metadata = {
+  title: "Your Orders",
 };
 
 async function getOrCreateValidToken(orderId: number): Promise<string | null> {

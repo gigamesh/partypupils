@@ -1,23 +1,28 @@
-import { notFound } from "next/navigation";
-import Image from "next/image";
-import { prisma } from "@/lib/db";
-import { formatCurrency } from "@/lib/utils";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
-
+import { prisma } from "@/lib/db";
+import { formatCurrency } from "@/lib/utils";
+import Image from "next/image";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const release = await prisma.release.findUnique({ where: { slug } });
   if (!release) return { title: "Not Found" };
   return {
-    title: `${release.name} | Party Pupils`,
-    description: release.description || `Buy ${release.name} by Party Pupils.`,
+    title: release.name,
+    description: release.description,
+    openGraph: release.coverImageUrl
+      ? {
+          images: [{ url: release.coverImageUrl, alt: release.name }],
+        }
+      : undefined,
   };
 }
 
@@ -36,7 +41,9 @@ export default async function ReleasePage({ params }: Props) {
   if (!release) notFound();
 
   const formats = [
-    ...new Set(release.tracks.flatMap((t) => t.files.map((f) => f.format.toUpperCase()))),
+    ...new Set(
+      release.tracks.flatMap((t) => t.files.map((f) => f.format.toUpperCase())),
+    ),
   ];
 
   return (
@@ -125,7 +132,10 @@ export default async function ReleasePage({ params }: Props) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pt-2">
-                  <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
+                  <PlayButton
+                    trackId={track.id}
+                    previewUrl={track.previewUrl}
+                  />
                   <TrackProgress trackId={track.id} alwaysShow />
                 </div>
               </div>

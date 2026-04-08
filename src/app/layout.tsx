@@ -9,6 +9,8 @@ import { Inter, Outfit } from "next/font/google";
 import Image from "next/image";
 import "./globals.css";
 
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://partypupils.com";
+
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-heading-var",
@@ -20,10 +22,35 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: SITE_NAME,
+  metadataBase: new URL(baseUrl),
+  title: {
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
+  },
   description: SITE_DESCRIPTION,
   icons: {
     icon: "/favicon.png",
+  },
+  openGraph: {
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    siteName: SITE_NAME,
+    type: "website",
+    locale: "en_US",
+    images: [
+      {
+        url: "/images/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: SITE_NAME,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: ["/images/og-image.png"],
   },
 };
 

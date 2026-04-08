@@ -7,6 +7,7 @@ import { DownloadButtons } from "@/components/DownloadButtons";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
+import type { Metadata } from "next";
 import { ClearCart } from "./ClearCart";
 import { DOWNLOAD_TOKEN_EXPIRY_HOURS, DOWNLOAD_TOKEN_MAX } from "@/lib/constants";
 
@@ -14,8 +15,8 @@ interface Props {
   searchParams: Promise<{ session_id?: string }>;
 }
 
-export const metadata = {
-  title: "Order Complete | Party Pupils",
+export const metadata: Metadata = {
+  title: "Order Complete",
 };
 
 export default async function CheckoutSuccessPage({ searchParams }: Props) {
