@@ -21,6 +21,9 @@ interface TrackInput {
   existingWavStorageKey?: string;
   existingWavFileSize?: number;
   existingPreviewUrl?: string | null;
+  existingMp3Name?: string;
+  existingMp3StorageKey?: string;
+  existingMp3FileSize?: number;
 }
 
 interface ExistingTrack {
@@ -72,6 +75,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     if (release?.tracks && release.tracks.length > 0) {
       return release.tracks.map((t) => {
         const wav = t.files.find((f) => f.format === "wav");
+        const mp3 = t.files.find((f) => f.format === "mp3");
         return {
           existingId: t.id,
           name: t.name,
@@ -82,6 +86,9 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
           existingWavStorageKey: wav?.storageKey,
           existingWavFileSize: wav?.fileSize ?? undefined,
           existingPreviewUrl: t.previewUrl,
+          existingMp3Name: mp3?.fileName,
+          existingMp3StorageKey: mp3?.storageKey,
+          existingMp3FileSize: mp3?.fileSize ?? undefined,
         };
       });
     }
@@ -112,7 +119,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   }
 
-  async function uploadWav(file: File, prefix: string): Promise<{ url: string; previewUrl?: string }> {
+  async function uploadWav(file: File, prefix: string): Promise<{ url: string; previewUrl?: string; mp3Url?: string }> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("prefix", prefix);
@@ -181,6 +188,14 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             storageKey: result.url,
             fileSize: track.wavFile.size,
           });
+          if (result.mp3Url) {
+            files.push({
+              format: "mp3",
+              fileName: track.wavFile.name.replace(/\.wav$/i, ".mp3"),
+              storageKey: result.mp3Url,
+              fileSize: 0,
+            });
+          }
           previewUrl = result.previewUrl;
         } else if (track.existingWavStorageKey) {
           files.push({
@@ -189,6 +204,14 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             storageKey: track.existingWavStorageKey,
             fileSize: track.existingWavFileSize || 0,
           });
+          if (track.existingMp3StorageKey) {
+            files.push({
+              format: "mp3",
+              fileName: track.existingMp3Name || "track.mp3",
+              storageKey: track.existingMp3StorageKey,
+              fileSize: track.existingMp3FileSize || 0,
+            });
+          }
           previewUrl = track.existingPreviewUrl ?? undefined;
         }
 
