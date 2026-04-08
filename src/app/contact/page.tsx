@@ -45,7 +45,8 @@ export default function ContactPage() {
         <div className="glass-panel p-6 text-center">
           <h1>Message Sent</h1>
           <p className="text-muted-foreground">
-            Thanks for reaching out! We&apos;ll get back to you soon.
+            Thanks for reaching out!
+            <br /> I&apos;ll get back to you soon.
           </p>
         </div>
       </div>
