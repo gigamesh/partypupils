@@ -8,7 +8,7 @@ import { MERCH_URL } from "@/lib/constants";
 
 const NAV_ITEMS: readonly { label: string; href: string; external?: boolean; mobileOnly?: boolean }[] = [
   { label: "Music", href: "/music" },
-  { label: "Tour", href: "/#tour" },
+  { label: "Tour", href: "/tour" },
   { label: "Merch", href: MERCH_URL, external: true },
   { label: "Contact", href: "/contact" },
   { label: "My Orders", href: "/orders/lookup" },
