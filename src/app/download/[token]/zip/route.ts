@@ -75,30 +75,36 @@ export async function GET(req: NextRequest, context: RouteContext) {
       );
     }
 
-    const passthrough = new PassThrough();
-    const archive = archiver("zip", { zlib: { level: 0 } });
-
-    archive.pipe(passthrough);
-
-    for (const track of trackFiles) {
-      const res = await fetch(track.file.storageKey);
-      if (!res.ok || !res.body) continue;
-
-      const fileName = `${String(track.trackNumber).padStart(2, "0")} - ${track.name}.${format}`;
-      archive.append(Buffer.from(await res.arrayBuffer()), { name: fileName });
-    }
-
-    await archive.finalize();
-
-    const chunks: Buffer[] = [];
-    for await (const chunk of passthrough) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    const zipBuffer = Buffer.concat(chunks);
-
     const zipName = `${release.name} (${format.toUpperCase()}).zip`;
 
-    return new NextResponse(zipBuffer, {
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const archive = archiver("zip", { zlib: { level: 0 } });
+    const passthrough = new PassThrough();
+    archive.pipe(passthrough);
+
+    (async () => {
+      try {
+        for await (const chunk of passthrough) {
+          await writer.write(chunk);
+        }
+        await writer.close();
+      } catch {
+        await writer.abort();
+      }
+    })();
+
+    (async () => {
+      for (const track of trackFiles) {
+        const res = await fetch(track.file.storageKey);
+        if (!res.ok || !res.body) continue;
+        const fileName = `${String(track.trackNumber).padStart(2, "0")} - ${track.name}.${format}`;
+        archive.append(Buffer.from(await res.arrayBuffer()), { name: fileName });
+      }
+      await archive.finalize();
+    })();
+
+    return new Response(readable, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${zipName}"`,
