@@ -45,17 +45,11 @@ export default async function AdminReleasesPage() {
           {releases.map((release) => (
             <TableRow key={release.id}>
               <TableCell className="font-medium">
-                <a href={`/music/${release.slug}`} className="hover:underline">
+                <Link href={`/admin/releases/${release.id}/edit`} className="hover:underline">
                   {release.name}
-                </a>
-              </TableCell>
-              <TableCell className="text-right space-x-2">
-                <Link
-                  href={`/admin/releases/${release.id}/edit`}
-                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-                >
-                  Edit
                 </Link>
+              </TableCell>
+              <TableCell className="text-right">
                 <DeleteReleaseButton releaseId={release.id} releaseName={release.name} />
               </TableCell>
               <TableCell className="text-right">{release.type}</TableCell>

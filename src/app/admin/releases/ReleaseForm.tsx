@@ -99,6 +99,15 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     setTracks((prev) => prev.filter((_, i) => i !== index).map((t, i) => ({ ...t, trackNumber: i + 1 })));
   }
 
+  function moveTrack(index: number, direction: "up" | "down") {
+    setTracks((prev) => {
+      const next = [...prev];
+      const swapIndex = direction === "up" ? index - 1 : index + 1;
+      [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      return next.map((t, i) => ({ ...t, trackNumber: i + 1 }));
+    });
+  }
+
   function updateTrack(index: number, field: keyof TrackInput, value: string | File | null) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   }
@@ -328,7 +337,31 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         {tracks.map((track, index) => (
           <div key={index} className="rounded-lg border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Track {track.trackNumber}</span>
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === 0}
+                    onClick={() => moveTrack(index, "up")}
+                  >
+                    ▲
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={index === tracks.length - 1}
+                    onClick={() => moveTrack(index, "down")}
+                  >
+                    ▼
+                  </Button>
+                </div>
+                <span className="text-sm font-medium">Track {track.trackNumber}</span>
+              </div>
               {tracks.length > 1 && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => removeTrack(index)}>
                   Remove
