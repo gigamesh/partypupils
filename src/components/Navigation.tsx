@@ -10,6 +10,7 @@ const NAV_ITEMS: readonly { label: string; href: string; external?: boolean; mob
   { label: "Music", href: "/music" },
   { label: "Tour", href: "/#tour" },
   { label: "Merch", href: MERCH_URL, external: true },
+  { label: "Contact", href: "/contact" },
   { label: "My Orders", href: "/orders/lookup" },
   { label: "Cart", href: "/cart", mobileOnly: true },
 ];

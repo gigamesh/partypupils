@@ -1,6 +1,8 @@
 import { Resend } from "resend";
 import { SITE_NAME } from "./constants";
 
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL;
+
 let _resend: Resend;
 
 function resend() {
@@ -27,6 +29,36 @@ export async function sendOrderLookupEmail(email: string, verifyUrl: string) {
         <p style="font-size: 13px; color: #888; line-height: 1.5;">
           This link expires in 1 hour. If you didn&apos;t request this, you can safely ignore this email.
         </p>
+      </div>
+    `,
+  });
+}
+
+/** Forward a contact form submission to the site owner. */
+export async function sendContactEmail({
+  name,
+  email,
+  message,
+}: {
+  name: string;
+  email: string;
+  message: string;
+}) {
+  if (!CONTACT_EMAIL) {
+    throw new Error("CONTACT_EMAIL env var is not set");
+  }
+
+  await resend().emails.send({
+    from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+    to: CONTACT_EMAIL,
+    replyTo: email,
+    subject: `[${SITE_NAME}] Message from ${name}`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <h1 style="font-size: 24px; margin-bottom: 16px;">${SITE_NAME} — Contact Form</h1>
+        <p style="font-size: 14px; color: #888; margin-bottom: 4px;"><strong>From:</strong> ${name} &lt;${email}&gt;</p>
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 16px 0;" />
+        <p style="font-size: 16px; color: #333; line-height: 1.6; white-space: pre-wrap;">${message}</p>
       </div>
     `,
   });
