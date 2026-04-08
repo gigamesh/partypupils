@@ -1,11 +1,11 @@
 import { HashScroll } from "@/components/HashScroll";
+import Image from "@/components/Image";
 import { LinksList } from "@/components/LinksList";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { ScrollOverlay } from "@/components/ScrollOverlay";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
-import Image from "@/components/Image";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -94,7 +94,7 @@ export default async function HomePage() {
 
       <section
         id="tour"
-        className="mx-auto max-w-5xl px-4 py-16 scroll-mt-20 glass-panel"
+        className="mx-auto max-w-5xl px-4 pt-16 scroll-mt-20 glass-panel"
       >
         <h2 className="neon-glow text-center uppercase">Tour Dates</h2>
         <SeatedTourWidget />
