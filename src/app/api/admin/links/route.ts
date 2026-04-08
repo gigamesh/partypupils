@@ -34,13 +34,15 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, title, url, position, isVisible } = (await req.json()) as {
-    id: number;
-    title?: string;
-    url?: string;
-    position?: number;
-    isVisible?: boolean;
-  };
+  const { id, title, url, position, isVisible, showOnHero } =
+    (await req.json()) as {
+      id: number;
+      title?: string;
+      url?: string;
+      position?: number;
+      isVisible?: boolean;
+      showOnHero?: boolean;
+    };
 
   const link = await prisma.link.update({
     where: { id },
@@ -49,6 +51,7 @@ export async function PUT(req: NextRequest) {
       ...(url !== undefined && { url }),
       ...(position !== undefined && { position }),
       ...(isVisible !== undefined && { isVisible }),
+      ...(showOnHero !== undefined && { showOnHero }),
     },
   });
 

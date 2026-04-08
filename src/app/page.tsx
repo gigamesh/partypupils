@@ -18,7 +18,7 @@ export default async function HomePage() {
       take: 4,
     }),
     prisma.link.findMany({
-      where: { isVisible: true },
+      where: { isVisible: true, showOnHero: true },
       orderBy: { position: "asc" },
     }),
   ]);

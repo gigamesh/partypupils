@@ -1,8 +1,6 @@
 import { AudioProvider } from "@/components/AudioProvider";
 import { CartProvider } from "@/components/CartProvider";
-import { Navigation } from "@/components/Navigation";
-
-import { SocialLinks } from "@/components/SocialLinks";
+import { PageShell } from "@/components/PageShell";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import { env } from "@/lib/env";
 import type { Metadata } from "next";
@@ -80,13 +78,7 @@ export default function RootLayout({
         </div>
         <CartProvider>
           <AudioProvider>
-            <Navigation />
-            <main className="flex-1 bg-darkened">{children}</main>
-            <footer className="border-t border-white/10 py-8">
-              <div className="mx-auto max-w-5xl px-4 flex flex-col items-center">
-                <SocialLinks iconSize={24} className="neon-glow" />
-              </div>
-            </footer>
+            <PageShell>{children}</PageShell>
           </AudioProvider>
         </CartProvider>
       </body>
