@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/db";
 import { SocialLinks } from "@/components/SocialLinks";
+import { prisma } from "@/lib/db";
 import type { Metadata } from "next";
 import Image from "next/image";
 
@@ -27,6 +27,7 @@ export default async function LinksPage() {
             height={400}
             className="w-full h-full object-cover"
             priority
+            unoptimized
           />
         </div>
 
