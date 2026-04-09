@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useState } from "react";
 
 export default function OrderLookupPage() {
   const [email, setEmail] = useState("");
@@ -37,37 +37,39 @@ export default function OrderLookupPage() {
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <h1>Check your inbox</h1>
         <p className="text-muted-foreground">
-          We sent a link to <span className="font-medium text-foreground">{email}</span>.
-          Click it to access your orders and downloads. The link expires in 1 hour.
+          We sent a link to{" "}
+          <span className="font-medium text-foreground">{email}</span>. Click it
+          to access your orders and downloads. The link expires in 1 hour.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 min-h-[calc(100vh-8rem)] flex flex-col justify-center">
+    <div className="mx-auto max-w-md px-4 min-h-[calc(100vh-8rem)] flex flex-col justify-center glass-panel">
       <div className="glass-panel p-6">
-      <h1>Find Your Orders</h1>
-      <p className="text-muted-foreground mb-6">
-        Enter the email you used at checkout and we&apos;ll send you a link to access your downloads.
-      </p>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-          />
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Sending..." : "Send Download Link"}
-        </Button>
-      </form>
+        <h1>Find Your Orders</h1>
+        <p className="text-muted-foreground mb-6">
+          Enter the email you used at checkout and we&apos;ll send you a link to
+          access your downloads.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Sending..." : "Send Download Link"}
+          </Button>
+        </form>
       </div>
     </div>
   );

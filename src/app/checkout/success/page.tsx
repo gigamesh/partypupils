@@ -1,13 +1,13 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { formatCurrency, cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { DownloadButtons } from "@/components/DownloadButtons";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { prisma } from "@/lib/db";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ClearCart } from "./ClearCart";
 
 interface Props {
@@ -52,7 +52,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
         .
       </p>
 
-      <div className="rounded-lg border border-border p-6 space-y-4">
+      <div className="glass-panel rounded-lg border p-6 space-y-4">
         <h2>Your Downloads</h2>
         {order.items.map((item) => {
           if (item.release) {
@@ -61,31 +61,47 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">{item.release.name}</p>
-                    <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatCurrency(item.price)}
+                    </p>
                   </div>
                   {token && item.release.tracks.length >= 2 && (
                     <DownloadZipButtons
                       token={token}
                       releaseId={item.release.id}
-                      availableFormats={[...new Set(item.release.tracks.flatMap((t) => t.files.map((f) => f.format)))]}
+                      availableFormats={[
+                        ...new Set(
+                          item.release.tracks.flatMap((t) =>
+                            t.files.map((f) => f.format),
+                          ),
+                        ),
+                      ]}
                     />
                   )}
                 </div>
-                {token && item.release.tracks.map((track) => (
-                  <div
-                    key={track.id}
-                    className="border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-sm">
-                        <PlayButton trackId={track.id} previewUrl={track.previewUrl} />
-                        {track.trackNumber}. {track.name}
-                      </span>
-                      <DownloadButtons token={token} trackId={track.id} availableFormats={track.files.map((f) => f.format)} />
+                {token &&
+                  item.release.tracks.map((track) => (
+                    <div
+                      key={track.id}
+                      className="border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm">
+                          <PlayButton
+                            trackId={track.id}
+                            previewUrl={track.previewUrl}
+                          />
+                          {track.trackNumber}. {track.name}
+                        </span>
+                        <DownloadButtons
+                          token={token}
+                          trackId={track.id}
+                          availableFormats={track.files.map((f) => f.format)}
+                        />
+                      </div>
+                      <TrackProgress trackId={track.id} />
                     </div>
-                    <TrackProgress trackId={track.id} />
-                  </div>
-                ))}
+                  ))}
               </div>
             );
           }
@@ -97,13 +113,24 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <PlayButton trackId={item.track.id} previewUrl={item.track.previewUrl} />
+                    <PlayButton
+                      trackId={item.track.id}
+                      previewUrl={item.track.previewUrl}
+                    />
                     <div>
                       <p className="font-medium">{item.track.name}</p>
-                      <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatCurrency(item.price)}
+                      </p>
                     </div>
                   </div>
-                  {token && <DownloadButtons token={token} trackId={item.track.id} availableFormats={item.track.files.map((f) => f.format)} />}
+                  {token && (
+                    <DownloadButtons
+                      token={token}
+                      trackId={item.track.id}
+                      availableFormats={item.track.files.map((f) => f.format)}
+                    />
+                  )}
                 </div>
                 <TrackProgress trackId={item.track.id} />
               </div>
@@ -119,7 +146,10 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
       </div>
 
       <div className="mt-8 text-center">
-        <Link href="/music" className={cn(buttonVariants({ variant: "outline" }))}>
+        <Link
+          href="/music"
+          className={cn(buttonVariants({ variant: "outline" }))}
+        >
           Continue Shopping
         </Link>
       </div>
