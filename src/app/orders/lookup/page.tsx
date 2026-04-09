@@ -46,7 +46,7 @@ export default function OrderLookupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 min-h-[calc(100vh-8rem)] flex flex-col justify-center glass-panel">
+    <div className="mx-auto max-w-md px-4 min-h-[calc(100vh-8rem)] flex flex-col justify-center">
       <div className="glass-panel p-6">
         <h1>Find Your Orders</h1>
         <p className="text-muted-foreground mb-6">
