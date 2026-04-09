@@ -99,7 +99,7 @@ export default function ContactPage() {
               id="message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              rows={10}
+              rows={8}
               required
             />
           </div>
