@@ -70,13 +70,13 @@ export default function TestDownloadPage() {
         <div className="border-b border-border pb-3">
           <div className="flex items-center justify-between">
             <p className="text-sm">{TRACK_A.name}</p>
-            <DownloadButtons token={ALA_CARTE_TOKEN} trackId={TRACK_A.id} availableFormats={["wav"]} />
+            <DownloadButtons token={ALA_CARTE_TOKEN} trackId={TRACK_A.id} availableFormats={["wav", "mp3"]} />
           </div>
         </div>
         <div className="pb-3">
           <div className="flex items-center justify-between">
             <p className="text-sm">{TRACK_B.name}</p>
-            <DownloadButtons token={ALA_CARTE_TOKEN} trackId={TRACK_B.id} availableFormats={["wav"]} />
+            <DownloadButtons token={ALA_CARTE_TOKEN} trackId={TRACK_B.id} availableFormats={["wav", "mp3"]} />
           </div>
         </div>
         <div className="border-t border-border pt-3">
@@ -85,7 +85,7 @@ export default function TestDownloadPage() {
             <DownloadZipButtons
               token={ALA_CARTE_TOKEN}
               trackIds={[TRACK_A.id, TRACK_B.id]}
-              availableFormats={["wav"]}
+              availableFormats={["wav", "mp3"]}
             />
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function TestDownloadPage() {
             <DownloadZipButtons
               token={RELEASE_17_TOKEN}
               releaseId={RELEASE_17.id}
-              availableFormats={["wav"]}
+              availableFormats={["wav", "mp3"]}
             />
           </div>
           {RELEASE_17.tracks.map((track) => (
@@ -116,7 +116,7 @@ export default function TestDownloadPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm">{track.name}</span>
-                <DownloadButtons token={RELEASE_17_TOKEN} trackId={track.id} availableFormats={["wav"]} />
+                <DownloadButtons token={RELEASE_17_TOKEN} trackId={track.id} availableFormats={["wav", "mp3"]} />
               </div>
             </div>
           ))}
@@ -129,7 +129,7 @@ export default function TestDownloadPage() {
             <DownloadZipButtons
               token={RELEASE_18_TOKEN}
               releaseId={RELEASE_18.id}
-              availableFormats={["wav"]}
+              availableFormats={["wav", "mp3"]}
             />
           </div>
           {RELEASE_18.tracks.map((track) => (
@@ -139,7 +139,7 @@ export default function TestDownloadPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm">{track.name}</span>
-                <DownloadButtons token={RELEASE_18_TOKEN} trackId={track.id} availableFormats={["wav"]} />
+                <DownloadButtons token={RELEASE_18_TOKEN} trackId={track.id} availableFormats={["wav", "mp3"]} />
               </div>
             </div>
           ))}
