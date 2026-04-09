@@ -8,8 +8,7 @@ export const AUDIO_FORMATS = ["mp3", "wav"] as const;
 export const SEATED_ARTIST_ID = "f5bd3ef2-2234-4972-8124-93f835758465";
 export const SEATED_WIDGET_ID = "seated-55fdf2c0";
 
-export const MERCH_URL =
-  "https://partypupils.threadless.com/designs/party-pupils";
+export const MERCH_URL = "https://party-pupils-shop.fourthwall.com";
 
 export const SOCIAL_LINKS = [
   {

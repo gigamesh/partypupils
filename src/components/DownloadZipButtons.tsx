@@ -15,38 +15,23 @@ interface DownloadZipButtonsProps {
 export function DownloadZipButtons({ token, releaseId, trackIds, availableFormats }: DownloadZipButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
-  async function handleDownload(format: string) {
+  function handleClick(format: string) {
     setLoading(format);
-    try {
-      const query = releaseId
-        ? `releaseId=${releaseId}&format=${format}`
-        : `trackIds=${trackIds!.join(",")}&format=${format}`;
-      const res = await fetch(`/download/${token}/zip?${query}`);
-      if (!res.ok) {
-        setLoading(null);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || `download.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // silently fail
-    }
-    setLoading(null);
+    setTimeout(() => setLoading(null), 3000);
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        {availableFormats.map((format) => (
-          <button
+    <div className="flex gap-2">
+      {availableFormats.map((format) => {
+        const query = releaseId
+          ? `releaseId=${releaseId}&format=${format}`
+          : `trackIds=${trackIds!.join(",")}&format=${format}`;
+        return (
+          <a
             key={format}
-            onClick={() => handleDownload(format)}
-            disabled={loading !== null}
+            href={`/download/${token}/zip?${query}`}
+            download
+            onClick={() => handleClick(format)}
             className={cn(buttonVariants({ size: "sm", variant: "default" }))}
           >
             {loading === format ? (
@@ -54,14 +39,9 @@ export function DownloadZipButtons({ token, releaseId, trackIds, availableFormat
             ) : (
               `${format.toUpperCase()} ZIP`
             )}
-          </button>
-        ))}
-      </div>
-      {loading && (
-        <p className="text-sm text-muted-foreground">
-          Preparing your zip file — this may take a few minutes depending on the number of tracks.
-        </p>
-      )}
+          </a>
+        );
+      })}
     </div>
   );
 }

@@ -14,34 +14,19 @@ interface DownloadButtonsProps {
 export function DownloadButtons({ token, trackId, availableFormats }: DownloadButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
-  async function handleDownload(format: string) {
+  function handleClick(format: string) {
     setLoading(format);
-    try {
-      const res = await fetch(`/download/${token}?trackId=${trackId}&format=${format}`);
-      if (!res.ok) {
-        setLoading(null);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || `download.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // silently fail
-    }
-    setLoading(null);
+    setTimeout(() => setLoading(null), 3000);
   }
 
   return (
     <div className="flex gap-2">
       {availableFormats.map((format) => (
-        <button
+        <a
           key={format}
-          onClick={() => handleDownload(format)}
-          disabled={loading !== null}
+          href={`/download/${token}?trackId=${trackId}&format=${format}`}
+          download
+          onClick={() => handleClick(format)}
           className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}
         >
           {loading === format ? (
@@ -49,7 +34,7 @@ export function DownloadButtons({ token, trackId, availableFormats }: DownloadBu
           ) : (
             format.toUpperCase()
           )}
-        </button>
+        </a>
       ))}
     </div>
   );
