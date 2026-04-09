@@ -1,5 +1,6 @@
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
+import { isInternalUrl } from "@/lib/urls";
 import type { Metadata } from "next";
 import Image from "@/components/Image";
 
@@ -50,21 +51,23 @@ export default async function LinksPage() {
         <SocialLinks iconSize={22} />
 
         <div className="w-full flex flex-col gap-3 mt-2">
-          {links.map((link) => (
-            <a
-              key={link.id}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full text-center py-3.5 px-4 rounded-full
-                border border-white/20 bg-white/10 backdrop-blur-sm
-                text-white font-medium text-sm uppercase tracking-wide
-                hover:bg-neon/20 hover:border-neon/50
-                transition-all duration-200"
-            >
-              {link.title}
-            </a>
-          ))}
+          {links.map((link) => {
+            const internal = isInternalUrl(link.url);
+            return (
+              <a
+                key={link.id}
+                href={link.url}
+                {...(!internal && { target: "_blank", rel: "noopener noreferrer" })}
+                className="block w-full text-center py-3.5 px-4 rounded-full
+                  border border-white/20 bg-white/10 backdrop-blur-sm
+                  text-white font-medium text-sm uppercase tracking-wide
+                  hover:bg-neon/20 hover:border-neon/50
+                  transition-all duration-200"
+              >
+                {link.title}
+              </a>
+            );
+          })}
         </div>
       </div>
     </div>
