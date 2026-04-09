@@ -35,6 +35,12 @@ function cartItemKey(item: { releaseId?: number; trackId?: number; catalogPurcha
 
 let listeners: (() => void)[] = [];
 let snapshot: CartItem[] = [];
+if (typeof window !== "undefined") {
+  try {
+    const stored = localStorage.getItem(CART_KEY);
+    if (stored) snapshot = JSON.parse(stored);
+  } catch {}
+}
 
 function getSnapshot(): CartItem[] {
   return snapshot;
