@@ -11,10 +11,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const { token } = await context.params;
     const releaseId = parseInt(req.nextUrl.searchParams.get("releaseId") || "0");
+    const trackIdsParam = req.nextUrl.searchParams.get("trackIds");
     const format = req.nextUrl.searchParams.get("format") || "mp3";
 
-    if (!releaseId) {
-      return NextResponse.json({ error: "Missing releaseId" }, { status: 400 });
+    if (!releaseId && !trackIdsParam) {
+      return NextResponse.json({ error: "Missing releaseId or trackIds" }, { status: 400 });
     }
 
     const downloadToken = await prisma.downloadToken.findUnique({
@@ -36,46 +37,76 @@ export async function GET(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Invalid download link" }, { status: 404 });
     }
 
-    const orderHasRelease = downloadToken.order.items.some(
-      (item) => item.releaseId === releaseId
-    );
+    let trackFiles: { name: string; trackNumber: number; file: { storageKey: string } }[];
+    let zipName: string;
 
-    if (!orderHasRelease) {
-      return NextResponse.json({ error: "Release not in order" }, { status: 403 });
-    }
+    if (trackIdsParam) {
+      const requestedTrackIds = trackIdsParam.split(",").map(Number);
+      const orderTrackIds = new Set(
+        downloadToken.order.items.filter((item) => item.trackId).map((item) => item.trackId!)
+      );
+      const allOwned = requestedTrackIds.every((id) => orderTrackIds.has(id));
+      if (!allOwned) {
+        return NextResponse.json({ error: "Track not in order" }, { status: 403 });
+      }
 
-    const release = await prisma.release.findUnique({
-      where: { id: releaseId },
-      include: {
-        tracks: {
-          orderBy: { trackNumber: "asc" },
-          include: {
-            files: { where: { format } },
+      const tracks = await prisma.track.findMany({
+        where: { id: { in: requestedTrackIds } },
+        orderBy: { name: "asc" },
+        include: { files: { where: { format } } },
+      });
+
+      trackFiles = tracks
+        .map((track, i) => ({
+          name: track.name,
+          trackNumber: i + 1,
+          file: track.files[0],
+        }))
+        .filter((t) => t.file);
+
+      zipName = `Party Pupils - Tracks (${format.toUpperCase()}).zip`;
+    } else {
+      const orderHasRelease = downloadToken.order.items.some(
+        (item) => item.releaseId === releaseId
+      );
+
+      if (!orderHasRelease) {
+        return NextResponse.json({ error: "Release not in order" }, { status: 403 });
+      }
+
+      const release = await prisma.release.findUnique({
+        where: { id: releaseId },
+        include: {
+          tracks: {
+            orderBy: { trackNumber: "asc" },
+            include: {
+              files: { where: { format } },
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!release) {
-      return NextResponse.json({ error: "Release not found" }, { status: 404 });
+      if (!release) {
+        return NextResponse.json({ error: "Release not found" }, { status: 404 });
+      }
+
+      trackFiles = release.tracks
+        .map((track) => ({
+          name: track.name,
+          trackNumber: track.trackNumber,
+          file: track.files[0],
+        }))
+        .filter((t) => t.file);
+
+      zipName = `${release.name} (${format.toUpperCase()}).zip`;
     }
-
-    const trackFiles = release.tracks
-      .map((track) => ({
-        name: track.name,
-        trackNumber: track.trackNumber,
-        file: track.files[0],
-      }))
-      .filter((t) => t.file);
 
     if (trackFiles.length === 0) {
       return NextResponse.json(
-        { error: "No audio files have been uploaded for this release yet." },
+        { error: "No audio files have been uploaded for these tracks yet." },
         { status: 404 }
       );
     }
-
-    const zipName = `${release.name} (${format.toUpperCase()}).zip`;
 
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();

@@ -7,17 +7,21 @@ import { Loader2Icon } from "lucide-react";
 
 interface DownloadZipButtonsProps {
   token: string;
-  releaseId: number;
+  releaseId?: number;
+  trackIds?: number[];
   availableFormats: string[];
 }
 
-export function DownloadZipButtons({ token, releaseId, availableFormats }: DownloadZipButtonsProps) {
+export function DownloadZipButtons({ token, releaseId, trackIds, availableFormats }: DownloadZipButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
   async function handleDownload(format: string) {
     setLoading(format);
     try {
-      const res = await fetch(`/download/${token}/zip?releaseId=${releaseId}&format=${format}`);
+      const query = releaseId
+        ? `releaseId=${releaseId}&format=${format}`
+        : `trackIds=${trackIds!.join(",")}&format=${format}`;
+      const res = await fetch(`/download/${token}/zip?${query}`);
       if (!res.ok) {
         setLoading(null);
         return;

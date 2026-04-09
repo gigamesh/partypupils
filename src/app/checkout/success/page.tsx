@@ -139,6 +139,24 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
           return null;
         })}
 
+        {token && (() => {
+          const trackItems = order.items.filter((item) => item.track);
+          if (trackItems.length < 2) return null;
+          const formats = [...new Set(trackItems.flatMap((item) => item.track!.files.map((f) => f.format)))];
+          return (
+            <div className="border-t border-border pt-3">
+              <div className="flex items-center justify-between">
+                <p className="font-medium">Download All Tracks</p>
+                <DownloadZipButtons
+                  token={token}
+                  trackIds={trackItems.map((item) => item.track!.id)}
+                  availableFormats={formats}
+                />
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="pt-3 flex justify-between font-semibold">
           <span>Total</span>
           <span>{formatCurrency(order.amountTotal)}</span>
