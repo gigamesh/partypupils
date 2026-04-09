@@ -187,18 +187,9 @@ export default function TestDownloadPage() {
         Test all download scenarios. Verify Chrome shows native download progress.
       </p>
 
-      {/* Single track download */}
-      <div className="glass-panel rounded-lg p-6 space-y-4">
-        <h2>1. Single Track Download</h2>
-        <div className="flex items-center justify-between">
-          <p className="text-sm">{TRACK_A.name}</p>
-          <DownloadButtons token={TOKEN} trackId={TRACK_A.id} availableFormats={["wav"]} />
-        </div>
-      </div>
-
       {/* A-la-carte multi-track zip */}
       <div className="glass-panel rounded-lg p-6 space-y-4">
-        <h2>2. A-La-Carte Tracks (with zip)</h2>
+        <h2>1. A-La-Carte Tracks (with zip)</h2>
         <div className="border-b border-border pb-3">
           <div className="flex items-center justify-between">
             <p className="text-sm">{TRACK_A.name}</p>
@@ -231,7 +222,7 @@ export default function TestDownloadPage() {
 
       {/* Complete Catalog purchase — all releases, each with zip + individual tracks */}
       <div className="glass-panel rounded-lg p-6 space-y-6">
-        <h2>3. Complete Catalog Purchase</h2>
+        <h2>2. Complete Catalog Purchase</h2>
         <p className="text-sm text-muted-foreground">
           Simulates the &ldquo;Buy the Complete Catalog&rdquo; option from /music.
           All 9 releases, each with its own ZIP button and individual track downloads.
