@@ -5,12 +5,20 @@ import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn, formatCurrency } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function CartPage() {
   const { items, removeItem, total } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    function handlePageShow(e: PageTransitionEvent) {
+      if (e.persisted) setLoading(false);
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   async function handleCheckout() {
     setLoading(true);
