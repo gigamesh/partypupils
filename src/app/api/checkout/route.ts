@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
 
   const isCatalogPurchase = items.some((i) => i.catalogPurchase);
   const baseUrl = getBaseUrl();
+  console.log("[checkout] baseUrl:", JSON.stringify(baseUrl));
 
   try {
     if (isCatalogPurchase) {
