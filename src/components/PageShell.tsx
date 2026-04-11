@@ -20,7 +20,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 bg-darkened">{children}</main>
       <footer className="border-t border-white/10 py-8">
         <div className="mx-auto max-w-5xl px-4 flex items-center">
-          <div className="flex-1" />
+          <div className="hidden lg:block flex-1" />
           <SocialLinks iconSize={24} className="neon-glow" />
           <div className="flex-1 text-right">
             <span className="text-xs text-white/80">
