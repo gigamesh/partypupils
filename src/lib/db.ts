@@ -5,7 +5,10 @@ import { env } from "./env";
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: env.DATABASE_URL() });
+  const connectionString = env
+    .DATABASE_URL()
+    .replace("sslmode=require", "sslmode=verify-full");
+  const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({ adapter });
 }
 
