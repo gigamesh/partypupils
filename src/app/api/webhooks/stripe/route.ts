@@ -51,6 +51,14 @@ export async function POST(req: NextRequest) {
 
     const email = session.customer_details?.email || "";
 
+    const existingOrder = await prisma.order.findUnique({
+      where: { stripeSessionId: session.id },
+    });
+
+    if (existingOrder) {
+      return NextResponse.json({ received: true });
+    }
+
     await prisma.order.create({
       data: {
         stripeSessionId: session.id,
