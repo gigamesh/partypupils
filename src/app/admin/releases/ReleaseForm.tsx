@@ -119,28 +119,42 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   }
 
-  async function uploadWav(file: File, prefix: string): Promise<{ url: string; previewUrl?: string; mp3Url?: string }> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("prefix", prefix);
-    formData.append("autoPreview", "true");
-    const res = await fetch("/api/admin/upload", {
+  async function presignAndUpload(file: File, key: string): Promise<string> {
+    const presignRes = await fetch("/api/admin/upload/presign", {
       method: "POST",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, contentType: file.type || "application/octet-stream" }),
     });
-    return res.json();
+    if (!presignRes.ok) throw new Error("Failed to get upload URL");
+    const { url, publicUrl } = await presignRes.json();
+
+    const uploadRes = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!uploadRes.ok) throw new Error("Failed to upload file");
+
+    return publicUrl;
+  }
+
+  async function uploadWav(file: File, prefix: string): Promise<{ url: string; previewUrl?: string; mp3Url?: string }> {
+    const key = `${prefix}/${file.name}`;
+    const url = await presignAndUpload(file, key);
+
+    const processRes = await fetch("/api/admin/upload/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+    const { previewUrl, mp3Url } = await processRes.json();
+
+    return { url, previewUrl, mp3Url };
   }
 
   async function uploadFile(file: File, prefix: string): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("prefix", prefix);
-    const res = await fetch("/api/admin/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    return data.url;
+    const key = `${prefix}/${file.name}`;
+    return presignAndUpload(file, key);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -258,10 +272,12 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         return;
       }
 
-      router.push("/admin");
+      const saved = await res.json();
+      router.push(`/admin/releases/${saved.id}/edit`);
       router.refresh();
-    } catch {
-      setError("Something went wrong");
+    } catch (err) {
+      console.error("Release save failed:", err);
+      setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
       setStatus("");
     }
@@ -391,12 +407,6 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 </Button>
               )}
             </div>
-            {track.existingId && track.existingPreviewUrl && (
-              <div className="flex items-center gap-2 pt-1">
-                <PlayButton trackId={track.existingId} previewUrl={track.existingPreviewUrl} />
-                <TrackProgress trackId={track.existingId} alwaysShow />
-              </div>
-            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Name</Label>
@@ -407,6 +417,12 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} required />
               </div>
             </div>
+            {track.existingId && track.existingPreviewUrl && (
+              <div className="flex items-center gap-2 pt-1">
+                <PlayButton trackId={track.existingId} previewUrl={track.existingPreviewUrl} />
+                <TrackProgress trackId={track.existingId} alwaysShow />
+              </div>
+            )}
             <div className="space-y-1">
               <Label>WAV File {!track.existingWavName && "(required)"}</Label>
               <Input
@@ -444,7 +460,13 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
       {loading && status && (
         <div className="space-y-2 rounded-lg border border-border p-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{status}</span>
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              {status}
+            </span>
             {progress.total > 0 && (
               <span className="text-muted-foreground">
                 {progress.current}/{progress.total}

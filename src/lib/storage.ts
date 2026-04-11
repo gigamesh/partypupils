@@ -2,7 +2,9 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "./env";
 
 const s3 = new S3Client({
@@ -51,6 +53,28 @@ export async function uploadBuffer(
   );
   const url = `${publicUrl}/${pathname}`;
   return { url, storageKey: url };
+}
+
+/** Generate a presigned PUT URL for direct browser-to-R2 uploads. */
+export async function getPresignedUploadUrl(
+  key: string,
+  contentType: string
+): Promise<{ url: string; publicUrl: string }> {
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ContentType: contentType,
+  });
+  const url = await getSignedUrl(s3, command, { expiresIn: 600 });
+  return { url, publicUrl: `${publicUrl}/${key}` };
+}
+
+/** Download a file from R2 as a Buffer. */
+export async function getFileBuffer(key: string): Promise<Buffer> {
+  const { Body } = await s3.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key })
+  );
+  return Buffer.from(await Body!.transformToByteArray());
 }
 
 /** Delete a file by its public URL (storageKey). */
