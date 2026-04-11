@@ -94,10 +94,12 @@ export default async function HomePage() {
 
       <section
         id="tour"
-        className="mx-auto max-w-5xl px-4 pt-16 scroll-mt-20 glass-panel"
+        className="mx-auto max-w-5xl px-4 pt-16 pb-16 scroll-mt-20"
       >
-        <h2 className="neon-glow text-center uppercase">Tour Dates</h2>
-        <SeatedTourWidget />
+        <div className="glass-panel px-4 py-8 sm:px-8">
+          <h2 className="neon-glow text-center uppercase">Tour Dates</h2>
+          <SeatedTourWidget />
+        </div>
       </section>
     </div>
   );

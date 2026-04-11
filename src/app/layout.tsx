@@ -77,9 +77,7 @@ export default function RootLayout({
         </div>
         <CartProvider>
           <AudioProvider>
-            <div className="relative z-[2] flex flex-col flex-1">
-              <PageShell>{children}</PageShell>
-            </div>
+            <PageShell>{children}</PageShell>
           </AudioProvider>
         </CartProvider>
       </body>
