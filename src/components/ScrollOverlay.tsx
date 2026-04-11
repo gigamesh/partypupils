@@ -35,7 +35,7 @@ export function ScrollOverlay({
   return (
     <div
       ref={ref}
-      className="fixed inset-0 -z-1 bg-background pointer-events-none"
+      className="fixed inset-0 z-0 bg-background pointer-events-none"
       style={{ opacity: 0 }}
       aria-hidden="true"
     />

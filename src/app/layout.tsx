@@ -1,5 +1,6 @@
 import { AudioProvider } from "@/components/AudioProvider";
 import { CartProvider } from "@/components/CartProvider";
+import { FixedBackground } from "@/components/FixedBackground";
 import { PageShell } from "@/components/PageShell";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import { env } from "@/lib/env";
@@ -62,12 +63,15 @@ export default function RootLayout({
       lang="en"
       className={`${outfit.variable} ${inter.variable} antialiased dark`}
     >
-      <body className="flex flex-col">
-        <CartProvider>
-          <AudioProvider>
-            <PageShell>{children}</PageShell>
-          </AudioProvider>
-        </CartProvider>
+      <body>
+        <FixedBackground />
+        <div className="relative z-10 flex flex-col min-h-dvh">
+          <CartProvider>
+            <AudioProvider>
+              <PageShell>{children}</PageShell>
+            </AudioProvider>
+          </CartProvider>
+        </div>
       </body>
     </html>
   );

@@ -123,16 +123,11 @@
     @apply border-border outline-ring/50;
   }
   html {
-    background: url("/images/ocean-bg.jpg") 50% 15% / cover no-repeat;
-    overflow: hidden;
-    height: 100%;
+    background: #1f70b2;
   }
   body {
     @apply text-foreground;
     font-family: var(--font-body-var), sans-serif;
-    background: rgba(31, 112, 178, 0.4);
-    overflow-y: auto;
-    height: 100%;
   }
   h1,
   h2 {
