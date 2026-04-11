@@ -64,13 +64,16 @@ export async function POST(req: NextRequest) {
         : [],
     ]);
 
+    const toAbsoluteUrl = (url: string) =>
+      url.startsWith("http") ? url : `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+
     const lineItems = [
       ...releases.map((r) => ({
         price_data: {
           currency: DEFAULT_CURRENCY,
           product_data: {
             name: r.name,
-            ...(r.coverImageUrl ? { images: [r.coverImageUrl] } : {}),
+            ...(r.coverImageUrl ? { images: [toAbsoluteUrl(r.coverImageUrl)] } : {}),
           },
           unit_amount: r.price,
         },
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
           currency: DEFAULT_CURRENCY,
           product_data: {
             name: `${t.release.name} — ${t.name}`,
-            ...(t.release.coverImageUrl ? { images: [t.release.coverImageUrl] } : {}),
+            ...(t.release.coverImageUrl ? { images: [toAbsoluteUrl(t.release.coverImageUrl)] } : {}),
           },
           unit_amount: t.price,
         },
