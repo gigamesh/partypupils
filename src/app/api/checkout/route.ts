@@ -64,8 +64,16 @@ export async function POST(req: NextRequest) {
         : [],
     ]);
 
-    const toAbsoluteUrl = (url: string) =>
-      url.startsWith("http") ? url : `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+    const toAbsoluteUrl = (url: string) => {
+      const raw = url.startsWith("http") ? url : `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+      try {
+        const parsed = new URL(raw);
+        parsed.pathname = encodeURI(decodeURI(parsed.pathname));
+        return parsed.toString();
+      } catch {
+        return raw;
+      }
+    };
 
     const lineItems = [
       ...releases.map((r) => ({
