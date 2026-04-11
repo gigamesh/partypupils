@@ -130,7 +130,7 @@
   body {
     @apply text-foreground;
     font-family: var(--font-body-var), sans-serif;
-    background: transparent;
+    background: rgba(31, 112, 178, 0.4);
     overflow-y: auto;
     height: 100%;
   }
@@ -152,21 +152,6 @@
     @apply text-lg font-medium;
     margin-bottom: 0.75rem;
   }
-}
-
-/* Dark page overlay — darkens the background for content-heavy pages */
-.bg-darkened {
-  position: relative;
-}
-
-.bg-darkened::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: var(--color-background);
-  opacity: 0.65;
-  pointer-events: none;
 }
 
 /* Frosted glass container */
