@@ -122,9 +122,17 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    background: url("/images/ocean-bg.jpg") 50% 15% / cover no-repeat;
+    overflow: hidden;
+    height: 100%;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     font-family: var(--font-body-var), sans-serif;
+    background: transparent;
+    overflow-y: auto;
+    height: 100%;
   }
   h1,
   h2 {
@@ -161,29 +169,10 @@
   pointer-events: none;
 }
 
-.bg-darkened:has(> .bg-darkened-off)::before {
-  display: none;
-}
-
 /* Frosted glass container */
 .glass-panel {
   @apply border bg-background/50 backdrop-blur-sm overflow-hidden;
   border-radius: 6px;
-}
-
-/* Static background */
-.bg-static {
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.bg-static img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 /* Neon link hover */

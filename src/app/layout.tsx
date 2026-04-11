@@ -5,7 +5,6 @@ import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import { env } from "@/lib/env";
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
-import Image from "@/components/Image";
 import "./globals.css";
 
 const baseUrl = env.NEXT_PUBLIC_BASE_URL();
@@ -61,20 +60,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${outfit.variable} ${inter.variable} h-full antialiased dark`}
+      className={`${outfit.variable} ${inter.variable} antialiased dark`}
     >
-      <body className="min-h-full flex flex-col">
-        <div className="bg-static" aria-hidden="true">
-          <Image
-            src="/images/ocean-bg.jpg"
-            alt=""
-            fill
-            className="object-cover"
-            style={{ objectPosition: "50% 15%" }}
-            priority
-            sizes="100vw"
-          />
-        </div>
+      <body className="flex flex-col">
         <CartProvider>
           <AudioProvider>
             <PageShell>{children}</PageShell>
