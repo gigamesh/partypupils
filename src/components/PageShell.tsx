@@ -18,11 +18,11 @@ export function PageShell({ children }: { children: React.ReactNode }) {
     <>
       <Navigation />
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-white/10 py-8">
-        <div className="mx-auto max-w-5xl px-4 flex items-center">
-          <div className="hidden lg:block flex-1" />
+      <footer className="relative z-10 border-t border-white/10 py-8">
+        <div className="mx-auto max-w-5xl px-4 flex flex-col items-center gap-4 sm:flex-row">
+          <div className="hidden sm:block flex-1" />
           <SocialLinks iconSize={24} className="neon-glow" />
-          <div className="flex-1 text-right">
+          <div className="sm:flex-1 sm:text-right">
             <span className="text-xs font-bold">
               Built by{" "}
               <a
