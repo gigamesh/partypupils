@@ -13,7 +13,7 @@ export function FixedBackground() {
       />
       <div
         className="absolute inset-0"
-        style={{ background: "rgba(31, 112, 178, 0.4)" }}
+        style={{ background: "rgba(31, 112, 178, 0.3)" }}
       />
     </div>
   );
