@@ -4,6 +4,8 @@ import { FixedBackground } from "@/components/FixedBackground";
 import { PageShell } from "@/components/PageShell";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import { env } from "@/lib/env";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
@@ -72,6 +74,8 @@ export default function RootLayout({
             </AudioProvider>
           </CartProvider>
         </div>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
