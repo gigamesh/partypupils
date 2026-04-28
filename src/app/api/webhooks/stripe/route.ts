@@ -71,14 +71,33 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (email) {
-      const itemNames = [
-        ...releases.map((r) => r.name),
-        ...tracks.map((t) => t.name),
-      ];
-      const verifyToken = await createOrderVerificationToken(email);
-      const verifyUrl = `${env.NEXT_PUBLIC_BASE_URL()}/orders/verify?token=${verifyToken}`;
-      await sendPurchaseConfirmationEmail(email, verifyUrl, itemNames);
+    if (!email) {
+      // Stripe almost always supplies an email but doesn't guarantee it. The order is
+      // safely recorded; without an email we have no way to send the verification link
+      // back to the customer — manual intervention required.
+      console.warn(
+        `[stripe-webhook] checkout.session.completed (session=${session.id}) has no customer_details.email — order recorded but customer cannot retrieve downloads.`,
+      );
+    } else {
+      // Best-effort email send. If Resend is down or anything else throws we log loudly
+      // but DO NOT rethrow — otherwise Stripe retries the webhook and on every retry
+      // we'd hit the existingOrder short-circuit and exit without sending, masking the
+      // failure indefinitely. A failed email is a separate retry concern from order
+      // recording, which is already idempotent.
+      try {
+        const itemNames = [
+          ...releases.map((r) => r.name),
+          ...tracks.map((t) => t.name),
+        ];
+        const verifyToken = await createOrderVerificationToken(email);
+        const verifyUrl = `${env.NEXT_PUBLIC_BASE_URL()}/orders/verify?token=${verifyToken}`;
+        await sendPurchaseConfirmationEmail(email, verifyUrl, itemNames);
+      } catch (err) {
+        console.error(
+          `[stripe-webhook] failed to send purchase confirmation to ${email} for session ${session.id}:`,
+          err,
+        );
+      }
     }
   }
 

@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST as stripeWebhook } from "@/app/api/webhooks/stripe/route";
 import { stripe } from "@/lib/stripe";
+import { sendPurchaseConfirmationEmail } from "@/lib/email";
 import { prisma } from "@/lib/db";
 import { makeRelease, makeTrackWithFile } from "../../factories";
 
@@ -18,6 +19,8 @@ function webhookReq(rawBody: string) {
 
 beforeEach(() => {
   vi.mocked(stripe().webhooks.constructEvent).mockReset();
+  vi.mocked(sendPurchaseConfirmationEmail).mockReset();
+  vi.mocked(sendPurchaseConfirmationEmail).mockResolvedValue(undefined);
 });
 
 describe("POST /api/webhooks/stripe", () => {
@@ -97,6 +100,67 @@ describe("POST /api/webhooks/stripe", () => {
 
     const orders = await prisma.order.findMany({ where: { stripeSessionId: "cs_test_dup" } });
     expect(orders).toHaveLength(1);
+  });
+
+  it("still creates an Order when customer_details.email is empty (logs a warning)", async () => {
+    const release = await makeRelease();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.mocked(stripe().webhooks.constructEvent).mockReturnValueOnce({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_no_email",
+          payment_intent: "pi_no_email",
+          amount_total: 999,
+          customer_details: { email: null },
+          metadata: { release_ids: JSON.stringify([release.id]), track_ids: "[]" },
+        },
+      },
+    } as never);
+
+    const res = await stripeWebhook(webhookReq("{}") as never);
+    expect(res.status).toBe(200);
+
+    const order = await prisma.order.findUnique({ where: { stripeSessionId: "cs_no_email" } });
+    expect(order).not.toBeNull();
+    expect(order?.email).toBe("");
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no customer_details.email"));
+    expect(vi.mocked(sendPurchaseConfirmationEmail)).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it("does not retry the whole webhook when the confirmation email fails", async () => {
+    const release = await makeRelease();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(sendPurchaseConfirmationEmail).mockRejectedValueOnce(new Error("Resend is down"));
+
+    vi.mocked(stripe().webhooks.constructEvent).mockReturnValueOnce({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_email_fail",
+          payment_intent: "pi_fail",
+          amount_total: 999,
+          customer_details: { email: "buyer@test" },
+          metadata: { release_ids: JSON.stringify([release.id]), track_ids: "[]" },
+        },
+      },
+    } as never);
+
+    const res = await stripeWebhook(webhookReq("{}") as never);
+    // 200 (not 500): we don't want Stripe retrying just because email send failed.
+    expect(res.status).toBe(200);
+
+    const order = await prisma.order.findUnique({ where: { stripeSessionId: "cs_email_fail" } });
+    expect(order).not.toBeNull();
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("failed to send purchase confirmation"),
+      expect.any(Error),
+    );
+
+    errSpy.mockRestore();
   });
 
   it("returns 200 without creating an Order when both id arrays are empty (no work to do)", async () => {
