@@ -421,12 +421,18 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 <span className="text-sm font-medium">Track {track.trackNumber}</span>
               </div>
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <label
+                  className={`flex items-center gap-1.5 text-xs ${
+                    inRadio ? "text-muted-foreground" : "text-muted-foreground/40 cursor-not-allowed"
+                  }`}
+                  title={inRadio ? undefined : "Release is excluded from Party Pupils Radio"}
+                >
                   <input
                     type="checkbox"
-                    checked={track.inRadio}
+                    checked={inRadio && track.inRadio}
+                    disabled={!inRadio}
                     onChange={(e) => updateTrack(index, "inRadio", e.target.checked)}
-                    className="h-3.5 w-3.5"
+                    className="h-3.5 w-3.5 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   In radio
                 </label>
