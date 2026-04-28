@@ -37,7 +37,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Invalid download link" }, { status: 404 });
     }
 
-    let trackFiles: { name: string; trackNumber: number; file: { storageKey: string } }[];
+    // Pre-built filename per track so the two paths (trackIds vs releaseId) can name files
+    // differently — release zips get "01 - X.mp3" matching the album order; multi-track
+    // zips get "Album Name - X.mp3" because cross-release numbering would be misleading.
+    let trackFiles: { fileName: string; storageKey: string }[];
     let zipName: string;
 
     if (trackIdsParam) {
@@ -52,17 +55,18 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
       const tracks = await prisma.track.findMany({
         where: { id: { in: requestedTrackIds } },
-        orderBy: { name: "asc" },
-        include: { files: { where: { format } } },
+        include: { files: { where: { format } }, release: { select: { name: true } } },
       });
+      const trackById = new Map(tracks.map((t) => [t.id, t]));
 
-      trackFiles = tracks
-        .map((track, i) => ({
-          name: track.name,
-          trackNumber: i + 1,
-          file: track.files[0],
-        }))
-        .filter((t) => t.file);
+      // Preserve request order — that's the order the customer chose at checkout.
+      trackFiles = requestedTrackIds
+        .map((id) => trackById.get(id))
+        .filter((t): t is NonNullable<typeof t> => t !== undefined && t.files.length > 0)
+        .map((t) => ({
+          fileName: `${t.release.name} - ${t.name}.${format}`,
+          storageKey: t.files[0].storageKey,
+        }));
 
       zipName = `Party Pupils - Tracks (${format.toUpperCase()}).zip`;
     } else {
@@ -91,12 +95,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
       }
 
       trackFiles = release.tracks
+        .filter((t) => t.files.length > 0)
         .map((track) => ({
-          name: track.name,
-          trackNumber: track.trackNumber,
-          file: track.files[0],
-        }))
-        .filter((t) => t.file);
+          fileName: `${String(track.trackNumber).padStart(2, "0")} - ${track.name}.${format}`,
+          storageKey: track.files[0].storageKey,
+        }));
 
       zipName = `${release.name} (${format.toUpperCase()}).zip`;
     }
@@ -127,10 +130,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     (async () => {
       for (const track of trackFiles) {
-        const res = await fetch(track.file.storageKey);
+        const res = await fetch(track.storageKey);
         if (!res.ok || !res.body) continue;
-        const fileName = `${String(track.trackNumber).padStart(2, "0")} - ${track.name}.${format}`;
-        archive.append(Buffer.from(await res.arrayBuffer()), { name: fileName });
+        archive.append(Buffer.from(await res.arrayBuffer()), { name: track.fileName });
       }
       await archive.finalize();
     })();
