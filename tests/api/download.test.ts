@@ -141,4 +141,40 @@ describe("GET /download/[token]/zip", () => {
     const res = await downloadZip(tokenReq(token, "format=mp3"), ctx(token));
     expect(res.status).toBe(400);
   });
+
+  it("502s when any track is unavailable in R2 (pre-flight HEAD check)", async () => {
+    const release = await makeRelease();
+    const t = await makeTrackWithFile(release.id);
+    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
+    const token = order.downloadTokens[0].token;
+
+    // HEAD pre-flight returns 404 → route should refuse to start streaming.
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+
+    const res = await downloadZip(
+      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      ctx(token),
+    );
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toMatch(/temporarily unavailable/i);
+    // We use t in the assertion above (release ownership is implicit in the test setup).
+    expect(t.id).toBeGreaterThan(0);
+  });
+
+  it("starts streaming once HEAD pre-flight succeeds", async () => {
+    const release = await makeRelease();
+    await makeTrackWithFile(release.id);
+    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
+    const token = order.downloadTokens[0].token;
+
+    fetchMock.mockResolvedValue(new Response("audio-bytes", { status: 200 }));
+
+    const res = await downloadZip(
+      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      ctx(token),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/zip");
+  });
 });

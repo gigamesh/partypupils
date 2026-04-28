@@ -111,6 +111,33 @@ export async function GET(req: NextRequest, context: RouteContext) {
       );
     }
 
+    // Pre-flight: HEAD every file before we start streaming. If any are missing/unavailable,
+    // fail fast with a 502 — better than handing the customer a silently-truncated zip
+    // because we can't change the response status once streaming starts.
+    const heads = await Promise.all(
+      trackFiles.map(async (t) => {
+        try {
+          const r = await fetch(t.storageKey, { method: "HEAD" });
+          return { ok: r.ok, status: r.status, fileName: t.fileName };
+        } catch (err) {
+          return { ok: false, status: 0, fileName: t.fileName, err };
+        }
+      }),
+    );
+    const missing = heads.filter((h) => !h.ok);
+    if (missing.length > 0) {
+      console.error(
+        `[zip-download] ${missing.length}/${trackFiles.length} files unavailable in R2:`,
+        missing.map((m) => `${m.fileName} (status ${m.status})`).join(", "),
+      );
+      return NextResponse.json(
+        {
+          error: `${missing.length} of ${trackFiles.length} files are temporarily unavailable. Please try again in a moment.`,
+        },
+        { status: 502 },
+      );
+    }
+
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const archive = archiver("zip", { zlib: { level: 0 } });
@@ -131,7 +158,15 @@ export async function GET(req: NextRequest, context: RouteContext) {
     (async () => {
       for (const track of trackFiles) {
         const res = await fetch(track.storageKey);
-        if (!res.ok || !res.body) continue;
+        if (!res.ok || !res.body) {
+          // Pre-flight passed but the GET failed — race with deletion or a transient R2
+          // hiccup. We've already sent 200 + headers so can't switch status; loud log
+          // so the failure is visible in production logs.
+          console.error(
+            `[zip-download] mid-stream fetch failed for ${track.fileName} (status ${res.status}); skipping in zip`,
+          );
+          continue;
+        }
         archive.append(Buffer.from(await res.arrayBuffer()), { name: track.fileName });
       }
       await archive.finalize();
