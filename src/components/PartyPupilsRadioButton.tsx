@@ -6,20 +6,21 @@ import { useAudio } from "./AudioProvider";
 import { Button } from "@/components/ui/button";
 
 /**
- * Tunes in to a fresh random shuffle of the entire catalog. When the radio is
- * already the active source, the button toggles play/pause and reflects the
- * current playback state.
+ * Master play/pause for the global player, branded as Party Pupils Radio.
+ * - With anything loaded in the queue: behaves like the player bar's play
+ *   button (toggles play/pause, icon mirrors `state.isPlaying`).
+ * - With an empty queue: fetches a fresh random shuffle and starts playing.
  */
 export function PartyPupilsRadioButton({ className }: { className?: string }) {
   const { state, playQueue, toggle } = useAudio();
   const [loading, setLoading] = useState(false);
 
-  const isRadio = state.queueSource === "radio" && state.currentIndex >= 0;
-  const isPlayingRadio = isRadio && state.isPlaying;
+  const hasQueue = state.currentIndex >= 0;
+  const isPlaying = hasQueue && state.isPlaying;
 
   const handleClick = async () => {
     if (loading) return;
-    if (isRadio) {
+    if (hasQueue) {
       toggle();
       return;
     }
@@ -38,9 +39,11 @@ export function PartyPupilsRadioButton({ className }: { className?: string }) {
 
   const label = loading
     ? "Tuning in…"
-    : isPlayingRadio
-      ? "Pause Party Pupils Radio"
-      : "Tune in to Party Pupils Radio";
+    : isPlaying
+      ? "Pause"
+      : hasQueue
+        ? "Play"
+        : "Tune in to Party Pupils Radio";
 
   return (
     <Button
@@ -51,7 +54,7 @@ export function PartyPupilsRadioButton({ className }: { className?: string }) {
       aria-label={label}
       className={className}
     >
-      {isPlayingRadio ? (
+      {isPlaying ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <rect x="6" y="4" width="4" height="16" rx="1" />
           <rect x="14" y="4" width="4" height="16" rx="1" />
