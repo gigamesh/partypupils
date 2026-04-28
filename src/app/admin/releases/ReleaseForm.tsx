@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "@/components/Image";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,34 @@ import { slugify } from "@/lib/utils";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import type { PlayerTrack } from "@/lib/player-types";
+
+/** Checkbox that supports an indeterminate display state for "some children selected". */
+function RadioCheckbox({
+  id,
+  checked,
+  partial,
+  onChange,
+}: {
+  id?: string;
+  checked: boolean;
+  partial: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = partial;
+  }, [partial]);
+  return (
+    <input
+      id={id}
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      className="h-4 w-4 cursor-pointer"
+    />
+  );
+}
 
 interface TrackInput {
   existingId?: number;
@@ -552,7 +580,12 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
           <Label htmlFor="published">Published</Label>
         </div>
         <div className="flex items-center gap-2">
-          <input id="inRadio" type="checkbox" checked={inRadio} onChange={(e) => setInRadio(e.target.checked)} className="h-4 w-4" />
+          <RadioCheckbox
+            id="inRadio"
+            checked={inRadio}
+            partial={inRadio && tracks.some((t) => !t.inRadio)}
+            onChange={(next) => setInRadio(next)}
+          />
           <Label htmlFor="inRadio">Include in Party Pupils Radio</Label>
           <span className="text-xs text-muted-foreground">(uncheck to exclude every track in this release from the radio mix)</span>
         </div>

@@ -19,7 +19,10 @@ import { ReleaseRadioToggle } from "./releases/ReleaseRadioToggle";
 export default async function AdminReleasesPage() {
   const releases = await prisma.release.findMany({
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { tracks: true } } },
+    include: {
+      _count: { select: { tracks: true } },
+      tracks: { select: { inRadio: true } },
+    },
   });
 
   return (
@@ -58,7 +61,11 @@ export default async function AdminReleasesPage() {
               <TableCell className="text-right">{formatCurrency(release.price)}</TableCell>
               <TableCell className="text-right">{release._count.tracks}</TableCell>
               <TableCell className="text-center">
-                <ReleaseRadioToggle releaseId={release.id} initial={release.inRadio} />
+                <ReleaseRadioToggle
+                  releaseId={release.id}
+                  initial={release.inRadio}
+                  initialPartial={release.inRadio && release.tracks.some((t) => !t.inRadio)}
+                />
               </TableCell>
               <TableCell className="text-right">
                 <Badge variant={release.isPublished ? "default" : "secondary"}>
