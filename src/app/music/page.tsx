@@ -3,7 +3,7 @@ import { PartyPupilsRadioButton } from "@/components/PartyPupilsRadioButton";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { getCatalogPrice } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
-import { toPlayerTrack } from "@/lib/player-data";
+import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -28,18 +28,10 @@ export default async function MusicPage() {
     getCatalogPrice(),
   ]);
 
-  const releasesWithTracks = releases.map((r) => {
-    const releaseInfo = {
-      id: r.id,
-      name: r.name,
-      slug: r.slug,
-      coverImageUrl: r.coverImageUrl,
-    };
-    const tracks = r.tracks
-      .map((t) => toPlayerTrack(t, releaseInfo))
-      .filter((t): t is NonNullable<typeof t> => t !== null);
-    return { ...r, playerTracks: tracks };
-  });
+  const releasesWithTracks = releases.map((r) => ({
+    ...r,
+    playerTracks: buildPlayerTracksForRelease(r),
+  }));
 
   const hasAnyStreamableTrack = releasesWithTracks.some((r) => r.playerTracks.length > 0);
 

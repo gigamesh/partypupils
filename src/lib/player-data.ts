@@ -42,3 +42,18 @@ export function toPlayerTrack(track: TrackInput, release: ReleaseInput): PlayerT
     streamUrl: normaliseUrl(rawStream),
   };
 }
+
+/** Map a release-with-tracks (Prisma include shape) to its non-null PlayerTrack[]. */
+export function buildPlayerTracksForRelease(
+  release: ReleaseInput & { tracks: TrackInput[] },
+): PlayerTrack[] {
+  const releaseInfo = {
+    id: release.id,
+    name: release.name,
+    slug: release.slug,
+    coverImageUrl: release.coverImageUrl,
+  };
+  return release.tracks
+    .map((t) => toPlayerTrack(t, releaseInfo))
+    .filter((t): t is PlayerTrack => t !== null);
+}
