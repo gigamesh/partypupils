@@ -88,18 +88,11 @@ export function PlayerBar() {
   if (!track) return null;
 
   return (
-    <>
-      {expanded && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
-          onClick={() => setExpanded(false)}
-          aria-hidden="true"
-        />
-      )}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-background/85 backdrop-blur-md"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
+    <div
+      data-expanded={expanded ? "true" : "false"}
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-background/85 backdrop-blur-md"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       {/* Brand strip */}
       <div className="flex items-center justify-center gap-2 pt-1 pb-0.5 text-xs font-semibold uppercase tracking-[0.2em] text-neon/80">
         <span>Party Pupils Radio</span>
@@ -112,67 +105,83 @@ export function PlayerBar() {
         )}
       </div>
 
-      {/* Mobile expanded sheet */}
-      {expanded && (
-        <div className="md:hidden px-4 py-4 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <Link
-              href={`/music/${track.releaseSlug}`}
-              onClick={() => setExpanded(false)}
-              className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-muted"
-            >
-              {track.coverImageUrl ? (
-                <Image src={track.coverImageUrl} alt={track.releaseName} fill className="object-cover" sizes="112px" />
-              ) : (
-                <div className="flex h-full items-center justify-center text-3xl text-neon/30">♪</div>
-              )}
-            </Link>
-            <div className="min-w-0 flex-1">
-              <div className="text-base font-medium leading-tight truncate">{track.trackName}</div>
+      {/* Mobile expanded sheet — animated via grid-rows trick */}
+      <div
+        className={`md:hidden grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+          expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+        aria-hidden={!expanded}
+      >
+        <div className="overflow-hidden">
+          <div className="px-4 py-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
               <Link
                 href={`/music/${track.releaseSlug}`}
                 onClick={() => setExpanded(false)}
-                className="neon-link text-sm truncate block"
+                className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-muted"
               >
-                {track.releaseName}
+                {track.coverImageUrl ? (
+                  <Image src={track.coverImageUrl} alt={track.releaseName} fill className="object-cover" sizes="112px" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-3xl text-neon/30">♪</div>
+                )}
               </Link>
+              <div className="min-w-0 flex-1">
+                <div className="text-base font-medium leading-tight truncate">{track.trackName}</div>
+                <Link
+                  href={`/music/${track.releaseSlug}`}
+                  onClick={() => setExpanded(false)}
+                  className="neon-link text-sm truncate block"
+                >
+                  {track.releaseName}
+                </Link>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setExpanded(false)}
+                aria-label="Collapse"
+                tabIndex={expanded ? 0 : -1}
+              >
+                <ChevronDownIcon />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setExpanded(false)}
-              aria-label="Collapse"
-            >
-              <ChevronDownIcon />
-            </Button>
-          </div>
 
-          <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatTime(state.currentTime)}</span>
-            <span>{formatTime(state.duration)}</span>
-          </div>
+            <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{formatTime(state.currentTime)}</span>
+              <span>{formatTime(state.duration)}</span>
+            </div>
 
-          <div className="flex items-center justify-center gap-6">
-            <Button variant="ghost" size="icon-lg" onClick={prev} aria-label="Previous">
-              <SkipIcon direction="prev" size={22} />
-            </Button>
-            <Button
-              variant="pill"
-              size="icon-xl"
-              onClick={toggle}
-              aria-label={state.isPlaying ? "Pause" : "Play"}
-            >
-              <PlayPauseIcon playing={state.isPlaying} size={26} />
-            </Button>
-            <Button variant="ghost" size="icon-lg" onClick={next} aria-label="Next">
-              <SkipIcon direction="next" size={22} />
-            </Button>
+            <div className="flex items-center justify-center gap-6">
+              <Button variant="ghost" size="icon-lg" onClick={prev} aria-label="Previous" tabIndex={expanded ? 0 : -1}>
+                <SkipIcon direction="prev" size={22} />
+              </Button>
+              <Button
+                variant="pill"
+                size="icon-xl"
+                onClick={toggle}
+                aria-label={state.isPlaying ? "Pause" : "Play"}
+                tabIndex={expanded ? 0 : -1}
+              >
+                <PlayPauseIcon playing={state.isPlaying} size={26} />
+              </Button>
+              <Button variant="ghost" size="icon-lg" onClick={next} aria-label="Next" tabIndex={expanded ? 0 : -1}>
+                <SkipIcon direction="next" size={22} />
+              </Button>
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Compact bar */}
+      {/* Compact bar — collapses on mobile when expanded; always shown on desktop */}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out md:grid-rows-[1fr] md:opacity-100 ${
+          expanded ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+        }`}
+        aria-hidden={expanded}
+      >
+        <div className="overflow-hidden">
       <div className="mx-auto flex h-12 max-w-5xl items-center gap-3 px-4 md:h-14">
         <Link
           href={`/music/${track.releaseSlug}`}
@@ -244,10 +253,11 @@ export function PlayerBar() {
       </div>
 
       {/* Mobile thin progress (under bar) */}
-      <div className="md:hidden px-4 pb-1">
+      <div className="md:hidden px-4 pb-3">
         <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
       </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
