@@ -9,8 +9,11 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
+    "db:push": "dotenv -e .env -- prisma db push",
     "db:push:prod": "dotenv -e .env.prod -- prisma db push",
-    "db:reset": "prisma db push --force-reset"
+    "db:reset": "prisma db push --force-reset",
+    "test": "tsx scripts/run-tests.ts",
+    "test:watch": "tsx scripts/run-tests.ts --watch"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -49,12 +52,14 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "@vitest/ui": "^4.1.5",
     "concurrently": "^9.2.1",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   }
 }

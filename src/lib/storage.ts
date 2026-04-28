@@ -14,6 +14,12 @@ const s3 = new S3Client({
     accessKeyId: env.R2_ACCESS_KEY_ID(),
     secretAccessKey: env.R2_SECRET_ACCESS_KEY(),
   },
+  // AWS SDK v3 began auto-adding x-amz-checksum-crc32 to PUT requests in late-2024.
+  // For presigned URLs this bakes the checksum of an *empty* body into the URL —
+  // R2 then rejects the actual upload with BadDigest. Restrict checksums to ops
+  // that explicitly need them.
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
 });
 
 const bucket = env.R2_BUCKET_NAME();

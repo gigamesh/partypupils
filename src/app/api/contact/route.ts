@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendContactEmail } from "@/lib/email";
+import { isAllowedRequestOrigin } from "@/lib/urls";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX = 3;
@@ -18,6 +19,10 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAllowedRequestOrigin(req)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
   const { name, email, message, website } = body;
 

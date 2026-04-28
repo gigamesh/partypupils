@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
-
-interface TrackInput {
-  name: string;
-  price: number;
-  trackNumber: number;
-  previewUrl?: string | null;
-  files: { format: string; fileName: string; storageKey: string; fileSize: number }[];
-}
+import {
+  cleanupR2Objects,
+  StaleFormError,
+  syncReleaseAndTracks,
+  type TrackInput,
+} from "@/lib/release-tracks";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -22,38 +20,31 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const releaseId = parseInt(id);
   const body = await req.json();
-  const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, tracks } = body;
+  const incoming: TrackInput[] = Array.isArray(body.tracks) ? body.tracks : [];
 
-  // Delete existing tracks (cascade deletes their files too)
-  await prisma.track.deleteMany({ where: { releaseId } });
+  try {
+    await syncReleaseAndTracks(
+      releaseId,
+      {
+        name: body.name,
+        slug: body.slug,
+        description: body.description,
+        price: body.price,
+        type: body.type,
+        coverImageUrl: body.coverImageUrl,
+        releasedAt: body.releasedAt,
+        isPublished: body.isPublished,
+      },
+      incoming,
+    );
+  } catch (err) {
+    if (err instanceof StaleFormError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
+  }
 
-  const release = await prisma.release.update({
-    where: { id: releaseId },
-    data: {
-      name,
-      slug,
-      description,
-      price,
-      type,
-      coverImageUrl,
-      releasedAt: releasedAt ? new Date(releasedAt) : null,
-      isPublished,
-      ...(tracks && tracks.length > 0
-        ? {
-            tracks: {
-              create: (tracks as TrackInput[]).map((t) => ({
-                name: t.name,
-                price: t.price,
-                trackNumber: t.trackNumber,
-                previewUrl: t.previewUrl || null,
-                files: t.files.length > 0 ? { create: t.files } : undefined,
-              })),
-            },
-          }
-        : {}),
-    },
-  });
-
+  const release = await prisma.release.findUnique({ where: { id: releaseId } });
   return NextResponse.json(release);
 }
 
@@ -63,7 +54,31 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  await prisma.release.delete({ where: { id: parseInt(id) } });
+  const releaseId = parseInt(id);
+
+  // Capture every R2 object referenced by this release before the cascade nukes the rows.
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    include: { tracks: { include: { files: true } } },
+  });
+
+  if (!release) {
+    return NextResponse.json({ error: "Release not found" }, { status: 404 });
+  }
+
+  const r2KeysToDelete: string[] = [
+    ...(release.coverImageUrl ? [release.coverImageUrl] : []),
+    ...release.tracks.flatMap((t) => [
+      ...t.files.map((f) => f.storageKey),
+      ...(t.previewUrl ? [t.previewUrl] : []),
+    ]),
+  ];
+
+  await prisma.release.delete({ where: { id: releaseId } });
+
+  if (r2KeysToDelete.length > 0) {
+    await cleanupR2Objects(r2KeysToDelete);
+  }
 
   return NextResponse.json({ ok: true });
 }

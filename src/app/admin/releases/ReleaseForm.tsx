@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
@@ -230,6 +240,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         }
 
         trackData.push({
+          id: track.existingId,
           name: track.name,
           price: trackPrice,
           trackNumber: track.trackNumber,
@@ -273,6 +284,11 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
       }
 
       const saved = await res.json();
+      // Reset state explicitly — on edits the URL doesn't change so the form
+      // stays mounted and would otherwise be stuck in "Saving..." forever.
+      setLoading(false);
+      setStatus("");
+      setProgress({ current: 0, total: 0 });
       router.push(`/admin/releases/${saved.id}/edit`);
       router.refresh();
     } catch (err) {
@@ -366,12 +382,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label>Tracks</Label>
-          <Button type="button" variant="outline" size="sm" onClick={addTrack}>
-            Add Track
-          </Button>
-        </div>
+        <Label>Tracks</Label>
 
         {tracks.map((track, index) => (
           <div key={index} className="rounded-lg border border-border p-4 space-y-3">
@@ -402,9 +413,48 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 <span className="text-sm font-medium">Track {track.trackNumber}</span>
               </div>
               {tracks.length > 1 && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => removeTrack(index)}>
-                  Remove
-                </Button>
+                <Dialog>
+                  <DialogTrigger render={<Button type="button" variant="ghost" size="sm" />}>
+                    Remove
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Remove track?</DialogTitle>
+                      <DialogDescription>
+                        {track.existingId ? (
+                          <>
+                            <strong>
+                              Customers who purchased this track — individually or as part of
+                              this release — will permanently lose access to their download.
+                            </strong>
+                            <br />
+                            <br />
+                            <strong>{track.name || `Track ${track.trackNumber}`}</strong> will be
+                            deleted from the database and its audio file removed from storage when
+                            you click Update Release. This cannot be undone.
+                          </>
+                        ) : (
+                          <>
+                            Remove <strong>{track.name || `Track ${track.trackNumber}`}</strong>{" "}
+                            from this release? It hasn't been saved yet, so no data will be
+                            destroyed.
+                          </>
+                        )}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <DialogClose render={<Button type="button" variant="outline" />}>
+                        Cancel
+                      </DialogClose>
+                      <DialogClose
+                        render={<Button type="button" variant="destructive" />}
+                        onClick={() => removeTrack(index)}
+                      >
+                        Remove
+                      </DialogClose>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -450,6 +500,10 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             </div>
           </div>
         ))}
+
+        <Button type="button" variant="outline" size="sm" onClick={addTrack}>
+          Add Track
+        </Button>
       </div>
 
       <div className="flex items-center gap-2">

@@ -4,6 +4,7 @@ import { stripe } from "@/lib/stripe";
 import { getBaseUrl } from "@/lib/utils";
 import { DEFAULT_CURRENCY } from "@/lib/constants";
 import { getCatalogPrice } from "@/lib/catalog";
+import { isAllowedRequestOrigin } from "@/lib/urls";
 
 interface CartItem {
   releaseId?: number;
@@ -12,6 +13,10 @@ interface CartItem {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAllowedRequestOrigin(req)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { items } = (await req.json()) as { items: CartItem[] };
 
   if (!items || items.length === 0) {
