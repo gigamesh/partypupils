@@ -34,6 +34,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         coverImageUrl: body.coverImageUrl,
         releasedAt: body.releasedAt,
         isPublished: body.isPublished,
+        inRadio: body.inRadio,
       },
       incoming,
     );

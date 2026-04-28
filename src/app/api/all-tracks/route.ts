@@ -16,9 +16,10 @@ function shuffle<T>(arr: T[]): T[] {
 
 export async function GET() {
   const releases = await prisma.release.findMany({
-    where: { isPublished: true },
+    where: { isPublished: true, inRadio: true },
     include: {
       tracks: {
+        where: { inRadio: true },
         orderBy: { trackNumber: "asc" },
         include: { files: true },
       },

@@ -28,6 +28,7 @@ model Release {
   coverImageUrl String?
   releasedAt    DateTime?
   isPublished   Boolean     @default(false)
+  inRadio       Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -44,6 +45,7 @@ model Track {
   price       Int // cents — price for individual track purchase
   trackNumber Int
   previewUrl  String?
+  inRadio     Boolean  @default(true)
   createdAt   DateTime @default(now())
 
   release    Release     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
