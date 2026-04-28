@@ -35,6 +35,10 @@ export const buttonVariants = cva(
         "icon-xl": "size-12",
       },
     },
+    compoundVariants: [
+      // Sizes set their own border-radius; re-apply rounded-full so pill stays circular.
+      { variant: "pill", className: "rounded-full" },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",
