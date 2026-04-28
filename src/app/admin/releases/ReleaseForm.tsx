@@ -230,6 +230,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         }
 
         trackData.push({
+          id: track.existingId,
           name: track.name,
           price: trackPrice,
           trackNumber: track.trackNumber,
