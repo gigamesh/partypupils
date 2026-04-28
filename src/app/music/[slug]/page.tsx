@@ -159,7 +159,11 @@ export default async function ReleasePage({ params }: Props) {
                         index={queueIndex}
                       />
                     ) : null}
-                    <TrackProgress trackId={track.id} />
+                    <TrackProgress
+                      trackId={track.id}
+                      streamUrl={playerTrack?.streamUrl}
+                      alwaysShow
+                    />
                   </div>
                 </div>
               );

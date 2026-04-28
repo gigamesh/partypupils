@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAudio } from "./AudioProvider";
 
 interface TrackProgressProps {
   trackId: number;
+  /** Stream URL — when provided, the row probes audio metadata to display the static duration even before playback. */
+  streamUrl?: string;
   alwaysShow?: boolean;
 }
 
@@ -14,29 +17,57 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function TrackProgress({ trackId, alwaysShow = false }: TrackProgressProps) {
+export function TrackProgress({ trackId, streamUrl, alwaysShow = false }: TrackProgressProps) {
   const { state, seek } = useAudio();
+  const [probedDuration, setProbedDuration] = useState<number | null>(null);
 
   const isActive = state.trackId === trackId;
-  const hasDuration = isActive && state.duration > 0;
+  const activeDuration = isActive && state.duration > 0 ? state.duration : 0;
+  const duration = activeDuration || probedDuration || 0;
+  const currentTime = isActive ? state.currentTime : 0;
+  const hasDuration = duration > 0;
+  const progress = hasDuration ? currentTime / duration : 0;
 
-  if (!alwaysShow && !hasDuration) return null;
+  useEffect(() => {
+    if (isActive) return; // active duration comes from the live player
+    if (!streamUrl) return;
+    if (probedDuration != null) return;
 
-  const progress = hasDuration ? state.currentTime / state.duration : 0;
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.src = streamUrl;
+    const onMeta = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setProbedDuration(audio.duration);
+      }
+    };
+    audio.addEventListener("loadedmetadata", onMeta);
+    return () => {
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeAttribute("src");
+      audio.load();
+    };
+  }, [streamUrl, isActive, probedDuration]);
+
+  if (!alwaysShow && !isActive) return null;
 
   return (
     <div className="flex flex-1 items-center gap-3">
       <span className="text-xs text-muted-foreground whitespace-nowrap">
-        {hasDuration ? formatTime(state.currentTime) : "0:00"}
+        {formatTime(currentTime)}
       </span>
       <div
-        className="relative flex-1 h-1.5 rounded-full bg-muted cursor-pointer"
+        role="slider"
+        aria-valuemin={0}
+        aria-valuemax={duration}
+        aria-valuenow={currentTime}
+        className="relative h-1.5 flex-1 rounded-full bg-muted"
         onClick={(e) => {
-          if (!hasDuration) return;
+          if (!isActive || !hasDuration) return;
           e.stopPropagation();
           const rect = e.currentTarget.getBoundingClientRect();
           const ratio = (e.clientX - rect.left) / rect.width;
-          seek(ratio * state.duration);
+          seek(ratio * duration);
         }}
       >
         <div
@@ -45,7 +76,7 @@ export function TrackProgress({ trackId, alwaysShow = false }: TrackProgressProp
         />
       </div>
       <span className="text-xs text-muted-foreground whitespace-nowrap">
-        {hasDuration ? formatTime(state.duration) : "0:00"}
+        {formatTime(duration)}
       </span>
     </div>
   );
