@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
-import { syncReleaseAndTracks, type TrackInput } from "@/lib/release-tracks";
+import { cleanupR2Objects, syncReleaseAndTracks, type TrackInput } from "@/lib/release-tracks";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -42,7 +42,31 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  await prisma.release.delete({ where: { id: parseInt(id) } });
+  const releaseId = parseInt(id);
+
+  // Capture every R2 object referenced by this release before the cascade nukes the rows.
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    include: { tracks: { include: { files: true } } },
+  });
+
+  if (!release) {
+    return NextResponse.json({ error: "Release not found" }, { status: 404 });
+  }
+
+  const r2KeysToDelete: string[] = [
+    ...(release.coverImageUrl ? [release.coverImageUrl] : []),
+    ...release.tracks.flatMap((t) => [
+      ...t.files.map((f) => f.storageKey),
+      ...(t.previewUrl ? [t.previewUrl] : []),
+    ]),
+  ];
+
+  await prisma.release.delete({ where: { id: releaseId } });
+
+  if (r2KeysToDelete.length > 0) {
+    await cleanupR2Objects(r2KeysToDelete);
+  }
 
   return NextResponse.json({ ok: true });
 }

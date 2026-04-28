@@ -40,6 +40,15 @@ vi.mock("@/lib/email", () => ({
   sendContactEmail: vi.fn(async () => {}),
 }));
 
+// Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
+vi.mock("@/lib/storage", () => ({
+  deleteFile: vi.fn(async () => {}),
+  uploadFile: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
+  uploadBuffer: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
+  getPresignedUploadUrl: vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" })),
+  getFileBuffer: vi.fn(async () => Buffer.from("")),
+}));
+
 beforeAll(async () => {
   // Sanity check the connection up front — clearer than test-time timeouts.
   await prisma.$queryRaw`SELECT 1`;

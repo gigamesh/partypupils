@@ -7,6 +7,7 @@
  */
 import { Prisma, type ReleaseType } from "@/generated/prisma/client";
 import { prisma } from "./db";
+import { deleteFile } from "./storage";
 
 export interface FileInput {
   format: string;
@@ -70,13 +71,19 @@ export async function syncReleaseAndTracks(
   const incomingExistingIds = new Set(
     incoming.map((t) => t.id).filter((x): x is number => x != null),
   );
-  const toDeleteIds = existing
-    .filter((t) => !incomingExistingIds.has(t.id))
-    .map((t) => t.id);
+  const tracksBeingDeleted = existing.filter((t) => !incomingExistingIds.has(t.id));
+  const toDeleteIds = tracksBeingDeleted.map((t) => t.id);
   const toUpdate = incoming.filter(
     (t): t is TrackInput & { id: number } => t.id != null && existingById.has(t.id),
   );
   const toCreate = incoming.filter((t) => t.id == null);
+
+  // R2 storage keys for objects that the DB delete will leave orphaned. Cleaned up
+  // best-effort after the transaction commits — DB consistency is the priority.
+  const r2KeysToDelete: string[] = tracksBeingDeleted.flatMap((t) => [
+    ...t.files.map((f) => f.storageKey),
+    ...(t.previewUrl ? [t.previewUrl] : []),
+  ]);
 
   const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.release.update({
@@ -146,4 +153,18 @@ export async function syncReleaseAndTracks(
   }
 
   await prisma.$transaction(ops);
+
+  if (r2KeysToDelete.length > 0) {
+    await cleanupR2Objects(r2KeysToDelete);
+  }
+}
+
+/** Best-effort R2 deletion. Logs failures but doesn't throw — the DB is already consistent. */
+export async function cleanupR2Objects(storageKeys: string[]): Promise<void> {
+  const results = await Promise.allSettled(storageKeys.map((k) => deleteFile(k)));
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      console.warn(`[cleanupR2Objects] failed to delete ${storageKeys[i]}:`, r.reason);
+    }
+  });
 }

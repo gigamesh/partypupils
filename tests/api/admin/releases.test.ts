@@ -6,13 +6,19 @@
  * A small integration band at the bottom drives the same code through the
  * Next route handler to confirm the wiring matches.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import { POST as createRelease } from "@/app/api/admin/releases/route";
 import { PUT as updateRelease, DELETE as deleteRelease } from "@/app/api/admin/releases/[id]/route";
 import { syncReleaseAndTracks } from "@/lib/release-tracks";
+import { deleteFile } from "@/lib/storage";
 import { prisma } from "@/lib/db";
 import { makeRelease, makeTrackWithFile, makeCompletedOrder } from "../../factories";
+
+beforeEach(() => {
+  vi.mocked(deleteFile).mockReset();
+  vi.mocked(deleteFile).mockResolvedValue(undefined);
+});
 
 function jsonRequest(method: string, body: unknown): NextRequest {
   return new Request("http://test/api", {
@@ -184,6 +190,39 @@ describe("syncReleaseAndTracks", () => {
     expect(sorted.map((t) => t.id)).toEqual([b.id, a.id]);
   });
 
+  it("cleans up R2 objects when tracks are deleted (best-effort, after the DB commit)", async () => {
+    const release = await makeRelease();
+    const keep = await makeTrackWithFile(release.id, { name: "Keep", trackNumber: 1 });
+    const drop = await makeTrackWithFile(release.id, {
+      name: "Drop",
+      trackNumber: 2,
+      storageKey: "https://r2/dropped.mp3",
+    });
+    // Add a previewUrl on the dropped track so we exercise that branch too.
+    await prisma.track.update({
+      where: { id: drop.id },
+      data: { previewUrl: "https://r2/dropped-preview.mp3" },
+    });
+
+    await syncReleaseAndTracks(release.id, scalarsFor(release), [
+      { id: keep.id, name: keep.name, price: keep.price, trackNumber: 1, files: keep.files.map(asFileInput) },
+    ]);
+
+    const calls = vi.mocked(deleteFile).mock.calls.map((c) => c[0]).sort();
+    expect(calls).toEqual(["https://r2/dropped-preview.mp3", "https://r2/dropped.mp3"]);
+  });
+
+  it("does not call deleteFile when no tracks were deleted", async () => {
+    const release = await makeRelease();
+    const t = await makeTrackWithFile(release.id);
+
+    await syncReleaseAndTracks(release.id, scalarsFor(release), [
+      { id: t.id, name: "renamed", price: t.price, trackNumber: 1, files: t.files.map(asFileInput) },
+    ]);
+
+    expect(vi.mocked(deleteFile)).not.toHaveBeenCalled();
+  });
+
   it("ignores stray ids that don't belong to this release (treats them as deletions)", async () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id, { name: "Real" });
@@ -266,5 +305,37 @@ describe("PUT/DELETE /api/admin/releases/[id] (route wiring)", () => {
     expect(res.status).toBe(200);
     expect(await prisma.release.findUnique({ where: { id: release.id } })).toBeNull();
     expect(await prisma.track.count({ where: { releaseId: release.id } })).toBe(0);
+  });
+
+  it("DELETE cleans up R2 cover image, track files, and previews", async () => {
+    const release = await prisma.release.create({
+      data: {
+        name: "Has cover",
+        slug: `cover-${Math.random().toString(36).slice(2, 8)}`,
+        price: 999,
+        type: "single",
+        isPublished: true,
+        coverImageUrl: "https://r2/cover.jpg",
+      },
+    });
+    const t = await makeTrackWithFile(release.id, { storageKey: "https://r2/track.mp3" });
+    await prisma.track.update({ where: { id: t.id }, data: { previewUrl: "https://r2/preview.mp3" } });
+
+    await deleteRelease(
+      new Request("http://test", { method: "DELETE" }) as unknown as NextRequest,
+      ctx(release.id),
+    );
+
+    const calls = vi.mocked(deleteFile).mock.calls.map((c) => c[0]).sort();
+    expect(calls).toEqual(["https://r2/cover.jpg", "https://r2/preview.mp3", "https://r2/track.mp3"]);
+  });
+
+  it("DELETE returns 404 for a release that doesn't exist", async () => {
+    const res = await deleteRelease(
+      new Request("http://test", { method: "DELETE" }) as unknown as NextRequest,
+      ctx(99999),
+    );
+    expect(res.status).toBe(404);
+    expect(vi.mocked(deleteFile)).not.toHaveBeenCalled();
   });
 });
