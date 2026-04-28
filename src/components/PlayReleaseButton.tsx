@@ -19,18 +19,15 @@ export function PlayReleaseButton({
 
   if (tracks.length === 0) return null;
   const releaseId = tracks[0].releaseId;
-  const isThisQueue =
-    state.currentTrack?.releaseId === releaseId &&
-    state.queue.length === tracks.length &&
-    state.queue[0]?.trackId === tracks[0].trackId;
-  const isPlaying = isThisQueue && state.isPlaying;
+  const isCurrentRelease = state.currentTrack?.releaseId === releaseId;
+  const isPlaying = isCurrentRelease && state.isPlaying;
 
   return (
     <Button
       variant="pill"
       size="cta"
       onClick={() => {
-        if (isThisQueue) toggle();
+        if (isPlaying) toggle();
         else playQueue(tracks, 0, "release", { shuffle: false, repeat: "off" });
       }}
       aria-label={isPlaying ? `Pause ${label}` : label}
