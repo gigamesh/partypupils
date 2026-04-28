@@ -56,15 +56,6 @@ function ChevronDownIcon({ size = 22 }: { size?: number }) {
   );
 }
 
-function CloseIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
 function Scrubber({ currentTime, duration, onSeek }: { currentTime: number; duration: number; onSeek: (t: number) => void }) {
   const ratio = duration > 0 ? Math.min(1, currentTime / duration) : 0;
   return (
@@ -90,7 +81,7 @@ function Scrubber({ currentTime, duration, onSeek }: { currentTime: number; dura
 }
 
 export function PlayerBar() {
-  const { state, toggle, next, prev, seek, clear } = useAudio();
+  const { state, toggle, next, prev, seek } = useAudio();
   const [expanded, setExpanded] = useState(false);
 
   const track = state.currentTrack;
@@ -178,16 +169,6 @@ export function PlayerBar() {
               <SkipIcon direction="next" size={22} />
             </Button>
           </div>
-
-          <button
-            onClick={() => {
-              clear();
-              setExpanded(false);
-            }}
-            className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
-          >
-            <CloseIcon size={14} /> Clear queue
-          </button>
         </div>
       )}
 
@@ -239,13 +220,6 @@ export function PlayerBar() {
             <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
           </div>
           <span className="w-10 text-xs text-muted-foreground">{formatTime(state.duration)}</span>
-        </div>
-
-        {/* Desktop clear */}
-        <div className="hidden items-center md:flex">
-          <Button variant="ghost" size="icon-sm" onClick={clear} aria-label="Clear queue">
-            <CloseIcon size={16} />
-          </Button>
         </div>
 
         {/* Mobile transport */}
