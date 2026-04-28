@@ -423,10 +423,15 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                       <DialogDescription>
                         {track.existingId ? (
                           <>
+                            <strong>
+                              Customers who purchased this track — individually or as part of
+                              this release — will permanently lose access to their download.
+                            </strong>
+                            <br />
+                            <br />
                             <strong>{track.name || `Track ${track.trackNumber}`}</strong> will be
-                            permanently deleted when you click Update Release. Past order
-                            references to this track will lose their link. This action cannot be
-                            undone after saving.
+                            deleted from the database and its audio file removed from storage when
+                            you click Update Release. This cannot be undone.
                           </>
                         ) : (
                           <>

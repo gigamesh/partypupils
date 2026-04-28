@@ -58,9 +58,16 @@ export function DeleteReleaseButton({
         <DialogHeader>
           <DialogTitle>Delete release</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete <strong>{releaseName}</strong>? This
-            will permanently remove the release and all its tracks. This action
-            cannot be undone.
+            <strong>Customers who purchased this release in the past will permanently lose
+            access to their downloads.</strong> The release, all its tracks, and the audio files
+            in storage will be removed.
+            <br />
+            <br />
+            If you just want to hide it from the public site, untick <em>Published</em> on the
+            edit page instead — that preserves all customer access.
+            <br />
+            <br />
+            Delete <strong>{releaseName}</strong> anyway? This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
