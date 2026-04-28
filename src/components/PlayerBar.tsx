@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "@/components/Image";
+import { Button } from "@/components/ui/button";
 import { useAudio } from "./AudioProvider";
 import { NowPlayingIndicator } from "./NowPlayingIndicator";
 
@@ -104,162 +105,174 @@ export function PlayerBar() {
           aria-hidden="true"
         />
       )}
-
       <div
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-background/85 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {/* Brand strip */}
-        <div className="flex items-center justify-center gap-2 pt-1 pb-0.5 text-xs font-semibold uppercase tracking-[0.2em] text-neon/80">
-          <span>Party Pupils Radio</span>
-          {state.isPlaying && (
-            <>
-              <span className="text-neon/40">•</span>
-              <NowPlayingIndicator size={10} />
-              <span className="text-neon/60">On Air</span>
-            </>
-          )}
-        </div>
+      {/* Brand strip */}
+      <div className="flex items-center justify-center gap-2 pt-1 pb-0.5 text-xs font-semibold uppercase tracking-[0.2em] text-neon/80">
+        <span>Party Pupils Radio</span>
+        {state.isPlaying && (
+          <>
+            <span className="text-neon/40">•</span>
+            <NowPlayingIndicator size={10} />
+            <span className="text-neon/60">On Air</span>
+          </>
+        )}
+      </div>
 
-        {/* Mobile expanded sheet */}
-        {expanded && (
-          <div className="md:hidden border-b border-white/10 px-4 py-4 space-y-3">
-            <div className="flex items-start justify-between gap-3">
+      {/* Mobile expanded sheet */}
+      {expanded && (
+        <div className="md:hidden px-4 py-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <Link
+              href={`/music/${track.releaseSlug}`}
+              onClick={() => setExpanded(false)}
+              className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-muted"
+            >
+              {track.coverImageUrl ? (
+                <Image src={track.coverImageUrl} alt={track.releaseName} fill className="object-cover" sizes="112px" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-3xl text-neon/30">♪</div>
+              )}
+            </Link>
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-medium leading-tight truncate">{track.trackName}</div>
               <Link
                 href={`/music/${track.releaseSlug}`}
                 onClick={() => setExpanded(false)}
-                className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-muted"
+                className="neon-link text-sm truncate block"
               >
-                {track.coverImageUrl ? (
-                  <Image src={track.coverImageUrl} alt={track.releaseName} fill className="object-cover" sizes="112px" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-3xl text-neon/30">♪</div>
-                )}
+                {track.releaseName}
               </Link>
-              <div className="min-w-0 flex-1">
-                <div className="text-base font-medium leading-tight truncate">{track.trackName}</div>
-                <Link
-                  href={`/music/${track.releaseSlug}`}
-                  onClick={() => setExpanded(false)}
-                  className="neon-link text-sm truncate block"
-                >
-                  {track.releaseName}
-                </Link>
-              </div>
-              <button onClick={() => setExpanded(false)} aria-label="Collapse" className="neon-link p-1">
-                <ChevronDownIcon />
-              </button>
             </div>
-
-            <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{formatTime(state.currentTime)}</span>
-              <span>{formatTime(state.duration)}</span>
-            </div>
-
-            <div className="flex items-center justify-center gap-6">
-              <button onClick={prev} aria-label="Previous" className="neon-link p-2">
-                <SkipIcon direction="prev" size={22} />
-              </button>
-              <button
-                onClick={toggle}
-                aria-label={state.isPlaying ? "Pause" : "Play"}
-                className="rounded-full bg-neon p-3 text-black transition-opacity hover:opacity-90"
-              >
-                <PlayPauseIcon playing={state.isPlaying} size={26} />
-              </button>
-              <button onClick={next} aria-label="Next" className="neon-link p-2">
-                <SkipIcon direction="next" size={22} />
-              </button>
-            </div>
-
-            <button
-              onClick={() => {
-                clear();
-                setExpanded(false);
-              }}
-              className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setExpanded(false)}
+              aria-label="Collapse"
             >
-              <CloseIcon size={14} /> Clear queue
-            </button>
+              <ChevronDownIcon />
+            </Button>
           </div>
-        )}
 
-        {/* Compact bar */}
-        <div className="mx-auto flex h-12 max-w-5xl items-center gap-3 px-4 md:h-14">
+          <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{formatTime(state.currentTime)}</span>
+            <span>{formatTime(state.duration)}</span>
+          </div>
+
+          <div className="flex items-center justify-center gap-6">
+            <Button variant="ghost" size="icon-lg" onClick={prev} aria-label="Previous">
+              <SkipIcon direction="prev" size={22} />
+            </Button>
+            <Button
+              variant="pill"
+              size="icon-xl"
+              onClick={toggle}
+              aria-label={state.isPlaying ? "Pause" : "Play"}
+            >
+              <PlayPauseIcon playing={state.isPlaying} size={26} />
+            </Button>
+            <Button variant="ghost" size="icon-lg" onClick={next} aria-label="Next">
+              <SkipIcon direction="next" size={22} />
+            </Button>
+          </div>
+
+          <button
+            onClick={() => {
+              clear();
+              setExpanded(false);
+            }}
+            className="text-xs text-muted-foreground hover:text-white flex items-center gap-1"
+          >
+            <CloseIcon size={14} /> Clear queue
+          </button>
+        </div>
+      )}
+
+      {/* Compact bar */}
+      <div className="mx-auto flex h-12 max-w-5xl items-center gap-3 px-4 md:h-14">
+        <Link
+          href={`/music/${track.releaseSlug}`}
+          className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted md:h-11 md:w-11"
+        >
+          {track.coverImageUrl ? (
+            <Image src={track.coverImageUrl} alt={track.releaseName} fill className="object-cover" sizes="44px" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-lg text-neon/30">♪</div>
+          )}
+        </Link>
+
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium leading-tight">{track.trackName}</div>
           <Link
             href={`/music/${track.releaseSlug}`}
-            className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted md:h-11 md:w-11"
+            className="neon-link block truncate text-xs leading-tight"
           >
-            {track.coverImageUrl ? (
-              <Image src={track.coverImageUrl} alt={track.releaseName} fill className="object-cover" sizes="44px" />
-            ) : (
-              <div className="flex h-full items-center justify-center text-lg text-neon/30">♪</div>
-            )}
+            {track.releaseName}
           </Link>
-
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium leading-tight">{track.trackName}</div>
-            <Link
-              href={`/music/${track.releaseSlug}`}
-              className="neon-link block truncate text-xs leading-tight"
-            >
-              {track.releaseName}
-            </Link>
-          </div>
-
-          {/* Desktop transport */}
-          <div className="hidden items-center gap-2 md:flex">
-            <button onClick={prev} aria-label="Previous" className="neon-link p-1">
-              <SkipIcon direction="prev" />
-            </button>
-            <button
-              onClick={toggle}
-              aria-label={state.isPlaying ? "Pause" : "Play"}
-              className="rounded-full bg-neon p-1.5 text-black transition-opacity hover:opacity-90"
-            >
-              <PlayPauseIcon playing={state.isPlaying} size={18} />
-            </button>
-            <button onClick={next} aria-label="Next" className="neon-link p-1">
-              <SkipIcon direction="next" />
-            </button>
-          </div>
-
-          {/* Desktop scrubber + time */}
-          <div className="hidden flex-1 items-center gap-2 md:flex">
-            <span className="w-10 text-right text-xs text-muted-foreground">{formatTime(state.currentTime)}</span>
-            <div className="flex-1">
-              <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
-            </div>
-            <span className="w-10 text-xs text-muted-foreground">{formatTime(state.duration)}</span>
-          </div>
-
-          {/* Desktop clear */}
-          <div className="hidden items-center md:flex">
-            <button onClick={clear} aria-label="Clear queue" className="neon-link p-1.5">
-              <CloseIcon size={16} />
-            </button>
-          </div>
-
-          {/* Mobile transport */}
-          <div className="flex items-center gap-1 md:hidden">
-            <button
-              onClick={toggle}
-              aria-label={state.isPlaying ? "Pause" : "Play"}
-              className="rounded-full bg-neon p-1.5 text-black transition-opacity hover:opacity-90"
-            >
-              <PlayPauseIcon playing={state.isPlaying} size={16} />
-            </button>
-            <button onClick={() => setExpanded(true)} aria-label="Expand player" className="neon-link p-1.5">
-              <ChevronUpIcon size={20} />
-            </button>
-          </div>
         </div>
 
-        {/* Mobile thin progress (under bar) */}
-        <div className="md:hidden px-4 pb-1">
-          <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
+        {/* Desktop transport */}
+        <div className="hidden items-center gap-2 md:flex">
+          <Button variant="ghost" size="icon-sm" onClick={prev} aria-label="Previous">
+            <SkipIcon direction="prev" />
+          </Button>
+          <Button
+            variant="pill"
+            size="icon-sm"
+            onClick={toggle}
+            aria-label={state.isPlaying ? "Pause" : "Play"}
+          >
+            <PlayPauseIcon playing={state.isPlaying} size={18} />
+          </Button>
+          <Button variant="ghost" size="icon-sm" onClick={next} aria-label="Next">
+            <SkipIcon direction="next" />
+          </Button>
         </div>
+
+        {/* Desktop scrubber + time */}
+        <div className="hidden flex-1 items-center gap-2 md:flex">
+          <span className="w-10 text-right text-xs text-muted-foreground">{formatTime(state.currentTime)}</span>
+          <div className="flex-1">
+            <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
+          </div>
+          <span className="w-10 text-xs text-muted-foreground">{formatTime(state.duration)}</span>
+        </div>
+
+        {/* Desktop clear */}
+        <div className="hidden items-center md:flex">
+          <Button variant="ghost" size="icon-sm" onClick={clear} aria-label="Clear queue">
+            <CloseIcon size={16} />
+          </Button>
+        </div>
+
+        {/* Mobile transport */}
+        <div className="flex items-center gap-1 md:hidden">
+          <Button
+            variant="pill"
+            size="icon-sm"
+            onClick={toggle}
+            aria-label={state.isPlaying ? "Pause" : "Play"}
+          >
+            <PlayPauseIcon playing={state.isPlaying} size={16} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setExpanded(true)}
+            aria-label="Expand player"
+          >
+            <ChevronUpIcon size={20} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile thin progress (under bar) */}
+      <div className="md:hidden px-4 pb-1">
+        <Scrubber currentTime={state.currentTime} duration={state.duration} onSeek={seek} />
+      </div>
       </div>
     </>
   );

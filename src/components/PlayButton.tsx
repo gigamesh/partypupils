@@ -2,6 +2,7 @@
 
 import type { PlayerTrack } from "@/lib/player-types";
 import { useAudio } from "./AudioProvider";
+import { Button } from "@/components/ui/button";
 
 interface PlayButtonProps {
   track: PlayerTrack;
@@ -18,40 +19,26 @@ export function PlayButton({ track }: PlayButtonProps) {
   const isThisPlaying = isCurrent && state.isPlaying;
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon-sm"
       onClick={(e) => {
         e.stopPropagation();
         if (isCurrent) toggle();
         else playNext(track);
       }}
       aria-label={isThisPlaying ? "Pause" : "Play"}
-      className="neon-link shrink-0 p-1"
     >
       {isThisPlaying ? (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          stroke="none"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
           <rect x="6" y="4" width="4" height="16" rx="1" />
           <rect x="14" y="4" width="4" height="16" rx="1" />
         </svg>
       ) : (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          stroke="none"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
           <polygon points="6,4 20,12 6,20" />
         </svg>
       )}
-    </button>
+    </Button>
   );
 }

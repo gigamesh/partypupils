@@ -2,6 +2,7 @@
 
 import type { PlayerTrack } from "@/lib/player-types";
 import { useAudio } from "./AudioProvider";
+import { Button } from "@/components/ui/button";
 
 interface PlayReleaseButtonProps {
   tracks: PlayerTrack[];
@@ -12,7 +13,7 @@ interface PlayReleaseButtonProps {
 export function PlayReleaseButton({
   tracks,
   label = "Play release",
-  className = "",
+  className,
 }: PlayReleaseButtonProps) {
   const { state, playQueue, toggle } = useAudio();
 
@@ -25,17 +26,15 @@ export function PlayReleaseButton({
   const isPlaying = isThisQueue && state.isPlaying;
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="pill"
+      size="cta"
       onClick={() => {
         if (isThisQueue) toggle();
         else playQueue(tracks, 0, "release", { shuffle: false, repeat: "off" });
       }}
-      className={
-        className ||
-        "inline-flex items-center gap-2 rounded-full bg-neon px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
-      }
       aria-label={isPlaying ? `Pause ${label}` : label}
+      className={className}
     >
       {isPlaying ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -48,6 +47,6 @@ export function PlayReleaseButton({
         </svg>
       )}
       <span>{isPlaying ? "Pause" : label}</span>
-    </button>
+    </Button>
   );
 }

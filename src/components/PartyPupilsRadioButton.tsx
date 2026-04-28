@@ -3,17 +3,14 @@
 import type { PlayerTrack } from "@/lib/player-types";
 import { useState } from "react";
 import { useAudio } from "./AudioProvider";
-
-interface Props {
-  className?: string;
-}
+import { Button } from "@/components/ui/button";
 
 /**
  * Tunes in to a fresh random shuffle of the entire catalog. When the radio is
  * already the active source, the button toggles play/pause and reflects the
  * current playback state.
  */
-export function PartyPupilsRadioButton({ className = "" }: Props) {
+export function PartyPupilsRadioButton({ className }: { className?: string }) {
   const { state, playQueue, toggle } = useAudio();
   const [loading, setLoading] = useState(false);
 
@@ -46,15 +43,13 @@ export function PartyPupilsRadioButton({ className = "" }: Props) {
       : "Tune in to Party Pupils Radio";
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="pill"
+      size="cta"
       onClick={handleClick}
       disabled={loading}
-      className={
-        className ||
-        "inline-flex items-center gap-2 rounded-full bg-neon px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-60"
-      }
       aria-label={label}
+      className={className}
     >
       {isPlayingRadio ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -67,6 +62,6 @@ export function PartyPupilsRadioButton({ className = "" }: Props) {
         </svg>
       )}
       <span>{loading ? "Tuning in…" : "Party Pupils Radio"}</span>
-    </button>
+    </Button>
   );
 }
