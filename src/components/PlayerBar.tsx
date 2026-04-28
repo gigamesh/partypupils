@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import Image from "@/components/Image";
 import { Button } from "@/components/ui/button";
@@ -57,25 +57,67 @@ function ChevronDownIcon({ size = 22 }: { size?: number }) {
 }
 
 function Scrubber({ currentTime, duration, onSeek }: { currentTime: number; duration: number; onSeek: (t: number) => void }) {
-  const ratio = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+  const ref = useRef<HTMLDivElement>(null);
+  const [dragRatio, setDragRatio] = useState<number | null>(null);
+
+  const baseRatio = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+  const ratio = dragRatio ?? baseRatio;
+  const isDragging = dragRatio !== null;
+
+  const eventToRatio = (clientX: number): number => {
+    const el = ref.current;
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0) return 0;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  };
+
   return (
     <div
+      ref={ref}
       role="slider"
       aria-valuemin={0}
       aria-valuemax={duration || 0}
-      aria-valuenow={currentTime}
-      className="relative h-1.5 w-full rounded-full bg-white/15"
-      onClick={(e) => {
+      aria-valuenow={duration > 0 ? ratio * duration : 0}
+      className="relative -my-2 flex w-full items-center py-2 touch-none select-none"
+      onPointerDown={(e) => {
         if (!duration) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const r = (e.clientX - rect.left) / rect.width;
-        onSeek(r * duration);
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDragRatio(eventToRatio(e.clientX));
       }}
+      onPointerMove={(e) => {
+        if (!duration || !isDragging) return;
+        setDragRatio(eventToRatio(e.clientX));
+      }}
+      onPointerUp={(e) => {
+        if (!duration || !isDragging) return;
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+        const finalRatio = eventToRatio(e.clientX);
+        onSeek(finalRatio * duration);
+        setDragRatio(null);
+      }}
+      onPointerCancel={() => setDragRatio(null)}
     >
-      <div
-        className="absolute inset-y-0 left-0 rounded-full bg-neon"
-        style={{ width: `${ratio * 100}%` }}
-      />
+      <div className="relative h-1.5 w-full rounded-full bg-white/15">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-neon"
+          style={{
+            width: `${ratio * 100}%`,
+            transition: isDragging ? "none" : "width 100ms linear",
+          }}
+        />
+        <div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-neon shadow-[0_0_6px_rgba(173,253,2,0.6)]"
+          style={{
+            left: `${ratio * 100}%`,
+            height: isDragging ? "16px" : "12px",
+            width: isDragging ? "16px" : "12px",
+            transition: isDragging
+              ? "height 120ms, width 120ms"
+              : "left 100ms linear, height 120ms, width 120ms",
+          }}
+        />
+      </div>
     </div>
   );
 }
