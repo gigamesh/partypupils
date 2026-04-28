@@ -223,6 +223,39 @@ describe("syncReleaseAndTracks", () => {
     expect(vi.mocked(deleteFile)).not.toHaveBeenCalled();
   });
 
+  it("refuses (StaleFormError) when payload has tracks but none carry an id while DB has tracks", async () => {
+    const release = await makeRelease();
+    await makeTrackWithFile(release.id, { name: "Real" });
+
+    const failed = await syncReleaseAndTracks(release.id, scalarsFor(release), [
+      { name: "Stale", price: 100, trackNumber: 1, files: [] }, // no id
+    ]).catch((e) => e);
+
+    expect(failed).toBeInstanceOf(Error);
+    expect(failed.name).toBe("StaleFormError");
+    // Original tracks still present.
+    await prisma.$disconnect(); // adapter-pg quirk after expected failure
+    expect(await prisma.track.count({ where: { releaseId: release.id } })).toBe(1);
+  });
+
+  it("does NOT trigger StaleFormError when the release has no existing tracks (legit creation flow)", async () => {
+    const release = await makeRelease();
+    // No tracks in DB; payload has new tracks without ids — this is the normal "first save" case.
+
+    await syncReleaseAndTracks(release.id, scalarsFor(release), [
+      {
+        name: "Brand new",
+        price: 100,
+        trackNumber: 1,
+        files: [{ format: "mp3", fileName: "x.mp3", storageKey: "https://r2/x.mp3", fileSize: 5 }],
+      },
+    ]);
+
+    const tracks = await prisma.track.findMany({ where: { releaseId: release.id } });
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].name).toBe("Brand new");
+  });
+
   it("ignores stray ids that don't belong to this release (treats them as deletions)", async () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id, { name: "Real" });

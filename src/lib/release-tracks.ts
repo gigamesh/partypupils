@@ -42,6 +42,14 @@ function fileKey(f: { format: string; storageKey: string }): string {
   return `${f.format}::${f.storageKey}`;
 }
 
+/** Thrown when the incoming payload looks like a stale browser tab (no track IDs but DB has tracks). */
+export class StaleFormError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StaleFormError";
+  }
+}
+
 /**
  * Atomically apply a release update with incremental track sync:
  *
@@ -71,6 +79,16 @@ export async function syncReleaseAndTracks(
   const incomingExistingIds = new Set(
     incoming.map((t) => t.id).filter((x): x is number => x != null),
   );
+
+  // Defence against stale browser tabs: a form submitted from a tab opened before this
+  // codebase started sending track IDs would have `tracks.length > 0` but every entry
+  // missing `id`. Treating that as "delete everything, recreate with new IDs" is exactly
+  // the orphan-creating bug the incremental sync fixed. Refuse instead.
+  if (incoming.length > 0 && incomingExistingIds.size === 0 && existing.length > 0) {
+    throw new StaleFormError(
+      "This release has unsaved changes from a stale browser tab — please refresh and try again.",
+    );
+  }
   const tracksBeingDeleted = existing.filter((t) => !incomingExistingIds.has(t.id));
   const toDeleteIds = tracksBeingDeleted.map((t) => t.id);
   const toUpdate = incoming.filter(

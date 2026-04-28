@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
-import { cleanupR2Objects, syncReleaseAndTracks, type TrackInput } from "@/lib/release-tracks";
+import {
+  cleanupR2Objects,
+  StaleFormError,
+  syncReleaseAndTracks,
+  type TrackInput,
+} from "@/lib/release-tracks";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -17,20 +22,27 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   const body = await req.json();
   const incoming: TrackInput[] = Array.isArray(body.tracks) ? body.tracks : [];
 
-  await syncReleaseAndTracks(
-    releaseId,
-    {
-      name: body.name,
-      slug: body.slug,
-      description: body.description,
-      price: body.price,
-      type: body.type,
-      coverImageUrl: body.coverImageUrl,
-      releasedAt: body.releasedAt,
-      isPublished: body.isPublished,
-    },
-    incoming,
-  );
+  try {
+    await syncReleaseAndTracks(
+      releaseId,
+      {
+        name: body.name,
+        slug: body.slug,
+        description: body.description,
+        price: body.price,
+        type: body.type,
+        coverImageUrl: body.coverImageUrl,
+        releasedAt: body.releasedAt,
+        isPublished: body.isPublished,
+      },
+      incoming,
+    );
+  } catch (err) {
+    if (err instanceof StaleFormError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
+  }
 
   const release = await prisma.release.findUnique({ where: { id: releaseId } });
   return NextResponse.json(release);
