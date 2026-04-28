@@ -96,13 +96,9 @@ export function PlayerBar() {
       {/* Brand strip */}
       <div className="flex items-center justify-center gap-2 pt-1 pb-0.5 text-xs font-semibold uppercase tracking-[0.2em] text-neon/80">
         <span>Party Pupils Radio</span>
-        {state.isPlaying && (
-          <>
-            <span className="text-neon/40">•</span>
-            <NowPlayingIndicator size={10} />
-            <span className="text-neon/60">On Air</span>
-          </>
-        )}
+        <span className={state.isPlaying ? "text-neon/40" : "text-neon/15"}>•</span>
+        <NowPlayingIndicator size={10} active={state.isPlaying} />
+        <span className={state.isPlaying ? "text-neon/60" : "text-neon/25"}>On Air</span>
       </div>
 
       {/* Mobile expanded sheet — animated via grid-rows trick */}
