@@ -163,6 +163,38 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   }
 
+  /** Toggle track.inRadio with immediate persistence for existing tracks (skips the heavy PUT). */
+  function toggleTrackInRadio(index: number, next: boolean) {
+    const trackId = tracks[index].existingId;
+    updateTrack(index, "inRadio", next);
+    if (trackId == null) return; // unsaved track — will get saved with the next full Update Release
+    void fetch(`/api/admin/tracks/${trackId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inRadio: next }),
+    })
+      .then((r) => {
+        if (!r.ok) updateTrack(index, "inRadio", !next);
+      })
+      .catch(() => updateTrack(index, "inRadio", !next));
+  }
+
+  /** Toggle release.inRadio with immediate persistence when editing an existing release. */
+  function toggleReleaseInRadio(next: boolean) {
+    setInRadio(next);
+    const id = release?.id;
+    if (id == null) return; // creating a new release — flush on submit
+    void fetch(`/api/admin/releases/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inRadio: next }),
+    })
+      .then((r) => {
+        if (!r.ok) setInRadio(!next);
+      })
+      .catch(() => setInRadio(!next));
+  }
+
   async function presignAndUpload(file: File, key: string): Promise<string> {
     const presignRes = await fetch("/api/admin/upload/presign", {
       method: "POST",
@@ -459,7 +491,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                     type="checkbox"
                     checked={inRadio && track.inRadio}
                     disabled={!inRadio}
-                    onChange={(e) => updateTrack(index, "inRadio", e.target.checked)}
+                    onChange={(e) => toggleTrackInRadio(index, e.target.checked)}
                     className="h-3.5 w-3.5 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   In radio
@@ -584,7 +616,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             id="inRadio"
             checked={inRadio}
             partial={inRadio && tracks.some((t) => !t.inRadio)}
-            onChange={(next) => setInRadio(next)}
+            onChange={toggleReleaseInRadio}
           />
           <Label htmlFor="inRadio">Include in Party Pupils Radio</Label>
           <span className="text-xs text-muted-foreground">(uncheck to exclude every track in this release from the radio mix)</span>
