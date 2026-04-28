@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
+    "db:push": "dotenv -e .env -- prisma db push",
     "db:push:prod": "dotenv -e .env.prod -- prisma db push",
     "db:reset": "prisma db push --force-reset",
     "test": "tsx scripts/run-tests.ts",
