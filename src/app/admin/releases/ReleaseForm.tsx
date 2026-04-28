@@ -20,6 +20,7 @@ import {
 import { slugify } from "@/lib/utils";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
+import type { PlayerTrack } from "@/lib/player-types";
 
 interface TrackInput {
   existingId?: number;
@@ -467,12 +468,27 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} required />
               </div>
             </div>
-            {track.existingId && track.existingPreviewUrl && (
-              <div className="flex items-center gap-2 pt-1">
-                <PlayButton trackId={track.existingId} previewUrl={track.existingPreviewUrl} />
-                <TrackProgress trackId={track.existingId} alwaysShow />
-              </div>
-            )}
+            {(() => {
+              if (!track.existingId) return null;
+              const url = track.existingMp3StorageKey ?? track.existingPreviewUrl;
+              if (!url) return null;
+              const previewTrack: PlayerTrack = {
+                trackId: track.existingId,
+                trackName: track.name || `Track ${track.trackNumber}`,
+                trackNumber: track.trackNumber,
+                releaseId: release?.id ?? 0,
+                releaseName: name || "Release",
+                releaseSlug: slug,
+                coverImageUrl: release?.coverImageUrl ?? null,
+                streamUrl: url,
+              };
+              return (
+                <div className="flex items-center gap-2 pt-1">
+                  <PlayButton track={previewTrack} queue={[previewTrack]} index={0} />
+                  <TrackProgress trackId={track.existingId} alwaysShow />
+                </div>
+              );
+            })()}
             <div className="space-y-1">
               <Label>WAV File {!track.existingWavName && "(required)"}</Label>
               <Input

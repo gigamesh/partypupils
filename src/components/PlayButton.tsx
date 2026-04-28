@@ -1,33 +1,54 @@
 "use client";
 
+import type { PlayerTrack } from "@/lib/player-types";
 import { useAudio } from "./AudioProvider";
 
 interface PlayButtonProps {
-  trackId: number;
-  previewUrl: string | null;
+  track: PlayerTrack;
+  /** Unused — kept for prop-API stability with previous callers. */
+  queue?: PlayerTrack[];
+  /** Unused — kept for prop-API stability with previous callers. */
+  index?: number;
 }
 
-export function PlayButton({ trackId, previewUrl }: PlayButtonProps) {
-  const { state, toggle } = useAudio();
+export function PlayButton({ track }: PlayButtonProps) {
+  const { state, toggle, playNext } = useAudio();
 
-  if (!previewUrl) return null;
-
-  const isThisPlaying = state.trackId === trackId && state.isPlaying;
+  const isCurrent = state.trackId === track.trackId;
+  const isThisPlaying = isCurrent && state.isPlaying;
 
   return (
     <button
       type="button"
-      onClick={(e) => { e.stopPropagation(); toggle(trackId, previewUrl); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (isCurrent) toggle();
+        else playNext(track);
+      }}
       aria-label={isThisPlaying ? "Pause" : "Play"}
       className="neon-link shrink-0 p-1"
     >
       {isThisPlaying ? (
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
           <rect x="6" y="4" width="4" height="16" rx="1" />
           <rect x="14" y="4" width="4" height="16" rx="1" />
         </svg>
       ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
           <polygon points="6,4 20,12 6,20" />
         </svg>
       )}
