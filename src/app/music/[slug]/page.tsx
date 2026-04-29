@@ -1,7 +1,9 @@
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { PlayButton } from "@/components/PlayButton";
+import { PlayReleaseButton } from "@/components/PlayReleaseButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { prisma } from "@/lib/db";
+import { toPlayerTrack } from "@/lib/player-data";
 import { formatCurrency } from "@/lib/utils";
 import Image from "@/components/Image";
 import type { Metadata } from "next";
@@ -46,6 +48,16 @@ export default async function ReleasePage({ params }: Props) {
     ),
   ];
 
+  const releaseInfo = {
+    id: release.id,
+    name: release.name,
+    slug: release.slug,
+    coverImageUrl: release.coverImageUrl,
+  };
+  const playerTracks = release.tracks
+    .map((t) => toPlayerTrack(t, releaseInfo))
+    .filter((t): t is NonNullable<typeof t> => t !== null);
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
       <div className="glass-panel rounded-xl p-5 space-y-5">
@@ -67,13 +79,17 @@ export default async function ReleasePage({ params }: Props) {
             )}
           </div>
 
-          <div className="flex flex-col justify-between min-w-0">
+          <div className="flex flex-col justify-between min-w-0 gap-2">
             <div>
               <h1 className="text-xl">{release.name}</h1>
               <p className="text-lg font-semibold">
                 {formatCurrency(release.price)}
               </p>
             </div>
+
+            {playerTracks.length > 0 && (
+              <PlayReleaseButton tracks={playerTracks} />
+            )}
 
             {formats.length > 0 && (
               <div className="text-xs text-muted-foreground">
@@ -102,43 +118,56 @@ export default async function ReleasePage({ params }: Props) {
         {release.tracks.length >= 1 && (
           <div className="space-y-2">
             <h2 className="text-sm font-medium">Tracklist</h2>
-            {release.tracks.map((track) => (
-              <div
-                key={track.id}
-                className="rounded-lg border border-border p-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground w-6 text-right">
-                      {track.trackNumber}
-                    </span>
-                    <span className="text-sm font-medium">{track.name}</span>
+            {release.tracks.map((track) => {
+              const playerTrack = toPlayerTrack(track, releaseInfo);
+              const queueIndex = playerTrack
+                ? playerTracks.findIndex((p) => p.trackId === playerTrack.trackId)
+                : -1;
+              return (
+                <div
+                  key={track.id}
+                  className="rounded-lg border border-border p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-muted-foreground w-6 text-right">
+                        {track.trackNumber}
+                      </span>
+                      <span className="text-sm font-medium">{track.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-neon">
+                        {formatCurrency(track.price)}
+                      </span>
+                      <AddToCartButton
+                        item={{
+                          trackId: track.id,
+                          name: track.name,
+                          slug: release.slug,
+                          price: track.price,
+                          coverImageUrl: release.coverImageUrl,
+                          releaseName: release.name,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-neon">
-                      {formatCurrency(track.price)}
-                    </span>
-                    <AddToCartButton
-                      item={{
-                        trackId: track.id,
-                        name: track.name,
-                        slug: release.slug,
-                        price: track.price,
-                        coverImageUrl: release.coverImageUrl,
-                        releaseName: release.name,
-                      }}
+                  <div className="flex items-center gap-2 pt-2">
+                    {playerTrack && queueIndex >= 0 ? (
+                      <PlayButton
+                        track={playerTrack}
+                        queue={playerTracks}
+                        index={queueIndex}
+                      />
+                    ) : null}
+                    <TrackProgress
+                      trackId={track.id}
+                      streamUrl={playerTrack?.streamUrl}
+                      alwaysShow
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 pt-2">
-                  <PlayButton
-                    trackId={track.id}
-                    previewUrl={track.previewUrl}
-                  />
-                  <TrackProgress trackId={track.id} alwaysShow />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

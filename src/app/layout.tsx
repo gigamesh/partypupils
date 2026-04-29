@@ -2,6 +2,9 @@ import { AudioProvider } from "@/components/AudioProvider";
 import { CartProvider } from "@/components/CartProvider";
 import { FixedBackground } from "@/components/FixedBackground";
 import { PageShell } from "@/components/PageShell";
+import { PlayerBar } from "@/components/PlayerBar";
+import { PlayerSpacer } from "@/components/PlayerSpacer";
+import { RandomMixSeeder } from "@/components/RandomMixSeeder";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/constants";
 import { env } from "@/lib/env";
 import { Analytics } from "@vercel/analytics/next";
@@ -71,6 +74,9 @@ export default function RootLayout({
           <CartProvider>
             <AudioProvider>
               <PageShell>{children}</PageShell>
+              <PlayerBar />
+              <PlayerSpacer />
+              <RandomMixSeeder />
             </AudioProvider>
           </CartProvider>
         </div>

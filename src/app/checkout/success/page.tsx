@@ -4,6 +4,7 @@ import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { prisma } from "@/lib/db";
+import { toPlayerTrack } from "@/lib/player-data";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -28,7 +29,7 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
       items: {
         include: {
           release: { include: { tracks: { include: { files: true } } } },
-          track: { include: { files: true } },
+          track: { include: { files: true, release: true } },
         },
       },
       downloadTokens: true,
@@ -56,6 +57,15 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
         <h2>Your Downloads</h2>
         {order.items.map((item) => {
           if (item.release) {
+            const releaseInfo = {
+              id: item.release.id,
+              name: item.release.name,
+              slug: item.release.slug,
+              coverImageUrl: item.release.coverImageUrl,
+            };
+            const playerTracks = item.release.tracks
+              .map((t) => toPlayerTrack(t, releaseInfo))
+              .filter((t): t is NonNullable<typeof t> => t !== null);
             return (
               <div key={item.id} className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -80,32 +90,51 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
                   )}
                 </div>
                 {token &&
-                  item.release.tracks.map((track) => (
-                    <div
-                      key={track.id}
-                      className="border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-sm">
-                          <PlayButton
+                  item.release.tracks.map((track) => {
+                    const playerTrack = toPlayerTrack(track, releaseInfo);
+                    const queueIndex = playerTrack
+                      ? playerTracks.findIndex((p) => p.trackId === playerTrack.trackId)
+                      : -1;
+                    return (
+                      <div
+                        key={track.id}
+                        className="border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm">
+                            {playerTrack && queueIndex >= 0 && (
+                              <PlayButton
+                                track={playerTrack}
+                                queue={playerTracks}
+                                index={queueIndex}
+                              />
+                            )}
+                            {track.trackNumber}. {track.name}
+                          </span>
+                          <DownloadButtons
+                            token={token}
                             trackId={track.id}
-                            previewUrl={track.previewUrl}
+                            availableFormats={track.files.map((f) => f.format)}
                           />
-                          {track.trackNumber}. {track.name}
-                        </span>
-                        <DownloadButtons
-                          token={token}
-                          trackId={track.id}
-                          availableFormats={track.files.map((f) => f.format)}
-                        />
+                        </div>
+                        <TrackProgress trackId={track.id} />
                       </div>
-                      <TrackProgress trackId={track.id} />
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             );
           }
           if (item.track) {
+            const trackRelease = item.track.release ?? null;
+            const releaseInfo = trackRelease
+              ? {
+                  id: trackRelease.id,
+                  name: trackRelease.name,
+                  slug: trackRelease.slug,
+                  coverImageUrl: trackRelease.coverImageUrl,
+                }
+              : { id: 0, name: item.track.name, slug: "", coverImageUrl: null };
+            const playerTrack = toPlayerTrack(item.track, releaseInfo);
             return (
               <div
                 key={item.id}
@@ -113,10 +142,13 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <PlayButton
-                      trackId={item.track.id}
-                      previewUrl={item.track.previewUrl}
-                    />
+                    {playerTrack && (
+                      <PlayButton
+                        track={playerTrack}
+                        queue={[playerTrack]}
+                        index={0}
+                      />
+                    )}
                     <div>
                       <p className="font-medium">{item.track.name}</p>
                       <p className="text-sm text-muted-foreground">

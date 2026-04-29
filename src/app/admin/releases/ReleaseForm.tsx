@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "@/components/Image";
 import { Button } from "@/components/ui/button";
@@ -20,12 +20,42 @@ import {
 import { slugify } from "@/lib/utils";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
+import type { PlayerTrack } from "@/lib/player-types";
+
+/** Checkbox that supports an indeterminate display state for "some children selected". */
+function RadioCheckbox({
+  id,
+  checked,
+  partial,
+  onChange,
+}: {
+  id?: string;
+  checked: boolean;
+  partial: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = partial;
+  }, [partial]);
+  return (
+    <input
+      id={id}
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      className="h-4 w-4 cursor-pointer"
+    />
+  );
+}
 
 interface TrackInput {
   existingId?: number;
   name: string;
   priceStr: string;
   trackNumber: number;
+  inRadio: boolean;
   wavFile: File | null;
   existingWavName?: string;
   existingWavStorageKey?: string;
@@ -42,6 +72,7 @@ interface ExistingTrack {
   price: number;
   trackNumber: number;
   previewUrl: string | null;
+  inRadio: boolean;
   files: { format: string; fileName: string; storageKey: string; fileSize: number | null }[];
 }
 
@@ -56,6 +87,7 @@ interface ReleaseFormProps {
     coverImageUrl: string | null;
     releasedAt: Date | string | null;
     isPublished: boolean;
+    inRadio: boolean;
     tracks?: ExistingTrack[];
   };
 }
@@ -79,6 +111,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     return d.toISOString().slice(0, 10);
   });
   const [isPublished, setIsPublished] = useState(release?.isPublished || false);
+  const [inRadio, setInRadio] = useState(release?.inRadio ?? true);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverPreviewSrc, setCoverPreviewSrc] = useState<string | null>(null);
   const [tracks, setTracks] = useState<TrackInput[]>(() => {
@@ -91,6 +124,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
           name: t.name,
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
+          inRadio: t.inRadio,
           wavFile: null,
           existingWavName: wav?.fileName,
           existingWavStorageKey: wav?.storageKey,
@@ -102,13 +136,13 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         };
       });
     }
-    return [{ name: "", priceStr: "1.99", trackNumber: 1, wavFile: null }];
+    return [{ name: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
   });
 
   function addTrack() {
     setTracks((prev) => [
       ...prev,
-      { name: "", priceStr: "1.99", trackNumber: prev.length + 1, wavFile: null },
+      { name: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
     ]);
   }
 
@@ -125,8 +159,40 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     });
   }
 
-  function updateTrack(index: number, field: keyof TrackInput, value: string | File | null) {
+  function updateTrack(index: number, field: keyof TrackInput, value: string | boolean | File | null) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  }
+
+  /** Toggle track.inRadio with immediate persistence for existing tracks (skips the heavy PUT). */
+  function toggleTrackInRadio(index: number, next: boolean) {
+    const trackId = tracks[index].existingId;
+    updateTrack(index, "inRadio", next);
+    if (trackId == null) return; // unsaved track — will get saved with the next full Update Release
+    void fetch(`/api/admin/tracks/${trackId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inRadio: next }),
+    })
+      .then((r) => {
+        if (!r.ok) updateTrack(index, "inRadio", !next);
+      })
+      .catch(() => updateTrack(index, "inRadio", !next));
+  }
+
+  /** Toggle release.inRadio with immediate persistence when editing an existing release. */
+  function toggleReleaseInRadio(next: boolean) {
+    setInRadio(next);
+    const id = release?.id;
+    if (id == null) return; // creating a new release — flush on submit
+    void fetch(`/api/admin/releases/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inRadio: next }),
+    })
+      .then((r) => {
+        if (!r.ok) setInRadio(!next);
+      })
+      .catch(() => setInRadio(!next));
   }
 
   async function presignAndUpload(file: File, key: string): Promise<string> {
@@ -245,6 +311,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
           price: trackPrice,
           trackNumber: track.trackNumber,
           previewUrl,
+          inRadio: track.inRadio,
           files,
         });
       }
@@ -262,6 +329,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         coverImageUrl,
         releasedAt: releasedAt ? new Date(releasedAt + "T00:00:00Z").toISOString() : null,
         isPublished,
+        inRadio,
         tracks: trackData,
       };
 
@@ -412,50 +480,67 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 </div>
                 <span className="text-sm font-medium">Track {track.trackNumber}</span>
               </div>
-              {tracks.length > 1 && (
-                <Dialog>
-                  <DialogTrigger render={<Button type="button" variant="ghost" size="sm" />}>
-                    Remove
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Remove track?</DialogTitle>
-                      <DialogDescription>
-                        {track.existingId ? (
-                          <>
-                            <strong>
-                              Customers who purchased this track — individually or as part of
-                              this release — will permanently lose access to their download.
-                            </strong>
-                            <br />
-                            <br />
-                            <strong>{track.name || `Track ${track.trackNumber}`}</strong> will be
-                            deleted from the database and its audio file removed from storage when
-                            you click Update Release. This cannot be undone.
-                          </>
-                        ) : (
-                          <>
-                            Remove <strong>{track.name || `Track ${track.trackNumber}`}</strong>{" "}
-                            from this release? It hasn't been saved yet, so no data will be
-                            destroyed.
-                          </>
-                        )}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                      <DialogClose render={<Button type="button" variant="outline" />}>
-                        Cancel
-                      </DialogClose>
-                      <DialogClose
-                        render={<Button type="button" variant="destructive" />}
-                        onClick={() => removeTrack(index)}
-                      >
-                        Remove
-                      </DialogClose>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
+              <div className="flex items-center gap-3">
+                <label
+                  className={`flex items-center gap-1.5 text-xs ${
+                    inRadio ? "text-muted-foreground" : "text-muted-foreground/40 cursor-not-allowed"
+                  }`}
+                  title={inRadio ? undefined : "Release is excluded from Party Pupils Radio"}
+                >
+                  <input
+                    type="checkbox"
+                    checked={inRadio && track.inRadio}
+                    disabled={!inRadio}
+                    onChange={(e) => toggleTrackInRadio(index, e.target.checked)}
+                    className="h-3.5 w-3.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  In radio
+                </label>
+                {tracks.length > 1 && (
+                  <Dialog>
+                    <DialogTrigger render={<Button type="button" variant="ghost" size="sm" />}>
+                      Remove
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Remove track?</DialogTitle>
+                        <DialogDescription>
+                          {track.existingId ? (
+                            <>
+                              <strong>
+                                Customers who purchased this track — individually or as part of
+                                this release — will permanently lose access to their download.
+                              </strong>
+                              <br />
+                              <br />
+                              <strong>{track.name || `Track ${track.trackNumber}`}</strong> will be
+                              deleted from the database and its audio file removed from storage when
+                              you click Update Release. This cannot be undone.
+                            </>
+                          ) : (
+                            <>
+                              Remove <strong>{track.name || `Track ${track.trackNumber}`}</strong>{" "}
+                              from this release? It hasn&apos;t been saved yet, so no data will be
+                              destroyed.
+                            </>
+                          )}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <DialogClose render={<Button type="button" variant="outline" />}>
+                          Cancel
+                        </DialogClose>
+                        <DialogClose
+                          render={<Button type="button" variant="destructive" />}
+                          onClick={() => removeTrack(index)}
+                        >
+                          Remove
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -467,12 +552,27 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                 <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} required />
               </div>
             </div>
-            {track.existingId && track.existingPreviewUrl && (
-              <div className="flex items-center gap-2 pt-1">
-                <PlayButton trackId={track.existingId} previewUrl={track.existingPreviewUrl} />
-                <TrackProgress trackId={track.existingId} alwaysShow />
-              </div>
-            )}
+            {(() => {
+              if (!track.existingId) return null;
+              const url = track.existingMp3StorageKey ?? track.existingPreviewUrl;
+              if (!url) return null;
+              const previewTrack: PlayerTrack = {
+                trackId: track.existingId,
+                trackName: track.name || `Track ${track.trackNumber}`,
+                trackNumber: track.trackNumber,
+                releaseId: release?.id ?? 0,
+                releaseName: name || "Release",
+                releaseSlug: slug,
+                coverImageUrl: release?.coverImageUrl ?? null,
+                streamUrl: url,
+              };
+              return (
+                <div className="flex items-center gap-2 pt-1">
+                  <PlayButton track={previewTrack} queue={[previewTrack]} index={0} />
+                  <TrackProgress trackId={track.existingId} alwaysShow />
+                </div>
+              );
+            })()}
             <div className="space-y-1">
               <Label>WAV File {!track.existingWavName && "(required)"}</Label>
               <Input
@@ -506,9 +606,21 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <input id="published" type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} className="h-4 w-4" />
-        <Label htmlFor="published">Published</Label>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <input id="published" type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} className="h-4 w-4" />
+          <Label htmlFor="published">Published</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <RadioCheckbox
+            id="inRadio"
+            checked={inRadio}
+            partial={inRadio && tracks.some((t) => !t.inRadio)}
+            onChange={toggleReleaseInRadio}
+          />
+          <Label htmlFor="inRadio">Include in Party Pupils Radio</Label>
+          <span className="text-xs text-muted-foreground">(uncheck to exclude every track in this release from the radio mix)</span>
+        </div>
       </div>
 
       {loading && status && (

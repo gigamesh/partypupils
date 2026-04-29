@@ -23,6 +23,7 @@ export interface TrackInput {
   price: number;
   trackNumber: number;
   previewUrl?: string | null;
+  inRadio?: boolean;
   files: FileInput[];
 }
 
@@ -35,6 +36,7 @@ export interface ReleaseScalarsInput {
   coverImageUrl?: string | null;
   releasedAt?: string | Date | null;
   isPublished: boolean;
+  inRadio?: boolean;
 }
 
 /** Stable signature of a TrackFile by (format, storageKey) so we can decide whether files actually changed. */
@@ -115,6 +117,7 @@ export async function syncReleaseAndTracks(
         coverImageUrl: scalars.coverImageUrl ?? null,
         releasedAt: scalars.releasedAt ? new Date(scalars.releasedAt) : null,
         isPublished: scalars.isPublished,
+        inRadio: scalars.inRadio ?? true,
       },
     }),
   ];
@@ -132,6 +135,7 @@ export async function syncReleaseAndTracks(
           price: t.price,
           trackNumber: t.trackNumber,
           previewUrl: t.previewUrl || null,
+          inRadio: t.inRadio ?? true,
         },
       }),
     );
@@ -164,6 +168,7 @@ export async function syncReleaseAndTracks(
           price: t.price,
           trackNumber: t.trackNumber,
           previewUrl: t.previewUrl || null,
+          inRadio: t.inRadio ?? true,
           files: t.files.length > 0 ? { create: t.files } : undefined,
         },
       }),

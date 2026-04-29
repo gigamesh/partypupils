@@ -6,6 +6,7 @@ import { ScrollOverlay } from "@/components/ScrollOverlay";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
 import { prisma } from "@/lib/db";
+import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +17,23 @@ export default async function HomePage() {
       where: { isPublished: true },
       orderBy: { releasedAt: "desc" },
       take: 4,
+      include: {
+        tracks: {
+          orderBy: { trackNumber: "asc" },
+          include: { files: true },
+        },
+      },
     }),
     prisma.link.findMany({
       where: { isVisible: true, showOnHero: true },
       orderBy: { position: "asc" },
     }),
   ]);
+
+  const featuredWithTracks = featuredReleases.map((r) => ({
+    ...r,
+    playerTracks: buildPlayerTracksForRelease(r),
+  }));
 
   return (
     <div>
@@ -76,15 +88,17 @@ export default async function HomePage() {
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {featuredReleases.map((release) => (
+              {featuredWithTracks.map((release) => (
                 <ReleaseCard
                   key={release.id}
+                  id={release.id}
                   name={release.name}
                   slug={release.slug}
                   price={release.price}
                   type={release.type}
                   coverImageUrl={release.coverImageUrl}
                   showPrice={false}
+                  tracks={release.playerTracks}
                 />
               ))}
             </div>

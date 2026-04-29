@@ -14,11 +14,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DeleteReleaseButton } from "./releases/DeleteReleaseButton";
+import { ReleaseRadioToggle } from "./releases/ReleaseRadioToggle";
 
 export default async function AdminReleasesPage() {
   const releases = await prisma.release.findMany({
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { tracks: true } } },
+    include: {
+      _count: { select: { tracks: true } },
+      tracks: { select: { inRadio: true } },
+    },
   });
 
   return (
@@ -38,6 +42,7 @@ export default async function AdminReleasesPage() {
             <TableHead className="text-right">Type</TableHead>
             <TableHead className="text-right">Price</TableHead>
             <TableHead className="text-right">Tracks</TableHead>
+            <TableHead className="text-center" title="Include in Party Pupils Radio">In Radio</TableHead>
             <TableHead className="text-right">Status</TableHead>
           </TableRow>
         </TableHeader>
@@ -55,6 +60,13 @@ export default async function AdminReleasesPage() {
               <TableCell className="text-right">{release.type}</TableCell>
               <TableCell className="text-right">{formatCurrency(release.price)}</TableCell>
               <TableCell className="text-right">{release._count.tracks}</TableCell>
+              <TableCell className="text-center">
+                <ReleaseRadioToggle
+                  releaseId={release.id}
+                  initial={release.inRadio}
+                  initialPartial={release.inRadio && release.tracks.some((t) => !t.inRadio)}
+                />
+              </TableCell>
               <TableCell className="text-right">
                 <Badge variant={release.isPublished ? "default" : "secondary"}>
                   {release.isPublished ? "Published" : "Draft"}
@@ -64,7 +76,7 @@ export default async function AdminReleasesPage() {
           ))}
           {releases.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 No releases yet.
               </TableCell>
             </TableRow>

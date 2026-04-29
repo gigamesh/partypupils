@@ -34,6 +34,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         coverImageUrl: body.coverImageUrl,
         releasedAt: body.releasedAt,
         isPublished: body.isPublished,
+        inRadio: body.inRadio,
       },
       incoming,
     );
@@ -45,6 +46,30 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   }
 
   const release = await prisma.release.findUnique({ where: { id: releaseId } });
+  return NextResponse.json(release);
+}
+
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  if (!(await verifyAdminSession())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await context.params;
+  const body = await req.json();
+
+  const data: { inRadio?: boolean; isPublished?: boolean } = {};
+  if (typeof body.inRadio === "boolean") data.inRadio = body.inRadio;
+  if (typeof body.isPublished === "boolean") data.isPublished = body.isPublished;
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "No supported fields to update" }, { status: 400 });
+  }
+
+  const release = await prisma.release.update({
+    where: { id: parseInt(id) },
+    data,
+  });
+
   return NextResponse.json(release);
 }
 

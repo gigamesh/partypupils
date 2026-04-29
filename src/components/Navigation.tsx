@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "@/components/Image";
 import { useState, useEffect } from "react";
 import { CartButton } from "./CartButton";
+import { Button } from "@/components/ui/button";
 import { MERCH_URL } from "@/lib/constants";
 
 const NAV_ITEMS: readonly { label: string; href: string; external?: boolean; mobileOnly?: boolean }[] = [
@@ -63,17 +64,19 @@ export function Navigation() {
             <CartButton />
           </div>
 
-          <button
+          <Button
+            variant="ghost"
+            size="icon-lg"
             onClick={() => setOpen(!open)}
             aria-label="Toggle menu"
-            className="neon-link md:hidden"
+            className="md:hidden"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="4" x2="20" y1="6" y2="6" />
               <line x1="4" x2="20" y1="12" y2="12" />
               <line x1="4" x2="20" y1="18" y2="18" />
             </svg>
-          </button>
+          </Button>
         </nav>
       </header>
 
@@ -87,16 +90,17 @@ export function Navigation() {
         className={`fixed top-0 right-0 z-50 h-full w-64 bg-background border-l border-white/10 transition-transform duration-300 ease-in-out md:hidden ${open ? "translate-x-0" : "translate-x-full"}`}
       >
         <div className="flex justify-end p-4">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-lg"
             onClick={() => setOpen(false)}
             aria-label="Close menu"
-            className="neon-link"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" x2="6" y1="6" y2="18" />
               <line x1="6" x2="18" y1="6" y2="18" />
             </svg>
-          </button>
+          </Button>
         </div>
         <div className="flex flex-col gap-6 px-6 py-4 [&_a]:text-lg">
           {NAV_ITEMS.map((item) => (

@@ -2,17 +2,21 @@ import Link from "next/link";
 import Image from "@/components/Image";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { ReleasePlayOverlay } from "@/components/ReleasePlayOverlay";
+import type { PlayerTrack } from "@/lib/player-types";
 
 interface ReleaseCardProps {
+  id?: number;
   name: string;
   slug: string;
   price: number;
   type: string;
   coverImageUrl: string | null;
   showPrice?: boolean;
+  tracks?: PlayerTrack[];
 }
 
-export function ReleaseCard({ name, slug, price, type, coverImageUrl, showPrice = true }: ReleaseCardProps) {
+export function ReleaseCard({ id, name, slug, price, type, coverImageUrl, showPrice = true, tracks }: ReleaseCardProps) {
   return (
     <Link
       href={`/music/${slug}`}
@@ -31,6 +35,9 @@ export function ReleaseCard({ name, slug, price, type, coverImageUrl, showPrice 
           <div className="flex h-full items-center justify-center text-4xl text-neon/30">
             ♪
           </div>
+        )}
+        {tracks && id != null && (
+          <ReleasePlayOverlay tracks={tracks} releaseId={id} />
         )}
       </div>
       <div className="p-3">

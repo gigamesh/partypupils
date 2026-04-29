@@ -1,7 +1,9 @@
 import { CatalogBanner } from "@/components/CatalogBanner";
+import { PartyPupilsRadioButton } from "@/components/PartyPupilsRadioButton";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { getCatalogPrice } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
+import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -16,13 +18,29 @@ export default async function MusicPage() {
     prisma.release.findMany({
       where: { isPublished: true },
       orderBy: { releasedAt: "desc" },
+      include: {
+        tracks: {
+          orderBy: { trackNumber: "asc" },
+          include: { files: true },
+        },
+      },
     }),
     getCatalogPrice(),
   ]);
 
+  const releasesWithTracks = releases.map((r) => ({
+    ...r,
+    playerTracks: buildPlayerTracksForRelease(r),
+  }));
+
+  const hasAnyStreamableTrack = releasesWithTracks.some((r) => r.playerTracks.length > 0);
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="neon-glow uppercase">Music</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <h1 className="neon-glow uppercase mb-0">Music</h1>
+        {hasAnyStreamableTrack && <PartyPupilsRadioButton />}
+      </div>
 
       {catalog.releaseCount > 1 && <CatalogBanner catalog={catalog} />}
 
@@ -32,14 +50,16 @@ export default async function MusicPage() {
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {releases.map((release) => (
+          {releasesWithTracks.map((release) => (
             <ReleaseCard
               key={release.id}
+              id={release.id}
               name={release.name}
               slug={release.slug}
               price={release.price}
               type={release.type}
               coverImageUrl={release.coverImageUrl}
+              tracks={release.playerTracks}
             />
           ))}
         </div>

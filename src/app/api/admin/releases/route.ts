@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, tracks } = body;
+  const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, inRadio, tracks } = body;
 
   const existing = await prisma.release.findUnique({ where: { slug } });
   if (existing) {
@@ -25,12 +25,14 @@ export async function POST(req: NextRequest) {
       coverImageUrl,
       releasedAt: releasedAt ? new Date(releasedAt) : null,
       isPublished,
+      inRadio: inRadio ?? true,
       tracks: {
-        create: (tracks || []).map((t: { name: string; price: number; trackNumber: number; previewUrl?: string; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
+        create: (tracks || []).map((t: { name: string; price: number; trackNumber: number; previewUrl?: string; inRadio?: boolean; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
           name: t.name,
           price: t.price,
           trackNumber: t.trackNumber,
           previewUrl: t.previewUrl || null,
+          inRadio: t.inRadio ?? true,
           files: { create: t.files },
         })),
       },
