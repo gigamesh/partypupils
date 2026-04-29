@@ -1,4 +1,5 @@
 import { DownloadButtons } from "@/components/DownloadButtons";
+import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
@@ -53,7 +54,9 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
         .
       </p>
 
-      <div className="glass-panel rounded-lg border p-6 space-y-4">
+      <DownloadFAQ />
+
+      <div className="glass-panel mt-8 rounded-lg border p-6 space-y-4">
         <h2>Your Downloads</h2>
         {order.items.map((item) => {
           if (item.release) {

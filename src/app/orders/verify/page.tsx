@@ -1,4 +1,5 @@
 import { DownloadButtons } from "@/components/DownloadButtons";
+import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
@@ -82,7 +83,9 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
         Showing all orders for {email}.
       </p>
 
-      <div className="space-y-6">
+      <DownloadFAQ />
+
+      <div className="mt-8 space-y-6">
         {ordersWithTokens.map((order) => (
           <div key={order.id} className="glass-panel rounded-lg p-6 space-y-4">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
