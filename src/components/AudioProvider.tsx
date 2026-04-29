@@ -88,11 +88,12 @@ function ensureAudio(): HTMLAudioElement {
     emit({ ...state, duration: audioEl.duration || 0 }, { persist: "skip" });
     syncMediaSessionPosition();
   });
-  audioEl.addEventListener("ended", () => {
+  audioEl.addEventListener("ended", async () => {
     if (state.repeat === "one") {
       seekImpl(0);
       audioEl?.play().catch(() => {});
     } else {
+      await maybeRefreshRadioQueue();
       nextImpl(true);
     }
   });
@@ -175,6 +176,26 @@ function loadTrackAt(index: number, autoplay: boolean) {
   lastPrefetchedUrl = null;
 }
 
+/**
+ * When the queue source is the radio, refresh `state.queue` from /api/all-tracks
+ * before picking the next track. This lets admin `inRadio` toggles propagate to
+ * already-listening visitors at song boundaries — the currently-playing track
+ * finishes, then the next pick comes from the fresh list. Silent no-op on
+ * network failure or empty result; non-radio queues are left untouched.
+ */
+async function maybeRefreshRadioQueue() {
+  if (state.queueSource !== "radio") return;
+  try {
+    const r = await fetch("/api/all-tracks", { cache: "no-store" });
+    if (!r.ok) return;
+    const data = (await r.json()) as { tracks: PlayerTrack[] };
+    if (!Array.isArray(data.tracks) || data.tracks.length === 0) return;
+    state = { ...state, queue: data.tracks };
+  } catch {
+    /* keep current queue on failure */
+  }
+}
+
 function nextImpl(fromEnded: boolean) {
   if (state.queue.length === 0) return;
   let nextIdx: number;
@@ -237,7 +258,9 @@ function setMediaSessionMetadata(track: PlayerTrack) {
     });
     navigator.mediaSession.setActionHandler("play", () => toggleImpl());
     navigator.mediaSession.setActionHandler("pause", () => toggleImpl());
-    navigator.mediaSession.setActionHandler("nexttrack", () => nextImpl(false));
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      void nextPublic();
+    });
     navigator.mediaSession.setActionHandler("previoustrack", () => prevImpl());
     navigator.mediaSession.setActionHandler("seekto", (e) => {
       if (typeof e.seekTime === "number") seekImpl(e.seekTime);
@@ -364,7 +387,8 @@ function clearImpl() {
   emit({ ...EMPTY_PLAYER_STATE });
 }
 
-function nextPublic() {
+async function nextPublic() {
+  await maybeRefreshRadioQueue();
   nextImpl(false);
 }
 
