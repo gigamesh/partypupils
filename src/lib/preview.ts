@@ -1,45 +1,50 @@
-import { execFile } from "child_process";
-import { writeFile, readFile, unlink } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import { randomUUID } from "crypto";
+import { spawn } from "child_process";
+import { Readable } from "stream";
 import ffmpegStatic from "ffmpeg-static";
 
-/** Convert a WAV buffer to MP3 at the given bitrate (e.g. "128k", "320k"). */
-export async function convertToMp3(wavBuffer: Buffer, bitrate: string): Promise<Buffer> {
+function ffmpegBinary(): string {
   if (!ffmpegStatic) {
     throw new Error(
       `ffmpeg-static has no prebuilt binary for ${process.platform}/${process.arch}`
     );
   }
-  const ffmpegPath = ffmpegStatic;
-
-  const id = randomUUID();
-  const inputPath = join(tmpdir(), `${id}-input.wav`);
-  const outputPath = join(tmpdir(), `${id}-output.mp3`);
-
-  await writeFile(inputPath, wavBuffer);
-
-  await new Promise<void>((resolve, reject) => {
-    execFile(ffmpegPath, [
-      "-i", inputPath,
-      "-b:a", bitrate,
-      "-y",
-      outputPath,
-    ], (error: Error | null) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
-
-  const mp3Buffer = await readFile(outputPath);
-
-  await Promise.all([unlink(inputPath), unlink(outputPath)]).catch(() => {});
-
-  return mp3Buffer;
+  return ffmpegStatic;
 }
 
-/** Generate a 128kbps preview MP3 from a WAV buffer. */
-export async function generatePreview(wavBuffer: Buffer): Promise<Buffer> {
-  return convertToMp3(wavBuffer, "128k");
+/**
+ * Spawn ffmpeg with WAV-on-stdin → MP3-on-stdout at the given bitrate. The
+ * returned Readable is wired so that ffmpeg's exit code propagates as a stream
+ * error (caller will see it on the upload side).
+ */
+export function convertWavStreamToMp3(input: Readable, bitrate: string): Readable {
+  const proc = spawn(
+    ffmpegBinary(),
+    ["-i", "pipe:0", "-f", "mp3", "-b:a", bitrate, "pipe:1"],
+    { stdio: ["pipe", "pipe", "pipe"] },
+  );
+
+  let stderr = "";
+  proc.stderr.on("data", (chunk) => {
+    // Keep the tail; ffmpeg can be chatty during normal encodes.
+    stderr = (stderr + chunk.toString()).slice(-2000);
+  });
+
+  input.on("error", (err) => proc.stdout.destroy(err));
+  input.pipe(proc.stdin);
+  proc.stdin.on("error", (err: NodeJS.ErrnoException) => {
+    // EPIPE happens when ffmpeg exits before consuming all input; the exit
+    // handler below will surface the real error.
+    if (err.code !== "EPIPE") proc.stdout.destroy(err);
+  });
+
+  proc.on("error", (err) => proc.stdout.destroy(err));
+  proc.on("close", (code) => {
+    if (code !== 0) {
+      proc.stdout.destroy(
+        new Error(`ffmpeg exited with code ${code}: ${stderr.trim()}`),
+      );
+    }
+  });
+
+  return proc.stdout;
 }

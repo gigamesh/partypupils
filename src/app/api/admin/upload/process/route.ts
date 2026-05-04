@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/admin-auth";
-import { getFileBuffer, uploadBuffer } from "@/lib/storage";
-import { generatePreview, convertToMp3 } from "@/lib/preview";
+import { getFileStream, uploadStream } from "@/lib/storage";
+import { convertWavStreamToMp3 } from "@/lib/preview";
 
 export const maxDuration = 300;
 
 function describeError(reason: unknown): string {
   if (reason instanceof Error) return reason.message;
   return String(reason);
+}
+
+async function transcodeAndUpload(
+  sourceKey: string,
+  outputKey: string,
+  bitrate: string,
+): Promise<{ url: string; storageKey: string }> {
+  const wavStream = await getFileStream(sourceKey);
+  const mp3Stream = convertWavStreamToMp3(wavStream, bitrate);
+  return uploadStream(mp3Stream, outputKey, "audio/mpeg");
 }
 
 export async function POST(req: NextRequest) {
@@ -24,22 +34,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const wavBuffer = await getFileBuffer(key);
+  const previewKey = key
+    .replace(/\.wav$/i, "-preview.mp3")
+    .replace(/^([^/]+\/[^/]+\/[^/]+)\//, "$1/previews/");
+  const mp3Key = key.replace(/\.wav$/i, ".mp3");
 
+  // Two independent R2 GETs let us run both encodes in parallel without
+  // buffering the WAV. Each pipes R2 → ffmpeg → R2 multipart upload.
   const [previewResult, mp3Result] = await Promise.allSettled([
-    (async () => {
-      const previewBuffer = await generatePreview(wavBuffer);
-      const previewKey = key.replace(/\.wav$/i, "-preview.mp3").replace(
-        /^([^/]+\/[^/]+\/[^/]+)\//,
-        "$1/previews/"
-      );
-      return uploadBuffer(previewBuffer, previewKey, "audio/mpeg");
-    })(),
-    (async () => {
-      const mp3Buffer = await convertToMp3(wavBuffer, "320k");
-      const mp3Key = key.replace(/\.wav$/i, ".mp3");
-      return uploadBuffer(mp3Buffer, mp3Key, "audio/mpeg");
-    })(),
+    transcodeAndUpload(key, previewKey, "128k"),
+    transcodeAndUpload(key, mp3Key, "320k"),
   ]);
 
   const previewUrl =
