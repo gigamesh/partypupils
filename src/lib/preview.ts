@@ -3,9 +3,17 @@ import { writeFile, readFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import ffmpegStatic from "ffmpeg-static";
 
 /** Convert a WAV buffer to MP3 at the given bitrate (e.g. "128k", "320k"). */
 export async function convertToMp3(wavBuffer: Buffer, bitrate: string): Promise<Buffer> {
+  if (!ffmpegStatic) {
+    throw new Error(
+      `ffmpeg-static has no prebuilt binary for ${process.platform}/${process.arch}`
+    );
+  }
+  const ffmpegPath = ffmpegStatic;
+
   const id = randomUUID();
   const inputPath = join(tmpdir(), `${id}-input.wav`);
   const outputPath = join(tmpdir(), `${id}-output.mp3`);
@@ -13,12 +21,12 @@ export async function convertToMp3(wavBuffer: Buffer, bitrate: string): Promise<
   await writeFile(inputPath, wavBuffer);
 
   await new Promise<void>((resolve, reject) => {
-    execFile("ffmpeg", [
+    execFile(ffmpegPath, [
       "-i", inputPath,
       "-b:a", bitrate,
       "-y",
       outputPath,
-    ], (error) => {
+    ], (error: Error | null) => {
       if (error) reject(error);
       else resolve();
     });

@@ -3,6 +3,13 @@ import { verifyAdminSession } from "@/lib/admin-auth";
 import { uploadFile, uploadBuffer } from "@/lib/storage";
 import { generatePreview, convertToMp3 } from "@/lib/preview";
 
+export const maxDuration = 300;
+
+function describeError(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  return String(reason);
+}
+
 export async function POST(req: NextRequest) {
   if (!(await verifyAdminSession())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,6 +28,8 @@ export async function POST(req: NextRequest) {
 
   let previewUrl: string | undefined;
   let mp3Url: string | undefined;
+  let previewError: string | undefined;
+  let mp3Error: string | undefined;
 
   if (autoPreview && file.name.toLowerCase().endsWith(".wav")) {
     const wavBuffer = Buffer.from(await file.arrayBuffer());
@@ -41,15 +50,24 @@ export async function POST(req: NextRequest) {
     if (previewResult.status === "fulfilled") {
       previewUrl = previewResult.value.url;
     } else {
+      previewError = describeError(previewResult.reason);
       console.error("Preview generation failed:", previewResult.reason);
     }
 
     if (mp3Result.status === "fulfilled") {
       mp3Url = mp3Result.value.url;
     } else {
+      mp3Error = describeError(mp3Result.reason);
       console.error("MP3 generation failed:", mp3Result.reason);
+    }
+
+    if (!previewUrl && !mp3Url) {
+      return NextResponse.json(
+        { error: "Transcoding failed", url, previewError, mp3Error },
+        { status: 500 }
+      );
     }
   }
 
-  return NextResponse.json({ url, previewUrl, mp3Url });
+  return NextResponse.json({ url, previewUrl, mp3Url, previewError, mp3Error });
 }

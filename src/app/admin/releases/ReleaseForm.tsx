@@ -223,9 +223,21 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key }),
     });
-    const { previewUrl, mp3Url } = await processRes.json();
+    const data = await processRes.json();
 
-    return { url, previewUrl, mp3Url };
+    if (!processRes.ok) {
+      const detail = data.previewError || data.mp3Error || data.error || "Unknown error";
+      throw new Error(`Transcoding ${file.name} failed: ${detail}`);
+    }
+    if (!data.previewUrl || !data.mp3Url) {
+      const missing = [
+        !data.previewUrl ? `preview (${data.previewError || "missing"})` : null,
+        !data.mp3Url ? `mp3 (${data.mp3Error || "missing"})` : null,
+      ].filter(Boolean).join(", ");
+      throw new Error(`Transcoding ${file.name} incomplete: ${missing}`);
+    }
+
+    return { url, previewUrl: data.previewUrl, mp3Url: data.mp3Url };
   }
 
   async function uploadFile(file: File, prefix: string): Promise<string> {

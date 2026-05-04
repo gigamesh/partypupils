@@ -3,7 +3,12 @@ import { verifyAdminSession } from "@/lib/admin-auth";
 import { getFileBuffer, uploadBuffer } from "@/lib/storage";
 import { generatePreview, convertToMp3 } from "@/lib/preview";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
+
+function describeError(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  return String(reason);
+}
 
 export async function POST(req: NextRequest) {
   if (!(await verifyAdminSession())) {
@@ -42,6 +47,11 @@ export async function POST(req: NextRequest) {
   const mp3Url =
     mp3Result.status === "fulfilled" ? mp3Result.value.url : undefined;
 
+  const previewError =
+    previewResult.status === "rejected" ? describeError(previewResult.reason) : undefined;
+  const mp3Error =
+    mp3Result.status === "rejected" ? describeError(mp3Result.reason) : undefined;
+
   if (previewResult.status === "rejected") {
     console.error("Preview generation failed:", previewResult.reason);
   }
@@ -49,5 +59,12 @@ export async function POST(req: NextRequest) {
     console.error("MP3 generation failed:", mp3Result.reason);
   }
 
-  return NextResponse.json({ previewUrl, mp3Url });
+  if (!previewUrl && !mp3Url) {
+    return NextResponse.json(
+      { error: "Transcoding failed", previewError, mp3Error },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ previewUrl, mp3Url, previewError, mp3Error });
 }
