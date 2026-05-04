@@ -40,6 +40,18 @@ vi.mock("@/lib/email", () => ({
   sendContactEmail: vi.fn(async () => {}),
 }));
 
+// next/cache primitives need a Next.js render store at runtime; in vitest there isn't one.
+// Mock to no-ops so route handlers can call them without crashing. Tests can spy via vi.mocked.
+vi.mock("next/cache", async () => {
+  const actual = await vi.importActual<typeof import("next/cache")>("next/cache");
+  return {
+    ...actual,
+    revalidateTag: vi.fn(),
+    revalidatePath: vi.fn(),
+    unstable_cache: <T extends (...args: unknown[]) => unknown>(cb: T) => cb,
+  };
+});
+
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
 vi.mock("@/lib/storage", () => ({
   deleteFile: vi.fn(async () => {}),

@@ -43,6 +43,16 @@ export function toPlayerTrack(track: TrackInput, release: ReleaseInput): PlayerT
   };
 }
 
+/** Fisher-Yates shuffle. Returns a new array; does not mutate the input. */
+export function shufflePlayerTracks(tracks: PlayerTrack[]): PlayerTrack[] {
+  const out = tracks.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 /** Map a release-with-tracks (Prisma include shape) to its non-null PlayerTrack[]. */
 export function buildPlayerTracksForRelease(
   release: ReleaseInput & { tracks: TrackInput[] },

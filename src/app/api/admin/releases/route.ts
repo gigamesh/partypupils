@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
+import { RADIO_TRACKS_TAG } from "@/app/api/all-tracks/route";
 
 export async function POST(req: NextRequest) {
   if (!(await verifyAdminSession())) {
@@ -38,6 +40,8 @@ export async function POST(req: NextRequest) {
       },
     },
   });
+
+  revalidateTag(RADIO_TRACKS_TAG, "max");
 
   return NextResponse.json(release, { status: 201 });
 }
