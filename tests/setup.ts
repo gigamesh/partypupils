@@ -52,6 +52,18 @@ vi.mock("next/cache", async () => {
   };
 });
 
+// `after` from next/server requires a request scope; in vitest there isn't one.
+// Run the callback immediately so tests see its side effects (email sends, logs).
+vi.mock("next/server", async () => {
+  const actual = await vi.importActual<typeof import("next/server")>("next/server");
+  return {
+    ...actual,
+    after: vi.fn((cb: () => unknown | Promise<unknown>) => {
+      Promise.resolve().then(cb).catch(() => {});
+    }),
+  };
+});
+
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
 vi.mock("@/lib/storage", () => ({
   deleteFile: vi.fn(async () => {}),

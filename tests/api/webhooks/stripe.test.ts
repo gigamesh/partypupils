@@ -97,9 +97,13 @@ describe("POST /api/webhooks/stripe", () => {
 
     await stripeWebhook(webhookReq("{}") as never);
     await stripeWebhook(webhookReq("{}") as never);
+    // Let any deferred (after()) email sends run before asserting.
+    await new Promise((r) => setTimeout(r, 0));
 
     const orders = await prisma.order.findMany({ where: { stripeSessionId: "cs_test_dup" } });
     expect(orders).toHaveLength(1);
+    // The retry must short-circuit before scheduling another email send.
+    expect(vi.mocked(sendPurchaseConfirmationEmail)).toHaveBeenCalledTimes(1);
   });
 
   it("still creates an Order when customer_details.email is empty (logs a warning)", async () => {
