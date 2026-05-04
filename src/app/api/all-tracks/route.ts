@@ -3,8 +3,9 @@ import { prisma } from "@/lib/db";
 import { toPlayerTrack } from "@/lib/player-data";
 import type { PlayerTrack } from "@/lib/player-types";
 import { NextResponse } from "next/server";
+import { RADIO_TRACKS_TAG } from "@/lib/cache-tags";
 
-export const RADIO_TRACKS_TAG = "radio-tracks";
+export { RADIO_TRACKS_TAG };
 
 /**
  * Build the un-shuffled radio queue. Cached and tagged so admin writes

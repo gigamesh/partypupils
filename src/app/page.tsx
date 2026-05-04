@@ -5,29 +5,14 @@ import { ReleaseCard } from "@/components/ReleaseCard";
 import { ScrollOverlay } from "@/components/ScrollOverlay";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
-import { prisma } from "@/lib/db";
 import { buildPlayerTracksForRelease } from "@/lib/player-data";
+import { getFeaturedReleases, getHeroLinks } from "@/lib/release-reads";
 import Link from "next/link";
-
-export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const [featuredReleases, links] = await Promise.all([
-    prisma.release.findMany({
-      where: { isPublished: true },
-      orderBy: { releasedAt: "desc" },
-      take: 4,
-      include: {
-        tracks: {
-          orderBy: { trackNumber: "asc" },
-          include: { files: true },
-        },
-      },
-    }),
-    prisma.link.findMany({
-      where: { isVisible: true, showOnHero: true },
-      orderBy: { position: "asc" },
-    }),
+    getFeaturedReleases(),
+    getHeroLinks(),
   ]);
 
   const featuredWithTracks = featuredReleases.map((r) => ({

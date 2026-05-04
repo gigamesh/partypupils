@@ -2,11 +2,9 @@ import { CatalogBanner } from "@/components/CatalogBanner";
 import { PartyPupilsRadioButton } from "@/components/PartyPupilsRadioButton";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { getCatalogPrice } from "@/lib/catalog";
-import { prisma } from "@/lib/db";
 import { buildPlayerTracksForRelease } from "@/lib/player-data";
+import { getPublishedReleases } from "@/lib/release-reads";
 import type { Metadata } from "next";
-
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Music",
@@ -15,16 +13,7 @@ export const metadata: Metadata = {
 
 export default async function MusicPage() {
   const [releases, catalog] = await Promise.all([
-    prisma.release.findMany({
-      where: { isPublished: true },
-      orderBy: { releasedAt: "desc" },
-      include: {
-        tracks: {
-          orderBy: { trackNumber: "asc" },
-          include: { files: true },
-        },
-      },
-    }),
+    getPublishedReleases(),
     getCatalogPrice(),
   ]);
 

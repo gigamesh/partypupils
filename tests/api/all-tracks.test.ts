@@ -9,7 +9,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import { revalidateTag } from "next/cache";
-import { GET as getAllTracks, RADIO_TRACKS_TAG } from "@/app/api/all-tracks/route";
+import { GET as getAllTracks } from "@/app/api/all-tracks/route";
+import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 import { POST as createRelease } from "@/app/api/admin/releases/route";
 import {
   PUT as updateRelease,
@@ -108,6 +109,7 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
     );
     expect(res.status).toBe(201);
     expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RADIO_TRACKS_TAG, "max");
+    expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RELEASES_TAG, "max");
   });
 
   it("PUT /api/admin/releases/[id] calls revalidateTag(radio-tracks)", async () => {
@@ -142,18 +144,21 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
       ctx(release.id),
     );
     expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RADIO_TRACKS_TAG, "max");
+    expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RELEASES_TAG, "max");
   });
 
   it("PATCH /api/admin/releases/[id] calls revalidateTag when inRadio toggles", async () => {
     const release = await makeRelease({ slug: "inv-patch-radio" });
     await patchRelease(jsonRequest("PATCH", { inRadio: false }), ctx(release.id));
     expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RADIO_TRACKS_TAG, "max");
+    expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RELEASES_TAG, "max");
   });
 
   it("PATCH /api/admin/releases/[id] calls revalidateTag when isPublished toggles", async () => {
     const release = await makeRelease({ slug: "inv-patch-pub" });
     await patchRelease(jsonRequest("PATCH", { isPublished: false }), ctx(release.id));
     expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RADIO_TRACKS_TAG, "max");
+    expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RELEASES_TAG, "max");
   });
 
   it("DELETE /api/admin/releases/[id] calls revalidateTag(radio-tracks)", async () => {
@@ -163,5 +168,6 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
       ctx(release.id),
     );
     expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RADIO_TRACKS_TAG, "max");
+    expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith(RELEASES_TAG, "max");
   });
 });
