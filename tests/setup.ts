@@ -99,6 +99,7 @@ beforeEach(async () => {
     prisma.release.deleteMany(),
     prisma.siteSetting.deleteMany(),
     prisma.link.deleteMany(),
+    prisma.rateLimit.deleteMany(),
   ]);
 });
 
