@@ -302,6 +302,10 @@ describe("POST /api/admin/releases", () => {
       jsonRequest("POST", { name: "Dup", slug: "dup", price: 100, type: "single", isPublished: false, tracks: [] }),
     );
     expect(res.status).toBe(400);
+    // The unique-constraint failure rolls back the implicit Prisma transaction;
+    // adapter-pg leaves the pooled connection in an aborted state. Same workaround
+    // as the syncReleaseAndTracks rollback tests above.
+    await prisma.$disconnect();
   });
 });
 

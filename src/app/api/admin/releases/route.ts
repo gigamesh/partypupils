@@ -4,6 +4,14 @@ import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 
+function isUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: string }).code === "P2002"
+  );
+}
+
 export async function POST(req: NextRequest) {
   if (!(await verifyAdminSession())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -12,34 +20,40 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, inRadio, tracks } = body;
 
-  const existing = await prisma.release.findUnique({ where: { slug } });
-  if (existing) {
-    return NextResponse.json({ error: "Slug already exists" }, { status: 400 });
-  }
-
-  const release = await prisma.release.create({
-    data: {
-      name,
-      slug,
-      description,
-      price,
-      type,
-      coverImageUrl,
-      releasedAt: releasedAt ? new Date(releasedAt) : null,
-      isPublished,
-      inRadio: inRadio ?? true,
-      tracks: {
-        create: (tracks || []).map((t: { name: string; price: number; trackNumber: number; previewUrl?: string; inRadio?: boolean; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
-          name: t.name,
-          price: t.price,
-          trackNumber: t.trackNumber,
-          previewUrl: t.previewUrl || null,
-          inRadio: t.inRadio ?? true,
-          files: { create: t.files },
-        })),
+  let release;
+  try {
+    release = await prisma.release.create({
+      data: {
+        name,
+        slug,
+        description,
+        price,
+        type,
+        coverImageUrl,
+        releasedAt: releasedAt ? new Date(releasedAt) : null,
+        isPublished,
+        inRadio: inRadio ?? true,
+        tracks: {
+          create: (tracks || []).map((t: { name: string; price: number; trackNumber: number; previewUrl?: string; inRadio?: boolean; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
+            name: t.name,
+            price: t.price,
+            trackNumber: t.trackNumber,
+            previewUrl: t.previewUrl || null,
+            inRadio: t.inRadio ?? true,
+            files: { create: t.files },
+          })),
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    // Rely on the DB-level unique constraint instead of a separate findUnique
+    // pre-check (which had a tiny TOCTOU window between two concurrent admin
+    // submits).
+    if (isUniqueConstraintError(err)) {
+      return NextResponse.json({ error: "Slug already exists" }, { status: 400 });
+    }
+    throw err;
+  }
 
   revalidateTag(RADIO_TRACKS_TAG, "max");
   revalidateTag(RELEASES_TAG, "max");
