@@ -14,16 +14,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Missing trackId" }, { status: 400 });
   }
 
+  // Pull only the ID columns needed to authorize ownership; previously we joined
+  // release.tracks (every track of every release in the order) to walk in JS.
   const downloadToken = await prisma.downloadToken.findUnique({
     where: { token },
-    include: {
+    select: {
       order: {
-        include: {
-          items: {
-            include: {
-              release: { include: { tracks: true } },
-            },
-          },
+        select: {
+          items: { select: { trackId: true, releaseId: true } },
         },
       },
     },
@@ -33,23 +31,21 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Invalid download link" }, { status: 404 });
   }
 
-  const orderHasTrack = downloadToken.order.items.some((item) => {
-    if (item.trackId === trackId) return true;
-    if (item.release?.tracks.some((t) => t.id === trackId)) return true;
-    return false;
-  });
-
-  if (!orderHasTrack) {
-    return NextResponse.json({ error: "Track not in order" }, { status: 403 });
-  }
-
   const file = await prisma.trackFile.findFirst({
     where: { trackId, format },
-    include: { track: true },
+    include: { track: { select: { name: true, releaseId: true } } },
   });
 
   if (!file) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
+  }
+
+  const orderHasTrack = downloadToken.order.items.some(
+    (item) => item.trackId === trackId || item.releaseId === file.track.releaseId,
+  );
+
+  if (!orderHasTrack) {
+    return NextResponse.json({ error: "Track not in order" }, { status: 403 });
   }
 
   const res = await fetch(file.storageKey);
