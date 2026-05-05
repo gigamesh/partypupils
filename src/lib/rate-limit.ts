@@ -6,6 +6,11 @@ import { prisma } from "./db";
  * counter has been bumped, `false` when the caller is over the cap for the
  * current window. Older windows reset on the next call (no background sweeper).
  *
+ * The counter update is a single `INSERT ... ON CONFLICT DO UPDATE` so two
+ * concurrent calls serialize on the row lock — read-then-update at Postgres'
+ * default Read Committed isolation would let parallel attackers both observe
+ * the same `count` and both write `count + 1`, silently bypassing the cap.
+ *
  * For most pages a 15-minute window with single-digit `max` is plenty; this is
  * not a precise sliding window — bursts at the boundary can roughly double the
  * effective rate, which is fine for abuse control rather than fairness.
@@ -16,28 +21,28 @@ export async function consumeRateLimit(
   windowMs: number,
 ): Promise<boolean> {
   const now = new Date();
-  return prisma.$transaction(async (tx) => {
-    const existing = await tx.rateLimit.findUnique({ where: { key } });
-    const expired =
-      !existing || now.getTime() - existing.windowStart.getTime() >= windowMs;
+  const windowCutoff = new Date(now.getTime() - windowMs);
 
-    if (expired) {
-      await tx.rateLimit.upsert({
-        where: { key },
-        create: { key, count: 1, windowStart: now },
-        update: { count: 1, windowStart: now },
-      });
-      return true;
-    }
-
-    if (existing.count >= max) return false;
-
-    await tx.rateLimit.update({
-      where: { key },
-      data: { count: existing.count + 1 },
-    });
-    return true;
-  });
+  // The CASE branches handle two paths atomically:
+  //   - existing window has expired → reset count=1, windowStart=now
+  //   - existing window is current → increment count, keep windowStart
+  // RETURNING gives us the post-update count to compare against `max`.
+  const rows = await prisma.$queryRaw<{ count: number }[]>`
+    INSERT INTO "rate_limits" ("key", "count", "windowStart", "updatedAt")
+    VALUES (${key}, 1, ${now}, ${now})
+    ON CONFLICT ("key") DO UPDATE SET
+      "count" = CASE
+        WHEN "rate_limits"."windowStart" < ${windowCutoff} THEN 1
+        ELSE "rate_limits"."count" + 1
+      END,
+      "windowStart" = CASE
+        WHEN "rate_limits"."windowStart" < ${windowCutoff} THEN ${now}
+        ELSE "rate_limits"."windowStart"
+      END,
+      "updatedAt" = ${now}
+    RETURNING "count";
+  `;
+  return rows[0].count <= max;
 }
 
 /** Pull the originating IP from request headers; falls back to a stable string. */
