@@ -77,6 +77,58 @@ describe("POST /api/webhooks/stripe", () => {
     expect(trackItem?.price).toBe(track.price);
   });
 
+  it("is idempotent against a concurrent duplicate delivery (P2002 race)", async () => {
+    // Simulates two parallel deliveries that both pass the findUnique check —
+    // one wins the create, the other hits the unique constraint. Pre-seeding an
+    // order with the same stripeSessionId forces the second create to throw
+    // P2002, which is exactly what the loser of a real race would see.
+    const release = await makeRelease();
+    await prisma.order.create({
+      data: {
+        stripeSessionId: "cs_test_race",
+        email: "first@test",
+        amountTotal: release.price,
+        status: "completed",
+        items: { create: [{ releaseId: release.id, price: release.price }] },
+        downloadTokens: { create: {} },
+      },
+    });
+
+    // Bypass the findUnique short-circuit by spying on it once, so we exercise
+    // the create-path P2002 catch rather than the pre-check branch.
+    const findSpy = vi.spyOn(prisma.order, "findUnique").mockResolvedValueOnce(null as never);
+
+    vi.mocked(stripe().webhooks.constructEvent).mockReturnValueOnce({
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_race",
+          payment_intent: "pi_race",
+          amount_total: release.price,
+          customer_details: { email: "second@test" },
+          metadata: { release_ids: JSON.stringify([release.id]), track_ids: "[]" },
+        },
+      },
+    } as never);
+
+    const res = await stripeWebhook(webhookReq("{}") as never);
+    // 200 (not 500): we don't want Stripe retrying just because a sibling delivery won the race.
+    expect(res.status).toBe(200);
+    expect(vi.mocked(sendPurchaseConfirmationEmail)).not.toHaveBeenCalled();
+
+    // adapter-pg leaves the pooled connection in an aborted-transaction state
+    // after a P2002 inside an implicit transaction; same workaround as the
+    // syncReleaseAndTracks rollback tests.
+    await prisma.$disconnect();
+
+    // Only the pre-seeded order remains; no duplicate from the loser of the race.
+    const orders = await prisma.order.findMany({ where: { stripeSessionId: "cs_test_race" } });
+    expect(orders).toHaveLength(1);
+    expect(orders[0].email).toBe("first@test");
+
+    findSpy.mockRestore();
+  });
+
   it("is idempotent — a retried webhook does not create duplicate Orders", async () => {
     const release = await makeRelease();
 
@@ -97,9 +149,13 @@ describe("POST /api/webhooks/stripe", () => {
 
     await stripeWebhook(webhookReq("{}") as never);
     await stripeWebhook(webhookReq("{}") as never);
+    // Let any deferred (after()) email sends run before asserting.
+    await new Promise((r) => setTimeout(r, 0));
 
     const orders = await prisma.order.findMany({ where: { stripeSessionId: "cs_test_dup" } });
     expect(orders).toHaveLength(1);
+    // The retry must short-circuit before scheduling another email send.
+    expect(vi.mocked(sendPurchaseConfirmationEmail)).toHaveBeenCalledTimes(1);
   });
 
   it("still creates an Order when customer_details.email is empty (logs a warning)", async () => {

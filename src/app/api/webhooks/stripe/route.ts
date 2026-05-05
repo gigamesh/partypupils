@@ -1,10 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import Stripe from "stripe";
 import { sendPurchaseConfirmationEmail } from "@/lib/email";
 import { createOrderVerificationToken } from "@/lib/order-auth";
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: string }).code === "P2002"
+  );
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -27,6 +35,15 @@ export async function POST(req: NextRequest) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // Idempotency check first — Stripe retries duplicate-deliver this same event,
+    // so short-circuit before any other DB work.
+    const existingOrder = await prisma.order.findUnique({
+      where: { stripeSessionId: session.id },
+    });
+    if (existingOrder) {
+      return NextResponse.json({ received: true });
+    }
 
     const releaseIds: number[] = JSON.parse(session.metadata?.release_ids || "[]");
     const trackIds: number[] = JSON.parse(session.metadata?.track_ids || "[]");
@@ -51,25 +68,30 @@ export async function POST(req: NextRequest) {
 
     const email = session.customer_details?.email || "";
 
-    const existingOrder = await prisma.order.findUnique({
-      where: { stripeSessionId: session.id },
-    });
-
-    if (existingOrder) {
-      return NextResponse.json({ received: true });
+    try {
+      await prisma.order.create({
+        data: {
+          stripeSessionId: session.id,
+          stripePaymentId: session.payment_intent as string | null,
+          email,
+          amountTotal: session.amount_total || 0,
+          status: "completed",
+          items: { create: orderItems },
+          downloadTokens: { create: {} },
+        },
+      });
+    } catch (err) {
+      // Two webhook deliveries (or a retry that lands while we're still
+      // processing the first) can both pass the findUnique check above and race
+      // here. The unique constraint on stripeSessionId guarantees only one
+      // wins; the loser surfaces as P2002. Treat that as the same idempotent
+      // short-circuit as the findUnique branch — no email send, no 500, no
+      // Stripe retry.
+      if (isUniqueConstraintError(err)) {
+        return NextResponse.json({ received: true });
+      }
+      throw err;
     }
-
-    await prisma.order.create({
-      data: {
-        stripeSessionId: session.id,
-        stripePaymentId: session.payment_intent as string | null,
-        email,
-        amountTotal: session.amount_total || 0,
-        status: "completed",
-        items: { create: orderItems },
-        downloadTokens: { create: {} },
-      },
-    });
 
     if (!email) {
       // Stripe almost always supplies an email but doesn't guarantee it. The order is
@@ -79,25 +101,25 @@ export async function POST(req: NextRequest) {
         `[stripe-webhook] checkout.session.completed (session=${session.id}) has no customer_details.email — order recorded but customer cannot retrieve downloads.`,
       );
     } else {
-      // Best-effort email send. If Resend is down or anything else throws we log loudly
-      // but DO NOT rethrow — otherwise Stripe retries the webhook and on every retry
-      // we'd hit the existingOrder short-circuit and exit without sending, masking the
-      // failure indefinitely. A failed email is a separate retry concern from order
-      // recording, which is already idempotent.
-      try {
-        const itemNames = [
-          ...releases.map((r) => r.name),
-          ...tracks.map((t) => t.name),
-        ];
-        const verifyToken = await createOrderVerificationToken(email);
-        const verifyUrl = `${env.NEXT_PUBLIC_BASE_URL()}/orders/verify?token=${verifyToken}`;
-        await sendPurchaseConfirmationEmail(email, verifyUrl, itemNames);
-      } catch (err) {
-        console.error(
-          `[stripe-webhook] failed to send purchase confirmation to ${email} for session ${session.id}:`,
-          err,
-        );
-      }
+      // Defer email send past the response. Stripe sees a fast 200 instead of waiting on
+      // Resend; a failure here is logged but never causes a retry (the order is already
+      // recorded and idempotency would short-circuit a replay anyway).
+      const itemNames = [
+        ...releases.map((r) => r.name),
+        ...tracks.map((t) => t.name),
+      ];
+      after(async () => {
+        try {
+          const verifyToken = await createOrderVerificationToken(email);
+          const verifyUrl = `${env.NEXT_PUBLIC_BASE_URL()}/orders/verify?token=${verifyToken}`;
+          await sendPurchaseConfirmationEmail(email, verifyUrl, itemNames);
+        } catch (err) {
+          console.error(
+            `[stripe-webhook] failed to send purchase confirmation to ${email} for session ${session.id}:`,
+            err,
+          );
+        }
+      });
     }
   }
 

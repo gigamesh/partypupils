@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Readable } from "stream";
 import { verifyAdminSession } from "@/lib/admin-auth";
-import { uploadFile, uploadBuffer } from "@/lib/storage";
-import { generatePreview, convertToMp3 } from "@/lib/preview";
+import { uploadFile, uploadStream } from "@/lib/storage";
+import { convertWavStreamToMp3 } from "@/lib/preview";
 
 export const maxDuration = 300;
 
@@ -36,14 +37,14 @@ export async function POST(req: NextRequest) {
 
     const [previewResult, mp3Result] = await Promise.allSettled([
       (async () => {
-        const previewBuffer = await generatePreview(wavBuffer);
         const previewName = file.name.replace(/\.wav$/i, "-preview.mp3");
-        return uploadBuffer(previewBuffer, `${prefix}/previews/${previewName}`, "audio/mpeg");
+        const mp3Stream = convertWavStreamToMp3(Readable.from(wavBuffer), "128k");
+        return uploadStream(mp3Stream, `${prefix}/previews/${previewName}`, "audio/mpeg");
       })(),
       (async () => {
-        const mp3Buffer = await convertToMp3(wavBuffer, "320k");
         const mp3Name = file.name.replace(/\.wav$/i, ".mp3");
-        return uploadBuffer(mp3Buffer, `${prefix}/${mp3Name}`, "audio/mpeg");
+        const mp3Stream = convertWavStreamToMp3(Readable.from(wavBuffer), "320k");
+        return uploadStream(mp3Stream, `${prefix}/${mp3Name}`, "audio/mpeg");
       })(),
     ]);
 

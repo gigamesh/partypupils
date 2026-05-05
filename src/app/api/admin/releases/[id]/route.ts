@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import {
@@ -7,6 +8,7 @@ import {
   syncReleaseAndTracks,
   type TrackInput,
 } from "@/lib/release-tracks";
+import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -46,6 +48,8 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   }
 
   const release = await prisma.release.findUnique({ where: { id: releaseId } });
+  revalidateTag(RADIO_TRACKS_TAG, "max");
+  revalidateTag(RELEASES_TAG, "max");
   return NextResponse.json(release);
 }
 
@@ -69,6 +73,11 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     where: { id: parseInt(id) },
     data,
   });
+
+  if (data.inRadio !== undefined || data.isPublished !== undefined) {
+    revalidateTag(RADIO_TRACKS_TAG, "max");
+    revalidateTag(RELEASES_TAG, "max");
+  }
 
   return NextResponse.json(release);
 }
@@ -104,6 +113,9 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   if (r2KeysToDelete.length > 0) {
     await cleanupR2Objects(r2KeysToDelete);
   }
+
+  revalidateTag(RADIO_TRACKS_TAG, "max");
+  revalidateTag(RELEASES_TAG, "max");
 
   return NextResponse.json({ ok: true });
 }

@@ -2,8 +2,8 @@ import { AddToCartButton } from "@/components/AddToCartButton";
 import { PlayButton } from "@/components/PlayButton";
 import { PlayReleaseButton } from "@/components/PlayReleaseButton";
 import { TrackProgress } from "@/components/TrackProgress";
-import { prisma } from "@/lib/db";
 import { toPlayerTrack } from "@/lib/player-data";
+import { getReleaseBySlug } from "@/lib/release-reads";
 import { formatCurrency } from "@/lib/utils";
 import Image from "@/components/Image";
 import type { Metadata } from "next";
@@ -15,7 +15,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const release = await prisma.release.findUnique({ where: { slug } });
+  const release = await getReleaseBySlug(slug);
   if (!release) return { title: "Not Found" };
   return {
     title: release.name,
@@ -30,15 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ReleasePage({ params }: Props) {
   const { slug } = await params;
-  const release = await prisma.release.findUnique({
-    where: { slug, isPublished: true },
-    include: {
-      tracks: {
-        orderBy: { trackNumber: "asc" },
-        include: { files: true },
-      },
-    },
-  });
+  const release = await getReleaseBySlug(slug);
 
   if (!release) notFound();
 

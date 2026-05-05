@@ -35,3 +35,53 @@ describe("POST /api/contact origin check", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("POST /api/contact rate limiting (Postgres-backed)", () => {
+  it("429s after 3 successful sends from the same IP within the window", async () => {
+    const ip = "8.8.8.8";
+    for (let i = 0; i < 3; i++) {
+      const res = await contact(
+        jsonReq(
+          { name: "x", email: `x${i}@y.com`, message: "hi" },
+          { origin: "http://localhost:3000", "x-forwarded-for": ip },
+        ),
+      );
+      expect(res.status).toBe(200);
+    }
+    const blocked = await contact(
+      jsonReq(
+        { name: "x", email: "x@y.com", message: "hi" },
+        { origin: "http://localhost:3000", "x-forwarded-for": ip },
+      ),
+    );
+    expect(blocked.status).toBe(429);
+  });
+
+  it("limit is per-IP (different IPs aren't blocked together)", async () => {
+    const a = "10.0.0.1";
+    const b = "10.0.0.2";
+    for (let i = 0; i < 3; i++) {
+      await contact(
+        jsonReq(
+          { name: "x", email: "x@y.com", message: "hi" },
+          { origin: "http://localhost:3000", "x-forwarded-for": a },
+        ),
+      );
+    }
+    const aBlocked = await contact(
+      jsonReq(
+        { name: "x", email: "x@y.com", message: "hi" },
+        { origin: "http://localhost:3000", "x-forwarded-for": a },
+      ),
+    );
+    expect(aBlocked.status).toBe(429);
+
+    const bOk = await contact(
+      jsonReq(
+        { name: "x", email: "x@y.com", message: "hi" },
+        { origin: "http://localhost:3000", "x-forwarded-for": b },
+      ),
+    );
+    expect(bOk.status).toBe(200);
+  });
+});

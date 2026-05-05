@@ -4,6 +4,7 @@ import type { PlayerTrack } from "@/lib/player-types";
 import { useState } from "react";
 import { useAudio } from "./AudioProvider";
 import { Button } from "@/components/ui/button";
+import { shufflePlayerTracks } from "@/lib/player-data";
 
 /**
  * Master play/pause for the global player, branded as Party Pupils Radio.
@@ -26,10 +27,12 @@ export function PartyPupilsRadioButton({ className }: { className?: string }) {
     }
     setLoading(true);
     try {
-      const r = await fetch("/api/all-tracks", { cache: "no-store" });
+      const r = await fetch("/api/all-tracks");
       if (!r.ok) return;
       const data = (await r.json()) as { tracks: PlayerTrack[] };
-      if (data.tracks?.length > 0) playQueue(data.tracks, 0, "radio", { shuffle: true, repeat: "all" });
+      if (data.tracks?.length > 0) {
+        playQueue(shufflePlayerTracks(data.tracks), 0, "radio", { shuffle: true, repeat: "all" });
+      }
     } catch {
       /* swallow — button stays usable */
     } finally {

@@ -18,16 +18,13 @@ export async function GET(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Missing releaseId or trackIds" }, { status: 400 });
     }
 
+    // Only the order item id columns are needed for ownership checks below.
     const downloadToken = await prisma.downloadToken.findUnique({
       where: { token },
-      include: {
+      select: {
         order: {
-          include: {
-            items: {
-              include: {
-                release: { include: { tracks: true } },
-              },
-            },
+          select: {
+            items: { select: { trackId: true, releaseId: true } },
           },
         },
       },

@@ -1,11 +1,20 @@
 import "dotenv/config";
+import { Readable } from "stream";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { convertToMp3 } from "../src/lib/preview";
+import { convertWavStreamToMp3 } from "../src/lib/preview";
 import {
   S3Client,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
+
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -66,7 +75,9 @@ async function main() {
       const wavBuffer = Buffer.from(await res.arrayBuffer());
 
       console.log(`  Converting to 320kbps MP3...`);
-      const mp3Buffer = await convertToMp3(wavBuffer, "320k");
+      const mp3Buffer = await streamToBuffer(
+        convertWavStreamToMp3(Readable.from(wavBuffer), "320k"),
+      );
 
       const mp3Pathname = wavFile.storageKey
         .replace(publicUrl + "/", "")

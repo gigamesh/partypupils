@@ -4,7 +4,9 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import type { Readable } from "stream";
 import { env } from "./env";
 
 const s3 = new S3Client({
@@ -81,6 +83,38 @@ export async function getFileBuffer(key: string): Promise<Buffer> {
     new GetObjectCommand({ Bucket: bucket, Key: key })
   );
   return Buffer.from(await Body!.transformToByteArray());
+}
+
+/** Open a streaming read from R2. Caller must consume or destroy the returned stream. */
+export async function getFileStream(key: string): Promise<Readable> {
+  const { Body } = await s3.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key })
+  );
+  // The SDK returns the Node stream as Readable on Node runtimes.
+  return Body as Readable;
+}
+
+/**
+ * Upload a Readable stream to R2 using a multipart upload (lib-storage), so the
+ * total size doesn't have to be known up front. Returns the public URL.
+ */
+export async function uploadStream(
+  stream: Readable,
+  pathname: string,
+  contentType: string,
+): Promise<{ url: string; storageKey: string }> {
+  const upload = new Upload({
+    client: s3,
+    params: {
+      Bucket: bucket,
+      Key: pathname,
+      Body: stream,
+      ContentType: contentType,
+    },
+  });
+  await upload.done();
+  const url = `${publicUrl}/${pathname}`;
+  return { url, storageKey: url };
 }
 
 /** Delete a file by its public URL (storageKey). */

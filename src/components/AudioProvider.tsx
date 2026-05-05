@@ -15,6 +15,7 @@ import {
   type QueueSource,
   type RepeatMode,
 } from "@/lib/player-types";
+import { shufflePlayerTracks } from "@/lib/player-data";
 
 const STORAGE_KEY = "party-pupils-player";
 
@@ -186,11 +187,11 @@ function loadTrackAt(index: number, autoplay: boolean) {
 async function maybeRefreshRadioQueue() {
   if (state.queueSource !== "radio") return;
   try {
-    const r = await fetch("/api/all-tracks", { cache: "no-store" });
+    const r = await fetch("/api/all-tracks");
     if (!r.ok) return;
     const data = (await r.json()) as { tracks: PlayerTrack[] };
     if (!Array.isArray(data.tracks) || data.tracks.length === 0) return;
-    state = { ...state, queue: data.tracks };
+    state = { ...state, queue: shufflePlayerTracks(data.tracks) };
   } catch {
     /* keep current queue on failure */
   }

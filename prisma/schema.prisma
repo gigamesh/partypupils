@@ -130,3 +130,14 @@ model Link {
 
   @@map("links")
 }
+
+/// Fixed-window rate-limit counters shared across function instances.
+/// `key` is "<bucket>:<identifier>" e.g. "contact:1.2.3.4".
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("rate_limits")
+}

@@ -40,14 +40,43 @@ vi.mock("@/lib/email", () => ({
   sendContactEmail: vi.fn(async () => {}),
 }));
 
+// next/cache primitives need a Next.js render store at runtime; in vitest there isn't one.
+// Mock to no-ops so route handlers can call them without crashing. Tests can spy via vi.mocked.
+vi.mock("next/cache", async () => {
+  const actual = await vi.importActual<typeof import("next/cache")>("next/cache");
+  return {
+    ...actual,
+    revalidateTag: vi.fn(),
+    revalidatePath: vi.fn(),
+    unstable_cache: <T extends (...args: unknown[]) => unknown>(cb: T) => cb,
+  };
+});
+
+// `after` from next/server requires a request scope; in vitest there isn't one.
+// Run the callback immediately so tests see its side effects (email sends, logs).
+vi.mock("next/server", async () => {
+  const actual = await vi.importActual<typeof import("next/server")>("next/server");
+  return {
+    ...actual,
+    after: vi.fn((cb: () => unknown | Promise<unknown>) => {
+      Promise.resolve().then(cb).catch(() => {});
+    }),
+  };
+});
+
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
-vi.mock("@/lib/storage", () => ({
-  deleteFile: vi.fn(async () => {}),
-  uploadFile: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-  uploadBuffer: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-  getPresignedUploadUrl: vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" })),
-  getFileBuffer: vi.fn(async () => Buffer.from("")),
-}));
+vi.mock("@/lib/storage", async () => {
+  const { Readable } = await import("stream");
+  return {
+    deleteFile: vi.fn(async () => {}),
+    uploadFile: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
+    uploadBuffer: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
+    uploadStream: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
+    getPresignedUploadUrl: vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" })),
+    getFileBuffer: vi.fn(async () => Buffer.from("")),
+    getFileStream: vi.fn(async () => Readable.from(Buffer.from(""))),
+  };
+});
 
 beforeAll(async () => {
   // Sanity check the connection up front — clearer than test-time timeouts.
@@ -70,6 +99,7 @@ beforeEach(async () => {
     prisma.release.deleteMany(),
     prisma.siteSetting.deleteMany(),
     prisma.link.deleteMany(),
+    prisma.rateLimit.deleteMany(),
   ]);
 });
 
