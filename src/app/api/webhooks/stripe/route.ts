@@ -6,6 +6,14 @@ import Stripe from "stripe";
 import { sendPurchaseConfirmationEmail } from "@/lib/email";
 import { createOrderVerificationToken } from "@/lib/order-auth";
 
+function isUniqueConstraintError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: string }).code === "P2002"
+  );
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -60,17 +68,30 @@ export async function POST(req: NextRequest) {
 
     const email = session.customer_details?.email || "";
 
-    await prisma.order.create({
-      data: {
-        stripeSessionId: session.id,
-        stripePaymentId: session.payment_intent as string | null,
-        email,
-        amountTotal: session.amount_total || 0,
-        status: "completed",
-        items: { create: orderItems },
-        downloadTokens: { create: {} },
-      },
-    });
+    try {
+      await prisma.order.create({
+        data: {
+          stripeSessionId: session.id,
+          stripePaymentId: session.payment_intent as string | null,
+          email,
+          amountTotal: session.amount_total || 0,
+          status: "completed",
+          items: { create: orderItems },
+          downloadTokens: { create: {} },
+        },
+      });
+    } catch (err) {
+      // Two webhook deliveries (or a retry that lands while we're still
+      // processing the first) can both pass the findUnique check above and race
+      // here. The unique constraint on stripeSessionId guarantees only one
+      // wins; the loser surfaces as P2002. Treat that as the same idempotent
+      // short-circuit as the findUnique branch — no email send, no 500, no
+      // Stripe retry.
+      if (isUniqueConstraintError(err)) {
+        return NextResponse.json({ received: true });
+      }
+      throw err;
+    }
 
     if (!email) {
       // Stripe almost always supplies an email but doesn't guarantee it. The order is
