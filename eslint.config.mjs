@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored client-zip bundle copied from node_modules — minified, not ours to fix.
+    "public/client-zip-worker.js",
   ]),
 ]);
 
