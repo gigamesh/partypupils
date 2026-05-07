@@ -1,12 +1,15 @@
 /**
  * Tests for download token authorization.
- * Mocks the upstream R2 fetch so we can assert on response headers/status without
- * hitting the network.
+ * Single-track downloads now 302 to a presigned R2 URL — the function never
+ * touches the audio body. Zip downloads still build the archive server-side
+ * so they continue mocking the upstream R2 fetch.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET as downloadTrack } from "@/app/download/[token]/route";
 import { GET as downloadZip } from "@/app/download/[token]/zip/route";
+import { getPresignedDownloadUrl } from "@/lib/storage";
+import { prisma } from "@/lib/db";
 import { makeRelease, makeTrackWithFile, makeCompletedOrder } from "../factories";
 
 const fetchMock = vi.fn();
@@ -14,6 +17,10 @@ const fetchMock = vi.fn();
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  vi.mocked(getPresignedDownloadUrl).mockReset();
+  vi.mocked(getPresignedDownloadUrl).mockResolvedValue(
+    "https://r2/signed?response-content-disposition=stub",
+  );
 });
 
 function tokenReq(token: string, qs: string): NextRequest {
@@ -57,21 +64,50 @@ describe("GET /download/[token]", () => {
     expect(res.status).toBe(400);
   });
 
-  it("streams the file with attachment headers when the order owns the track", async () => {
+  it("302s to a presigned R2 URL when the order owns the track", async () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id, { name: "Owned" });
     const order = await makeCompletedOrder({ email: "x@y", trackIds: [t.id] });
     const token = order.downloadTokens[0].token;
 
-    fetchMock.mockResolvedValueOnce(new Response("audio-bytes", { status: 200 }));
-
     const res = await downloadTrack(
       tokenReq(token, `trackId=${t.id}&format=mp3`),
       ctx(token),
     );
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("audio/mpeg");
-    expect(res.headers.get("content-disposition")).toContain('attachment; filename="Owned.mp3"');
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toMatch(/^https:\/\/r2\/signed/);
+    expect(vi.mocked(getPresignedDownloadUrl)).toHaveBeenCalledWith(
+      t.files[0].storageKey,
+      { filename: "Owned.mp3", contentType: "audio/mpeg" },
+    );
+    // Critical: the function must NOT have fetched the audio body.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the wav content-type when format=wav", async () => {
+    const release = await makeRelease();
+    const t = await makeTrackWithFile(release.id, { name: "Wave" });
+    // makeTrackWithFile only seeds an mp3; add a wav so format=wav resolves a row.
+    await prisma.trackFile.create({
+      data: {
+        trackId: t.id,
+        format: "wav",
+        fileName: "Wave.wav",
+        storageKey: "https://r2/wave.wav",
+        fileSize: 100,
+      },
+    });
+    const order = await makeCompletedOrder({ email: "x@y", trackIds: [t.id] });
+    const token = order.downloadTokens[0].token;
+
+    await downloadTrack(
+      tokenReq(token, `trackId=${t.id}&format=wav`),
+      ctx(token),
+    );
+    expect(vi.mocked(getPresignedDownloadUrl)).toHaveBeenCalledWith(
+      "https://r2/wave.wav",
+      { filename: "Wave.wav", contentType: "audio/wav" },
+    );
   });
 
   it("authorizes a track when the order purchased its parent release", async () => {
@@ -80,28 +116,11 @@ describe("GET /download/[token]", () => {
     const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
     const token = order.downloadTokens[0].token;
 
-    fetchMock.mockResolvedValueOnce(new Response("bytes", { status: 200 }));
-
     const res = await downloadTrack(
       tokenReq(token, `trackId=${t.id}&format=mp3`),
       ctx(token),
     );
-    expect(res.status).toBe(200);
-  });
-
-  it("502s when the upstream R2 fetch fails", async () => {
-    const release = await makeRelease();
-    const t = await makeTrackWithFile(release.id);
-    const order = await makeCompletedOrder({ email: "x@y", trackIds: [t.id] });
-    const token = order.downloadTokens[0].token;
-
-    fetchMock.mockResolvedValueOnce(new Response("nope", { status: 503 }));
-
-    const res = await downloadTrack(
-      tokenReq(token, `trackId=${t.id}&format=mp3`),
-      ctx(token),
-    );
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(302);
   });
 });
 

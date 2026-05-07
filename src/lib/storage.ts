@@ -77,6 +77,26 @@ export async function getPresignedUploadUrl(
   return { url, publicUrl: `${publicUrl}/${key}` };
 }
 
+/**
+ * Generate a presigned GET URL with response-header overrides so a 302
+ * redirect to it triggers a same-tab download with the right filename and
+ * MIME type. Accepts the public URL (storageKey, what the DB stores) and
+ * strips the bucket prefix the same way `deleteFile` does.
+ */
+export async function getPresignedDownloadUrl(
+  storageKey: string,
+  { filename, contentType }: { filename: string; contentType: string },
+): Promise<string> {
+  const key = storageKey.replace(`${publicUrl}/`, "");
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${filename}"`,
+    ResponseContentType: contentType,
+  });
+  return getSignedUrl(s3, command, { expiresIn: 600 });
+}
+
 /** Download a file from R2 as a Buffer. */
 export async function getFileBuffer(key: string): Promise<Buffer> {
   const { Body } = await s3.send(
