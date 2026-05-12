@@ -124,7 +124,15 @@ describe("GET /download/[token]", () => {
   });
 });
 
-describe("GET /download/[token]/zip", () => {
+describe("GET /download/[token]/zip (manifest endpoint)", () => {
+  it("404s on an unknown token", async () => {
+    const res = await downloadZip(
+      tokenReq("does-not-exist", "releaseId=1&format=mp3"),
+      ctx("does-not-exist"),
+    );
+    expect(res.status).toBe(404);
+  });
+
   it("403s when requesting tracks the order doesn't own", async () => {
     const release = await makeRelease();
     const ownedTrack = await makeTrackWithFile(release.id);
@@ -161,39 +169,52 @@ describe("GET /download/[token]/zip", () => {
     expect(res.status).toBe(400);
   });
 
-  it("502s when any track is unavailable in R2 (pre-flight HEAD check)", async () => {
-    const release = await makeRelease();
-    const t = await makeTrackWithFile(release.id);
+  it("returns a manifest of presigned URLs for a release the order owns", async () => {
+    const release = await makeRelease({ name: "Album One" });
+    await makeTrackWithFile(release.id, { name: "Track A", trackNumber: 1 });
+    await makeTrackWithFile(release.id, { name: "Track B", trackNumber: 2 });
     const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
     const token = order.downloadTokens[0].token;
-
-    // HEAD pre-flight returns 404 → route should refuse to start streaming.
-    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
-
-    const res = await downloadZip(
-      tokenReq(token, `releaseId=${release.id}&format=mp3`),
-      ctx(token),
-    );
-    expect(res.status).toBe(502);
-    const body = await res.json();
-    expect(body.error).toMatch(/temporarily unavailable/i);
-    // We use t in the assertion above (release ownership is implicit in the test setup).
-    expect(t.id).toBeGreaterThan(0);
-  });
-
-  it("starts streaming once HEAD pre-flight succeeds", async () => {
-    const release = await makeRelease();
-    await makeTrackWithFile(release.id);
-    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
-    const token = order.downloadTokens[0].token;
-
-    fetchMock.mockResolvedValue(new Response("audio-bytes", { status: 200 }));
 
     const res = await downloadZip(
       tokenReq(token, `releaseId=${release.id}&format=mp3`),
       ctx(token),
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("application/zip");
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    const body = await res.json();
+
+    expect(body.zipName).toBe("Album One (MP3).zip");
+    expect(body.files).toHaveLength(2);
+    expect(body.files[0].fileName).toBe("01 - Track A.mp3");
+    expect(body.files[1].fileName).toBe("02 - Track B.mp3");
+    body.files.forEach((f: { url: string }) => {
+      expect(f.url).toMatch(/^https:\/\/r2\/signed/);
+    });
+    // Critical: the function must NOT have fetched any audio bytes itself.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a manifest of presigned URLs for a list of owned trackIds (preserving order)", async () => {
+    const release = await makeRelease({ name: "Mix Album" });
+    const t1 = await makeTrackWithFile(release.id, { name: "Alpha", trackNumber: 1 });
+    const t2 = await makeTrackWithFile(release.id, { name: "Beta", trackNumber: 2 });
+    const order = await makeCompletedOrder({ email: "x@y", trackIds: [t1.id, t2.id] });
+    const token = order.downloadTokens[0].token;
+
+    // Request in reverse order — the manifest must preserve request order
+    // (that's what the customer chose at checkout).
+    const res = await downloadZip(
+      tokenReq(token, `trackIds=${t2.id},${t1.id}&format=mp3`),
+      ctx(token),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.zipName).toBe("Party Pupils - Tracks (MP3).zip");
+    expect(body.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+      "Mix Album - Beta.mp3",
+      "Mix Album - Alpha.mp3",
+    ]);
   });
 });
