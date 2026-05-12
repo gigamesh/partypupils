@@ -41,7 +41,7 @@ export default async function HomePage() {
 
           <div className="hidden md:block absolute right-0 bottom-0 z-10">
             <Image
-              src="/images/side-profile.png"
+              src="/images/side-profile.webp"
               alt="Party Pupils"
               width={600}
               height={720}
