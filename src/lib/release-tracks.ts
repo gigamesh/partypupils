@@ -8,6 +8,7 @@
 import { Prisma, type ReleaseType } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import { deleteFile } from "./storage";
+import { slugify } from "./utils";
 
 export interface FileInput {
   format: string;
@@ -20,7 +21,7 @@ export interface TrackInput {
   /** Present for tracks that already exist in the DB; absent for new tracks. */
   id?: number;
   name: string;
-  /** Optional in the incoming payload — `dedupeTrackSlugs` fills empty values with a deterministic fallback. */
+  /** Optional in the incoming payload — `normalizeTrackSlugs` slugifies and falls back to `track-${trackNumber}` when empty. */
   slug?: string;
   price: number;
   trackNumber: number;
@@ -46,23 +47,41 @@ function fileKey(f: { format: string; storageKey: string }): string {
   return `${f.format}::${f.storageKey}`;
 }
 
+/** Thrown when two tracks in the same payload normalize to the same slug. */
+export class DuplicateTrackSlugError extends Error {
+  constructor(
+    public slug: string,
+    public conflicting: { first: string; second: string },
+  ) {
+    super(
+      `Two tracks have the same slug "${slug}": "${conflicting.first}" and "${conflicting.second}". Pick a unique slug for each.`,
+    );
+    this.name = "DuplicateTrackSlugError";
+  }
+}
+
 /**
- * Mutates `incoming` so every track has a non-empty slug that is unique within
- * the release, and returns the same array narrowed to `slug: string`. Tracks
- * earlier in the list keep their slug; later collisions get `-2`, `-3`, ...
- * appended. Empty/whitespace slugs are filled from `track-${trackNumber}`.
+ * Mutates `incoming` so every track has a normalized, URL-safe, non-empty slug
+ * that is unique within the release. Empty/whitespace slugs are filled from
+ * `track-${trackNumber}`. Throws `DuplicateTrackSlugError` if two tracks
+ * normalize to the same slug — the admin must disambiguate rather than have
+ * the server silently rewrite their input.
  */
-export function dedupeTrackSlugs(
+export function normalizeTrackSlugs(
   incoming: TrackInput[],
 ): asserts incoming is (TrackInput & { slug: string })[] {
-  const taken = new Set<string>();
+  const taken = new Map<string, string>(); // slug → name of the track that claimed it
   for (const t of incoming) {
-    const base = (t.slug && t.slug.trim()) || `track-${t.trackNumber}`;
-    let candidate = base;
-    let n = 2;
-    while (taken.has(candidate)) candidate = `${base}-${n++}`;
-    t.slug = candidate;
-    taken.add(candidate);
+    const normalized = slugify(t.slug ?? "") || `track-${t.trackNumber}`;
+    const prior = taken.get(normalized);
+    if (prior !== undefined) {
+      throw new DuplicateTrackSlugError(normalized, {
+        first: prior,
+        second: t.name,
+      });
+    }
+    t.slug = normalized;
+    taken.set(normalized, t.name);
   }
 }
 
@@ -114,7 +133,7 @@ export async function syncReleaseAndTracks(
     );
   }
 
-  dedupeTrackSlugs(incoming);
+  normalizeTrackSlugs(incoming);
 
   const tracksBeingDeleted = existing.filter((t) => !incomingExistingIds.has(t.id));
   const toDeleteIds = tracksBeingDeleted.map((t) => t.id);

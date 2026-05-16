@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
-import { dedupeTrackSlugs, type TrackInput } from "@/lib/release-tracks";
+import {
+  DuplicateTrackSlugError,
+  normalizeTrackSlugs,
+  type TrackInput,
+} from "@/lib/release-tracks";
 import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 
 function isUniqueConstraintError(err: unknown): boolean {
@@ -22,7 +26,14 @@ export async function POST(req: NextRequest) {
   const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, inRadio, tracks } = body;
 
   const incomingTracks: TrackInput[] = Array.isArray(tracks) ? tracks : [];
-  dedupeTrackSlugs(incomingTracks);
+  try {
+    normalizeTrackSlugs(incomingTracks);
+  } catch (err) {
+    if (err instanceof DuplicateTrackSlugError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
+  }
 
   let release;
   try {
