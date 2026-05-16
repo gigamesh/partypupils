@@ -153,6 +153,15 @@
     @apply text-lg font-medium;
     margin-bottom: 0.75rem;
   }
+  /* Default link color is the brand neon. Components that want a different
+     tone (button-styled anchors, footer link, etc.) override with text-* classes. */
+  a {
+    color: var(--color-neon);
+    transition: color 200ms, filter 200ms;
+  }
+  a:hover {
+    filter: drop-shadow(0 0 6px rgba(173, 253, 2, 0.5));
+  }
 }
 
 /* Frosted glass container */

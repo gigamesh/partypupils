@@ -2,8 +2,7 @@
 
 import type { PlayerTrack } from "@/lib/player-types";
 import { useAudio } from "./AudioProvider";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { NowPlayingIndicator } from "./NowPlayingIndicator";
 
 interface ReleasePlayOverlayProps {
@@ -30,8 +29,10 @@ export function ReleasePlayOverlay({ tracks, releaseId }: ReleasePlayOverlayProp
       <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/40" />
 
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        <button
+        <Button
           type="button"
+          variant="pill"
+          size="icon-xl"
           aria-label={isPlaying ? "Pause" : "Play release"}
           onClick={(e) => {
             e.preventDefault();
@@ -39,7 +40,7 @@ export function ReleasePlayOverlay({ tracks, releaseId }: ReleasePlayOverlayProp
             if (isCurrentRelease) toggle();
             else playQueue(tracks, 0, "release", { shuffle: false, repeat: "off" });
           }}
-          className={cn(buttonVariants({ variant: "pill", size: "icon-xl" }), "pointer-events-auto shadow-lg")}
+          className="pointer-events-auto shadow-lg"
         >
           {isPlaying ? (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -51,7 +52,7 @@ export function ReleasePlayOverlay({ tracks, releaseId }: ReleasePlayOverlayProp
               <polygon points="6,4 20,12 6,20" />
             </svg>
           )}
-        </button>
+        </Button>
       </div>
     </>
   );

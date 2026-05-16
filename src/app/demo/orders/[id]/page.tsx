@@ -3,13 +3,12 @@ import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { Button } from "@/components/ui/button";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { toPlayerTrack } from "@/lib/player-data";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 interface Props {
@@ -55,12 +54,9 @@ export default async function DemoOrderDetailPage({ params }: Props) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
       <div className="mb-4">
-        <Link
-          href="/demo/orders"
-          className={cn(buttonVariants({ size: "sm", variant: "ghost" }))}
-        >
+        <Button href="/demo/orders" size="sm" variant="ghost">
           ← All demo orders
-        </Link>
+        </Button>
       </div>
       <h1>Demo: Order #{order.id}</h1>
       <p className="text-muted-foreground mb-8">

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Loader2Icon } from "lucide-react";
 
 interface DownloadButtonsProps {
@@ -22,19 +21,21 @@ export function DownloadButtons({ token, trackId, availableFormats }: DownloadBu
   return (
     <div className="flex gap-2">
       {availableFormats.map((format) => (
-        <a
+        <Button
           key={format}
           href={`/download/${token}?trackId=${trackId}&format=${format}`}
           download
+          prefetch={false}
+          size="sm"
+          variant="secondary"
           onClick={() => handleClick(format)}
-          className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}
         >
           {loading === format ? (
             <><Loader2Icon className="h-4 w-4 animate-spin" /> Downloading</>
           ) : (
             format.toUpperCase()
           )}
-        </a>
+        </Button>
       ))}
     </div>
   );

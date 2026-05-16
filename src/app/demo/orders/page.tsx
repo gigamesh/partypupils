@@ -1,9 +1,8 @@
-import { buttonVariants } from "@/components/ui/button-variants";
+import { Button } from "@/components/ui/button";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -117,14 +116,13 @@ export default async function DemoOrdersListPage() {
                     <td className="py-2 px-2">{shape.scenarioLabel}</td>
                     <td className="py-2 px-2">{shape.totalTracks}</td>
                     <td className="py-2 px-2">
-                      <Link
+                      <Button
                         href={`/demo/orders/${order.id}`}
-                        className={cn(
-                          buttonVariants({ size: "sm", variant: "secondary" }),
-                        )}
+                        size="sm"
+                        variant="secondary"
                       >
                         View
-                      </Link>
+                      </Button>
                     </td>
                   </tr>
                 );
