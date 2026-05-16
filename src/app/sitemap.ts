@@ -7,7 +7,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const releases = await prisma.release.findMany({
     where: { isPublished: true },
-    select: { slug: true, updatedAt: true },
+    select: {
+      slug: true,
+      updatedAt: true,
+      tracks: { select: { slug: true } },
+    },
   });
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -23,5 +27,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticRoutes, ...releaseRoutes];
+  const trackRoutes: MetadataRoute.Sitemap = releases.flatMap((release) =>
+    release.tracks.map((track) => ({
+      url: `${baseUrl}/music/${release.slug}/${track.slug}`,
+      lastModified: release.updatedAt,
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
+  );
+
+  return [...staticRoutes, ...releaseRoutes, ...trackRoutes];
 }

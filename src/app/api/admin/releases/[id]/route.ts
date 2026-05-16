@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import {
   cleanupR2Objects,
+  DuplicateTrackSlugError,
   StaleFormError,
   syncReleaseAndTracks,
   type TrackInput,
@@ -41,7 +42,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       incoming,
     );
   } catch (err) {
-    if (err instanceof StaleFormError) {
+    if (err instanceof StaleFormError || err instanceof DuplicateTrackSlugError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     throw err;

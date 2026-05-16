@@ -154,7 +154,7 @@ export function PlayerBar() {
           <div className="px-4 py-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <Link
-                href={`/music/${track.releaseSlug}`}
+                href={`/music/${track.releaseSlug}/${track.trackSlug}`}
                 onClick={() => setExpanded(false)}
                 className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-muted"
               >
@@ -165,7 +165,13 @@ export function PlayerBar() {
                 )}
               </Link>
               <div className="min-w-0 flex-1">
-                <div className="text-base font-medium leading-tight truncate">{track.trackName}</div>
+                <Link
+                  href={`/music/${track.releaseSlug}/${track.trackSlug}`}
+                  onClick={() => setExpanded(false)}
+                  className="text-base font-medium leading-tight truncate block hover:text-neon"
+                >
+                  {track.trackName}
+                </Link>
                 <Link
                   href={`/music/${track.releaseSlug}`}
                   onClick={() => setExpanded(false)}
@@ -222,7 +228,7 @@ export function PlayerBar() {
         <div className="overflow-hidden">
       <div className="mx-auto flex h-12 max-w-5xl items-center gap-3 px-4 md:h-14">
         <Link
-          href={`/music/${track.releaseSlug}`}
+          href={`/music/${track.releaseSlug}/${track.trackSlug}`}
           className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted md:h-11 md:w-11"
         >
           {track.coverImageUrl ? (
@@ -233,7 +239,12 @@ export function PlayerBar() {
         </Link>
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium leading-tight">{track.trackName}</div>
+          <Link
+            href={`/music/${track.releaseSlug}/${track.trackSlug}`}
+            className="truncate text-sm font-medium leading-tight block hover:text-neon"
+          >
+            {track.trackName}
+          </Link>
           <Link
             href={`/music/${track.releaseSlug}`}
             className="neon-link block truncate text-xs leading-tight"

@@ -42,6 +42,7 @@ model Track {
   id          Int      @id @default(autoincrement())
   releaseId   Int
   name        String
+  slug        String
   price       Int // cents — price for individual track purchase
   trackNumber Int
   previewUrl  String?
@@ -52,6 +53,7 @@ model Track {
   files      TrackFile[]
   orderItems OrderItem[]
 
+  @@unique([releaseId, slug])
   @@map("tracks")
 }
 

@@ -8,6 +8,7 @@
 import { Prisma, type ReleaseType } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import { deleteFile } from "./storage";
+import { slugify } from "./utils";
 
 export interface FileInput {
   format: string;
@@ -20,6 +21,8 @@ export interface TrackInput {
   /** Present for tracks that already exist in the DB; absent for new tracks. */
   id?: number;
   name: string;
+  /** Optional in the incoming payload — `normalizeTrackSlugs` slugifies and falls back to `track-${trackNumber}` when empty. */
+  slug?: string;
   price: number;
   trackNumber: number;
   previewUrl?: string | null;
@@ -42,6 +45,44 @@ export interface ReleaseScalarsInput {
 /** Stable signature of a TrackFile by (format, storageKey) so we can decide whether files actually changed. */
 function fileKey(f: { format: string; storageKey: string }): string {
   return `${f.format}::${f.storageKey}`;
+}
+
+/** Thrown when two tracks in the same payload normalize to the same slug. */
+export class DuplicateTrackSlugError extends Error {
+  constructor(
+    public slug: string,
+    public conflicting: { first: string; second: string },
+  ) {
+    super(
+      `Two tracks have the same slug "${slug}": "${conflicting.first}" and "${conflicting.second}". Pick a unique slug for each.`,
+    );
+    this.name = "DuplicateTrackSlugError";
+  }
+}
+
+/**
+ * Mutates `incoming` so every track has a normalized, URL-safe, non-empty slug
+ * that is unique within the release. Empty/whitespace slugs are filled from
+ * `track-${trackNumber}`. Throws `DuplicateTrackSlugError` if two tracks
+ * normalize to the same slug — the admin must disambiguate rather than have
+ * the server silently rewrite their input.
+ */
+export function normalizeTrackSlugs(
+  incoming: TrackInput[],
+): asserts incoming is (TrackInput & { slug: string })[] {
+  const taken = new Map<string, string>(); // slug → name of the track that claimed it
+  for (const t of incoming) {
+    const normalized = slugify(t.slug ?? "") || `track-${t.trackNumber}`;
+    const prior = taken.get(normalized);
+    if (prior !== undefined) {
+      throw new DuplicateTrackSlugError(normalized, {
+        first: prior,
+        second: t.name,
+      });
+    }
+    t.slug = normalized;
+    taken.set(normalized, t.name);
+  }
 }
 
 /** Thrown when the incoming payload looks like a stale browser tab (no track IDs but DB has tracks). */
@@ -91,10 +132,13 @@ export async function syncReleaseAndTracks(
       "This release has unsaved changes from a stale browser tab — please refresh and try again.",
     );
   }
+
+  normalizeTrackSlugs(incoming);
+
   const tracksBeingDeleted = existing.filter((t) => !incomingExistingIds.has(t.id));
   const toDeleteIds = tracksBeingDeleted.map((t) => t.id);
   const toUpdate = incoming.filter(
-    (t): t is TrackInput & { id: number } => t.id != null && existingById.has(t.id),
+    (t): t is TrackInput & { id: number; slug: string } => t.id != null && existingById.has(t.id),
   );
   const toCreate = incoming.filter((t) => t.id == null);
 
@@ -132,6 +176,7 @@ export async function syncReleaseAndTracks(
         where: { id: t.id },
         data: {
           name: t.name,
+          slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,
           previewUrl: t.previewUrl || null,
@@ -165,6 +210,7 @@ export async function syncReleaseAndTracks(
         data: {
           releaseId,
           name: t.name,
+          slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,
           previewUrl: t.previewUrl || null,

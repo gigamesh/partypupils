@@ -53,6 +53,7 @@ function RadioCheckbox({
 interface TrackInput {
   existingId?: number;
   name: string;
+  slug: string;
   priceStr: string;
   trackNumber: number;
   inRadio: boolean;
@@ -69,6 +70,7 @@ interface TrackInput {
 interface ExistingTrack {
   id: number;
   name: string;
+  slug: string;
   price: number;
   trackNumber: number;
   previewUrl: string | null;
@@ -122,6 +124,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         return {
           existingId: t.id,
           name: t.name,
+          slug: t.slug,
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
           inRadio: t.inRadio,
@@ -136,13 +139,13 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         };
       });
     }
-    return [{ name: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
+    return [{ name: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
   });
 
   function addTrack() {
     setTracks((prev) => [
       ...prev,
-      { name: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
+      { name: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
     ]);
   }
 
@@ -320,6 +323,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         trackData.push({
           id: track.existingId,
           name: track.name,
+          slug: track.slug || slugify(track.name) || `track-${track.trackNumber}`,
           price: trackPrice,
           trackNumber: track.trackNumber,
           previewUrl,
@@ -557,12 +561,38 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Name</Label>
-                <Input value={track.name} onChange={(e) => updateTrack(index, "name", e.target.value)} required />
+                <Input
+                  value={track.name}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTracks((prev) =>
+                      prev.map((t, i) =>
+                        i === index
+                          ? {
+                              ...t,
+                              name: value,
+                              // Only auto-derive for unsaved tracks (matches release-slug behaviour).
+                              slug: t.existingId == null ? slugify(value) : t.slug,
+                            }
+                          : t,
+                      ),
+                    );
+                  }}
+                  required
+                />
               </div>
               <div className="space-y-1">
                 <Label>Price (USD)</Label>
                 <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} required />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Slug</Label>
+              <Input
+                value={track.slug}
+                onChange={(e) => updateTrack(index, "slug", e.target.value)}
+                required
+              />
             </div>
             {(() => {
               if (!track.existingId) return null;
@@ -571,6 +601,7 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
               const previewTrack: PlayerTrack = {
                 trackId: track.existingId,
                 trackName: track.name || `Track ${track.trackNumber}`,
+                trackSlug: track.slug,
                 trackNumber: track.trackNumber,
                 releaseId: release?.id ?? 0,
                 releaseName: name || "Release",

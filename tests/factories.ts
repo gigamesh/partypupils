@@ -29,6 +29,7 @@ export async function makeTrackWithFile(releaseId: number, overrides: Partial<{
     data: {
       releaseId,
       name: overrides.name ?? "Test Track",
+      slug: `track-${Math.random().toString(36).slice(2, 10)}`,
       trackNumber: overrides.trackNumber ?? 1,
       price: overrides.price ?? 150,
       files: {
