@@ -5,6 +5,7 @@ export type QueueSource = "radio" | "release" | "track" | null;
 export interface PlayerTrack {
   trackId: number;
   trackName: string;
+  trackSlug: string;
   trackNumber: number;
   releaseId: number;
   releaseName: string;

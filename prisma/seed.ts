@@ -1,8 +1,13 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { slugify } from "../src/lib/utils";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
+
+function trackSlug(name: string): string {
+  return slugify(name);
+}
 
 async function main() {
   // Virtual Clarity (Deluxe) — Album, January 17, 2025
@@ -20,14 +25,14 @@ async function main() {
       isPublished: true,
       tracks: {
         create: [
-          { name: "Believe In Love", price: 199, trackNumber: 1 },
-          { name: "Tokyo Blur", price: 199, trackNumber: 2 },
-          { name: "Hiya", price: 199, trackNumber: 3 },
-          { name: "White Light", price: 199, trackNumber: 4 },
-          { name: "E.P.C.O.T.", price: 199, trackNumber: 5 },
-          { name: "Are We Dreaming?", price: 199, trackNumber: 6 },
-          { name: "Circuit", price: 199, trackNumber: 7 },
-          { name: "Get Down", price: 199, trackNumber: 8 },
+          { name: "Believe In Love", slug: trackSlug("Believe In Love"), price: 199, trackNumber: 1 },
+          { name: "Tokyo Blur", slug: trackSlug("Tokyo Blur"), price: 199, trackNumber: 2 },
+          { name: "Hiya", slug: trackSlug("Hiya"), price: 199, trackNumber: 3 },
+          { name: "White Light", slug: trackSlug("White Light"), price: 199, trackNumber: 4 },
+          { name: "E.P.C.O.T.", slug: trackSlug("E.P.C.O.T."), price: 199, trackNumber: 5 },
+          { name: "Are We Dreaming?", slug: trackSlug("Are We Dreaming?"), price: 199, trackNumber: 6 },
+          { name: "Circuit", slug: trackSlug("Circuit"), price: 199, trackNumber: 7 },
+          { name: "Get Down", slug: trackSlug("Get Down"), price: 199, trackNumber: 8 },
         ],
       },
     },
@@ -48,22 +53,24 @@ async function main() {
       isPublished: true,
       tracks: {
         create: [
-          { name: "Lonelier (feat. Alna)", price: 199, trackNumber: 1 },
+          { name: "Lonelier (feat. Alna)", slug: trackSlug("Lonelier (feat. Alna)"), price: 199, trackNumber: 1 },
           {
             name: "West Coast Tears (feat. Gary Go)",
+            slug: trackSlug("West Coast Tears (feat. Gary Go)"),
             price: 199,
             trackNumber: 2,
           },
-          { name: "Rock The Party", price: 199, trackNumber: 3 },
-          { name: "The Plug (feat. Drelli)", price: 199, trackNumber: 4 },
+          { name: "Rock The Party", slug: trackSlug("Rock The Party"), price: 199, trackNumber: 3 },
+          { name: "The Plug (feat. Drelli)", slug: trackSlug("The Plug (feat. Drelli)"), price: 199, trackNumber: 4 },
           {
             name: "Love Me For The Weekend (feat. Ashe)",
+            slug: trackSlug("Love Me For The Weekend (feat. Ashe)"),
             price: 199,
             trackNumber: 5,
           },
-          { name: "One Two Things (feat. TOBi)", price: 199, trackNumber: 6 },
-          { name: "Bite My Tongue", price: 199, trackNumber: 7 },
-          { name: "Sax On The Beach", price: 199, trackNumber: 8 },
+          { name: "One Two Things (feat. TOBi)", slug: trackSlug("One Two Things (feat. TOBi)"), price: 199, trackNumber: 6 },
+          { name: "Bite My Tongue", slug: trackSlug("Bite My Tongue"), price: 199, trackNumber: 7 },
+          { name: "Sax On The Beach", slug: trackSlug("Sax On The Beach"), price: 199, trackNumber: 8 },
         ],
       },
     },
@@ -96,7 +103,7 @@ async function main() {
         releasedAt: new Date(single.date),
         isPublished: true,
         tracks: {
-          create: [{ name: single.name, price: 199, trackNumber: 1 }],
+          create: [{ name: single.name, slug: trackSlug(single.name), price: 199, trackNumber: 1 }],
         },
       },
     });

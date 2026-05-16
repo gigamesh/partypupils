@@ -27,6 +27,21 @@ let lastPrefetchedUrl: string | null = null;
 let rafHandle: number | null = null;
 let initialized = false;
 
+function isValidPersistedTrack(t: unknown): t is PlayerTrack {
+  if (!t || typeof t !== "object") return false;
+  const r = t as Record<string, unknown>;
+  return (
+    typeof r.trackId === "number" &&
+    typeof r.trackName === "string" &&
+    typeof r.trackSlug === "string" &&
+    typeof r.trackNumber === "number" &&
+    typeof r.releaseId === "number" &&
+    typeof r.releaseName === "string" &&
+    typeof r.releaseSlug === "string" &&
+    typeof r.streamUrl === "string"
+  );
+}
+
 function loadPersisted(): PersistedPlayerState | null {
   if (typeof window === "undefined") return null;
   try {
@@ -34,6 +49,19 @@ function loadPersisted(): PersistedPlayerState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedPlayerState;
     if (!Array.isArray(parsed.queue) || typeof parsed.currentIndex !== "number") return null;
+    // Drop any queue entries from older app versions that don't satisfy the current PlayerTrack shape.
+    // Without this, a stale localStorage from a deploy that pre-dates a field (e.g. trackSlug) would
+    // leak `undefined` into URLs and break navigation.
+    const cleanQueue = parsed.queue.filter(isValidPersistedTrack);
+    if (cleanQueue.length !== parsed.queue.length) {
+      const droppedCurrent = parsed.currentIndex >= cleanQueue.length;
+      return {
+        ...parsed,
+        queue: cleanQueue,
+        currentIndex: droppedCurrent ? -1 : parsed.currentIndex,
+        currentTime: droppedCurrent ? 0 : parsed.currentTime,
+      };
+    }
     return parsed;
   } catch {
     return null;

@@ -20,6 +20,8 @@ export interface TrackInput {
   /** Present for tracks that already exist in the DB; absent for new tracks. */
   id?: number;
   name: string;
+  /** Optional in the incoming payload — `dedupeTrackSlugs` fills empty values with a deterministic fallback. */
+  slug?: string;
   price: number;
   trackNumber: number;
   previewUrl?: string | null;
@@ -42,6 +44,26 @@ export interface ReleaseScalarsInput {
 /** Stable signature of a TrackFile by (format, storageKey) so we can decide whether files actually changed. */
 function fileKey(f: { format: string; storageKey: string }): string {
   return `${f.format}::${f.storageKey}`;
+}
+
+/**
+ * Mutates `incoming` so every track has a non-empty slug that is unique within
+ * the release, and returns the same array narrowed to `slug: string`. Tracks
+ * earlier in the list keep their slug; later collisions get `-2`, `-3`, ...
+ * appended. Empty/whitespace slugs are filled from `track-${trackNumber}`.
+ */
+export function dedupeTrackSlugs(
+  incoming: TrackInput[],
+): asserts incoming is (TrackInput & { slug: string })[] {
+  const taken = new Set<string>();
+  for (const t of incoming) {
+    const base = (t.slug && t.slug.trim()) || `track-${t.trackNumber}`;
+    let candidate = base;
+    let n = 2;
+    while (taken.has(candidate)) candidate = `${base}-${n++}`;
+    t.slug = candidate;
+    taken.add(candidate);
+  }
 }
 
 /** Thrown when the incoming payload looks like a stale browser tab (no track IDs but DB has tracks). */
@@ -91,10 +113,13 @@ export async function syncReleaseAndTracks(
       "This release has unsaved changes from a stale browser tab — please refresh and try again.",
     );
   }
+
+  dedupeTrackSlugs(incoming);
+
   const tracksBeingDeleted = existing.filter((t) => !incomingExistingIds.has(t.id));
   const toDeleteIds = tracksBeingDeleted.map((t) => t.id);
   const toUpdate = incoming.filter(
-    (t): t is TrackInput & { id: number } => t.id != null && existingById.has(t.id),
+    (t): t is TrackInput & { id: number; slug: string } => t.id != null && existingById.has(t.id),
   );
   const toCreate = incoming.filter((t) => t.id == null);
 
@@ -132,6 +157,7 @@ export async function syncReleaseAndTracks(
         where: { id: t.id },
         data: {
           name: t.name,
+          slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,
           previewUrl: t.previewUrl || null,
@@ -165,6 +191,7 @@ export async function syncReleaseAndTracks(
         data: {
           releaseId,
           name: t.name,
+          slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,
           previewUrl: t.previewUrl || null,

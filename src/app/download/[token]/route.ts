@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getPresignedDownloadUrl } from "@/lib/storage";
+import { tokenGrantsTrack } from "@/lib/download-auth";
 
 interface RouteContext {
   params: Promise<{ token: string }>;
@@ -15,23 +16,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Missing trackId" }, { status: 400 });
   }
 
-  // Pull only the ID columns needed to authorize ownership; previously we joined
-  // release.tracks (every track of every release in the order) to walk in JS.
-  const downloadToken = await prisma.downloadToken.findUnique({
-    where: { token },
-    select: {
-      order: {
-        select: {
-          items: { select: { trackId: true, releaseId: true } },
-        },
-      },
-    },
-  });
-
-  if (!downloadToken) {
-    return NextResponse.json({ error: "Invalid download link" }, { status: 404 });
-  }
-
   const file = await prisma.trackFile.findFirst({
     where: { trackId, format },
     include: { track: { select: { name: true, releaseId: true } } },
@@ -41,11 +25,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  const orderHasTrack = downloadToken.order.items.some(
-    (item) => item.trackId === trackId || item.releaseId === file.track.releaseId,
-  );
-
-  if (!orderHasTrack) {
+  const ok = await tokenGrantsTrack(token, trackId, file.track.releaseId);
+  if (!ok) {
     return NextResponse.json({ error: "Track not in order" }, { status: 403 });
   }
 

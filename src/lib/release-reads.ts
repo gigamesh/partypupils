@@ -66,6 +66,34 @@ export const getReleaseBySlug = cache(
   ),
 );
 
+/**
+ * Single track by (release slug, track slug). Same React-cache + unstable_cache
+ * pattern as `getReleaseBySlug` so `generateMetadata` and the page body share
+ * one DB round-trip. Returns the track with its files and parent release
+ * (including sibling tracks) for the song page.
+ */
+export const getTrackByReleaseAndSlug = cache(
+  unstable_cache(
+    (releaseSlug: string, trackSlug: string) =>
+      prisma.track.findFirst({
+        where: {
+          slug: trackSlug,
+          release: { slug: releaseSlug, isPublished: true },
+        },
+        include: {
+          files: true,
+          release: {
+            include: {
+              tracks: { orderBy: { trackNumber: "asc" }, include: { files: true } },
+            },
+          },
+        },
+      }),
+    ["track-by-release-and-slug-v1"],
+    { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
+  ),
+);
+
 /** Visible hero links — small list, but it's on the homepage so we cache it too. */
 export const getHeroLinks = unstable_cache(
   () =>

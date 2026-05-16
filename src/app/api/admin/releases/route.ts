@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
+import { dedupeTrackSlugs, type TrackInput } from "@/lib/release-tracks";
 import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 
 function isUniqueConstraintError(err: unknown): boolean {
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, inRadio, tracks } = body;
 
+  const incomingTracks: TrackInput[] = Array.isArray(tracks) ? tracks : [];
+  dedupeTrackSlugs(incomingTracks);
+
   let release;
   try {
     release = await prisma.release.create({
@@ -34,8 +38,9 @@ export async function POST(req: NextRequest) {
         isPublished,
         inRadio: inRadio ?? true,
         tracks: {
-          create: (tracks || []).map((t: { name: string; price: number; trackNumber: number; previewUrl?: string; inRadio?: boolean; files: { format: string; fileName: string; storageKey: string; fileSize: number }[] }) => ({
+          create: incomingTracks.map((t) => ({
             name: t.name,
+            slug: t.slug,
             price: t.price,
             trackNumber: t.trackNumber,
             previewUrl: t.previewUrl || null,

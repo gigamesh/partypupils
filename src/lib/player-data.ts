@@ -3,6 +3,7 @@ import type { PlayerTrack } from "./player-types";
 interface TrackInput {
   id: number;
   name: string;
+  slug: string;
   trackNumber: number;
   previewUrl: string | null;
   files: { format: string; storageKey: string }[];
@@ -34,6 +35,7 @@ export function toPlayerTrack(track: TrackInput, release: ReleaseInput): PlayerT
   return {
     trackId: track.id,
     trackName: track.name,
+    trackSlug: track.slug,
     trackNumber: track.trackNumber,
     releaseId: release.id,
     releaseName: release.name,
