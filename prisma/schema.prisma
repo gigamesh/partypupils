@@ -54,6 +54,7 @@ model Track {
   orderItems OrderItem[]
 
   @@unique([releaseId, slug])
+  @@unique([releaseId, trackNumber])
   @@map("tracks")
 }
 
