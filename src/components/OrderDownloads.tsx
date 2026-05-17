@@ -1,6 +1,5 @@
 import { DownloadButtons } from "@/components/DownloadButtons";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
-import { TrackProgress } from "@/components/TrackProgress";
 import { formatCurrency } from "@/lib/utils";
 
 interface TrackShape {
@@ -122,7 +121,6 @@ export function OrderDownloads({
                         />
                       )}
                     </div>
-                    <TrackProgress trackId={track.id} />
                   </div>
                 ))}
               </div>
@@ -152,7 +150,6 @@ export function OrderDownloads({
                     />
                   )}
                 </div>
-                <TrackProgress trackId={item.track.id} />
               </div>
             );
           }

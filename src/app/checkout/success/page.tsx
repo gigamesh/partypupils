@@ -24,7 +24,14 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
     include: {
       items: {
         include: {
-          release: { include: { tracks: { include: { files: true } } } },
+          release: {
+            include: {
+              tracks: {
+                orderBy: { trackNumber: "asc" },
+                include: { files: true },
+              },
+            },
+          },
           track: { include: { files: true, release: true } },
         },
       },
