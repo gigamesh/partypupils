@@ -24,7 +24,7 @@ export function FixedBackground() {
       {imrovedContrast && (
         <div
           className="absolute inset-0"
-          style={{ background: "rgba(0, 0, 0, 0.5)" }}
+          style={{ background: "rgba(0, 0, 0, 0.4)" }}
         />
       )}
     </div>

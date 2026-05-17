@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Loader2Icon } from "lucide-react";
 
 interface DownloadZipButtonsProps {
@@ -9,6 +10,7 @@ interface DownloadZipButtonsProps {
   releaseId?: number;
   trackIds?: number[];
   availableFormats: string[];
+  className?: string;
 }
 
 interface Manifest {
@@ -27,7 +29,7 @@ type SwState = "registering" | "ready" | "unavailable";
  * Browsers without `navigator.serviceWorker` (or where registration fails)
  * see a fallback message; per-track downloads still work via PR 1's bypass.
  */
-export function DownloadZipButtons({ token, releaseId, trackIds, availableFormats }: DownloadZipButtonsProps) {
+export function DownloadZipButtons({ token, releaseId, trackIds, availableFormats, className }: DownloadZipButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [swState, setSwState] = useState<SwState>("registering");
   const swRef = useRef<ServiceWorker | null>(null);
@@ -73,7 +75,9 @@ export function DownloadZipButtons({ token, releaseId, trackIds, availableFormat
     try {
       const query = releaseId
         ? `releaseId=${releaseId}&format=${format}`
-        : `trackIds=${trackIds!.join(",")}&format=${format}`;
+        : trackIds
+          ? `trackIds=${trackIds.join(",")}&format=${format}`
+          : `format=${format}`;
       const res = await fetch(`/download/${token}/zip?${query}`);
       if (!res.ok) throw new Error(`Manifest fetch failed: ${res.status}`);
       const manifest = (await res.json()) as Manifest;
@@ -127,7 +131,7 @@ export function DownloadZipButtons({ token, releaseId, trackIds, availableFormat
   }
 
   return (
-    <div className="flex gap-2">
+    <div className={cn("flex gap-2", className)}>
       {availableFormats.map((format) => (
         <Button
           key={format}

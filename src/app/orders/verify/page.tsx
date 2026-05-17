@@ -1,13 +1,8 @@
-import { DownloadButtons } from "@/components/DownloadButtons";
 import { DownloadFAQ } from "@/components/DownloadFAQ";
-import { DownloadZipButtons } from "@/components/DownloadZipButtons";
-import { PlayButton } from "@/components/PlayButton";
-import { TrackProgress } from "@/components/TrackProgress";
+import { OrderDownloads } from "@/components/OrderDownloads";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/db";
 import { verifyOrderVerificationToken } from "@/lib/order-auth";
-import { toPlayerTrack } from "@/lib/player-data";
-import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
 
 interface Props {
@@ -86,146 +81,11 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
 
       <div className="mt-8 space-y-6">
         {ordersWithTokens.map((order) => (
-          <div key={order.id} className="glass-panel rounded-lg p-6 space-y-4">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>{order.createdAt.toLocaleDateString()}</span>
-              <span>{formatCurrency(order.amountTotal)}</span>
-            </div>
-
-            {order.items.map((item) => {
-              if (item.release && order.downloadToken) {
-                const releaseInfo = {
-                  id: item.release.id,
-                  name: item.release.name,
-                  slug: item.release.slug,
-                  coverImageUrl: item.release.coverImageUrl,
-                };
-                const playerTracks = item.release.tracks
-                  .map((t) => toPlayerTrack(t, releaseInfo))
-                  .filter((t): t is NonNullable<typeof t> => t !== null);
-                return (
-                  <div key={item.id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{item.release.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatCurrency(item.price)}
-                        </p>
-                      </div>
-                      {item.release.tracks.length >= 2 && (
-                        <DownloadZipButtons
-                          token={order.downloadToken!}
-                          releaseId={item.release.id}
-                          availableFormats={[
-                            ...new Set(
-                              item.release.tracks.flatMap((t) =>
-                                t.files.map((f) => f.format),
-                              ),
-                            ),
-                          ]}
-                        />
-                      )}
-                    </div>
-                    {item.release.tracks.map((track) => {
-                      const playerTrack = toPlayerTrack(track, releaseInfo);
-                      const queueIndex = playerTrack
-                        ? playerTracks.findIndex((p) => p.trackId === playerTrack.trackId)
-                        : -1;
-                      return (
-                        <div
-                          key={track.id}
-                          className="border-b border-border pb-2 last:border-0 last:pb-0 pl-4"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-2 text-sm">
-                              {playerTrack && queueIndex >= 0 && (
-                                <PlayButton
-                                  track={playerTrack}
-                                  queue={playerTracks}
-                                  index={queueIndex}
-                                />
-                              )}
-                              {track.trackNumber}. {track.name}
-                            </span>
-                            <DownloadButtons
-                              token={order.downloadToken!}
-                              trackId={track.id}
-                              availableFormats={track.files.map((f) => f.format)}
-                            />
-                          </div>
-                          <TrackProgress trackId={track.id} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              }
-              if (item.track) {
-                const trackRelease = item.track.release ?? null;
-                const releaseInfo = trackRelease
-                  ? {
-                      id: trackRelease.id,
-                      name: trackRelease.name,
-                      slug: trackRelease.slug,
-                      coverImageUrl: trackRelease.coverImageUrl,
-                    }
-                  : { id: 0, name: item.track.name, slug: "", coverImageUrl: null };
-                const playerTrack = toPlayerTrack(item.track, releaseInfo);
-                return (
-                  <div
-                    key={item.id}
-                    className="border-b border-border pb-3 last:border-0 last:pb-0"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {playerTrack && (
-                          <PlayButton
-                            track={playerTrack}
-                            queue={[playerTrack]}
-                            index={0}
-                          />
-                        )}
-                        <div>
-                          <p className="font-medium">{item.track.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatCurrency(item.price)}
-                          </p>
-                        </div>
-                      </div>
-                      {order.downloadToken && (
-                        <DownloadButtons
-                          token={order.downloadToken}
-                          trackId={item.track.id}
-                          availableFormats={item.track.files.map(
-                            (f) => f.format,
-                          )}
-                        />
-                      )}
-                    </div>
-                    <TrackProgress trackId={item.track.id} />
-                  </div>
-                );
-              }
-              return null;
-            })}
-
-            {order.downloadToken && (() => {
-              const trackItems = order.items.filter((item) => item.track);
-              if (trackItems.length < 2) return null;
-              const formats = [...new Set(trackItems.flatMap((item) => item.track!.files.map((f) => f.format)))];
-              return (
-                <div className="border-t border-border pt-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">Download All Tracks</p>
-                    <DownloadZipButtons
-                      token={order.downloadToken!}
-                      trackIds={trackItems.map((item) => item.track!.id)}
-                      availableFormats={formats}
-                    />
-                  </div>
-                </div>
-              );
-            })()}
+          <div key={order.id} className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {order.createdAt.toLocaleDateString()}
+            </p>
+            <OrderDownloads order={order} token={order.downloadToken} />
           </div>
         ))}
       </div>

@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Loader2Icon } from "lucide-react";
 
 interface DownloadButtonsProps {
   token: string;
   trackId: number;
   availableFormats: string[];
+  className?: string;
 }
 
-export function DownloadButtons({ token, trackId, availableFormats }: DownloadButtonsProps) {
+export function DownloadButtons({ token, trackId, availableFormats, className }: DownloadButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
   function handleClick(format: string) {
@@ -19,7 +21,7 @@ export function DownloadButtons({ token, trackId, availableFormats }: DownloadBu
   }
 
   return (
-    <div className="flex gap-2">
+    <div className={cn("flex gap-2", className)}>
       {availableFormats.map((format) => (
         <Button
           key={format}

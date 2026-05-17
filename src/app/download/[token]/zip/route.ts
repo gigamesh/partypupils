@@ -20,15 +20,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const trackIdsParam = req.nextUrl.searchParams.get("trackIds");
   const format = req.nextUrl.searchParams.get("format") || "mp3";
 
-  if (!releaseId && !trackIdsParam) {
-    return NextResponse.json({ error: "Missing releaseId or trackIds" }, { status: 400 });
-  }
-
   const downloadToken = await prisma.downloadToken.findUnique({
     where: { token },
     select: {
       order: {
         select: {
+          id: true,
           items: { select: { trackId: true, releaseId: true } },
         },
       },
@@ -68,6 +65,47 @@ export async function GET(req: NextRequest, context: RouteContext) {
       }));
 
     zipName = `Party Pupils - Tracks (${format.toUpperCase()}).zip`;
+  } else if (!releaseId) {
+    const orderReleaseIds = downloadToken.order.items
+      .map((item) => item.releaseId)
+      .filter((id): id is number => id !== null);
+    const orderTrackIds = downloadToken.order.items
+      .map((item) => item.trackId)
+      .filter((id): id is number => id !== null);
+
+    const [releases, aLaCarteTracks] = await Promise.all([
+      prisma.release.findMany({
+        where: { id: { in: orderReleaseIds } },
+        include: {
+          tracks: {
+            orderBy: { trackNumber: "asc" },
+            include: { files: { where: { format } } },
+          },
+        },
+      }),
+      prisma.track.findMany({
+        where: { id: { in: orderTrackIds } },
+        include: { files: { where: { format } }, release: { select: { name: true } } },
+      }),
+    ]);
+
+    const releaseFiles = releases.flatMap((release) =>
+      release.tracks
+        .filter((t) => t.files.length > 0)
+        .map((track) => ({
+          fileName: `${release.name} - ${String(track.trackNumber).padStart(2, "0")} - ${track.name}.${format}`,
+          storageKey: track.files[0].storageKey,
+        })),
+    );
+    const aLaCarteFiles = aLaCarteTracks
+      .filter((t) => t.files.length > 0)
+      .map((t) => ({
+        fileName: `${t.release.name} - ${t.name}.${format}`,
+        storageKey: t.files[0].storageKey,
+      }));
+
+    trackFiles = [...releaseFiles, ...aLaCarteFiles];
+    zipName = `Party Pupils - Order ${downloadToken.order.id} (${format.toUpperCase()}).zip`;
   } else {
     const orderHasRelease = downloadToken.order.items.some(
       (item) => item.releaseId === releaseId,

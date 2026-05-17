@@ -9,50 +9,17 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-interface OrderShape {
-  releaseCount: number;
-  trackCount: number;
-  totalTracks: number;
-  scenarioLabel: string;
-}
-
-function classify(order: {
+function countTracks(order: {
   items: {
-    releaseId: number | null;
     trackId: number | null;
     release: { tracks: unknown[] } | null;
   }[];
-}): OrderShape {
-  const releaseItems = order.items.filter((i) => i.releaseId !== null);
-  const trackItems = order.items.filter((i) => i.trackId !== null);
-  const tracksFromReleases = releaseItems.reduce(
-    (sum, item) => sum + (item.release?.tracks.length ?? 0),
+}): number {
+  return order.items.reduce(
+    (sum, item) =>
+      sum + (item.release?.tracks.length ?? 0) + (item.trackId ? 1 : 0),
     0,
   );
-  const totalTracks = tracksFromReleases + trackItems.length;
-
-  let scenarioLabel: string;
-  if (releaseItems.length >= 1 && trackItems.length >= 1) {
-    scenarioLabel = "mixed";
-  } else if (releaseItems.length >= 1) {
-    const allMulti = releaseItems.every(
-      (item) => (item.release?.tracks.length ?? 0) >= 2,
-    );
-    scenarioLabel = allMulti ? "release (multi-track)" : "release";
-  } else if (trackItems.length >= 2) {
-    scenarioLabel = "à la carte (multi-track)";
-  } else if (trackItems.length === 1) {
-    scenarioLabel = "single track";
-  } else {
-    scenarioLabel = "empty";
-  }
-
-  return {
-    releaseCount: releaseItems.length,
-    trackCount: trackItems.length,
-    totalTracks,
-    scenarioLabel,
-  };
 }
 
 export default async function DemoOrdersListPage() {
@@ -89,7 +56,7 @@ export default async function DemoOrdersListPage() {
       ) : (
         <div className="space-y-3">
           {orders.map((order) => {
-            const shape = classify(order);
+            const totalTracks = countTracks(order);
             return (
               <div
                 key={order.id}
@@ -110,11 +77,7 @@ export default async function DemoOrdersListPage() {
                     total
                   </span>
                   <span>
-                    <span className="text-foreground">{shape.scenarioLabel}</span>{" "}
-                    scenario
-                  </span>
-                  <span>
-                    <span className="text-foreground">{shape.totalTracks}</span>{" "}
+                    <span className="text-foreground">{totalTracks}</span>{" "}
                     tracks
                   </span>
                 </div>
