@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Loader2Icon } from "lucide-react";
 
 interface DownloadZipButtonsProps {
@@ -130,19 +129,19 @@ export function DownloadZipButtons({ token, releaseId, trackIds, availableFormat
   return (
     <div className="flex gap-2">
       {availableFormats.map((format) => (
-        <button
+        <Button
           key={format}
           type="button"
+          size="sm"
           onClick={() => handleClick(format)}
           disabled={loading !== null || swState !== "ready"}
-          className={cn(buttonVariants({ size: "sm", variant: "default" }))}
         >
           {loading === format ? (
             <><Loader2Icon className="h-4 w-4 animate-spin" /> Zipping</>
           ) : (
             `${format.toUpperCase()} ZIP`
           )}
-        </button>
+        </Button>
       ))}
     </div>
   );

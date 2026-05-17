@@ -50,8 +50,6 @@ export function PartyPupilsRadioButton({ className }: { className?: string }) {
 
   return (
     <Button
-      variant="pill"
-      size="cta"
       onClick={handleClick}
       disabled={loading}
       aria-label={label}

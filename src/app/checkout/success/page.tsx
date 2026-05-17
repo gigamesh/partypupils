@@ -3,10 +3,10 @@ import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/db";
 import { toPlayerTrack } from "@/lib/player-data";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -199,12 +199,9 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
       </div>
 
       <div className="mt-8 text-center">
-        <Link
-          href="/music"
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
+        <Button href="/music" variant="outline">
           Continue Shopping
-        </Link>
+        </Button>
       </div>
     </div>
   );

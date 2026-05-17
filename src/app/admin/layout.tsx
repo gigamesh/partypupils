@@ -37,6 +37,12 @@ export default async function AdminLayout({
           Links
         </Link>
         <Link
+          href="/admin/faq"
+          className="text-sm text-muted-foreground hover:underline"
+        >
+          FAQ
+        </Link>
+        <Link
           href="/admin/settings"
           className="text-sm text-muted-foreground hover:underline"
         >

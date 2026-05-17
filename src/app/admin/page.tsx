@@ -2,8 +2,8 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { formatCurrency, cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { formatCurrency } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -29,9 +29,7 @@ export default async function AdminReleasesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1>Releases</h1>
-        <Link href="/admin/releases/new" className={cn(buttonVariants())}>
-          New Release
-        </Link>
+        <Button href="/admin/releases/new">New Release</Button>
       </div>
 
       <Table>

@@ -1,6 +1,7 @@
 import { CatalogBanner } from "@/components/CatalogBanner";
 import { PartyPupilsRadioButton } from "@/components/PartyPupilsRadioButton";
 import { ReleaseCard } from "@/components/ReleaseCard";
+import { Button } from "@/components/ui/button";
 import { getCatalogPrice } from "@/lib/catalog";
 import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import { getPublishedReleases } from "@/lib/release-reads";
@@ -22,13 +23,16 @@ export default async function MusicPage() {
     playerTracks: buildPlayerTracksForRelease(r),
   }));
 
-  const hasAnyStreamableTrack = releasesWithTracks.some((r) => r.playerTracks.length > 0);
-
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="neon-glow uppercase mb-0">Music</h1>
-        {hasAnyStreamableTrack && <PartyPupilsRadioButton />}
+        <div className="flex items-center gap-2">
+          <Button href="/faq" variant="secondary">
+            FAQ
+          </Button>
+          <PartyPupilsRadioButton />
+        </div>
       </div>
 
       {catalog.releaseCount > 1 && <CatalogBanner catalog={catalog} />}

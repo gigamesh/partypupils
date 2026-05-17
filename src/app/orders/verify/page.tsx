@@ -3,13 +3,12 @@ import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/db";
 import { verifyOrderVerificationToken } from "@/lib/order-auth";
 import { toPlayerTrack } from "@/lib/player-data";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 interface Props {
   searchParams: Promise<{ token?: string }>;
@@ -232,12 +231,9 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
       </div>
 
       <div className="mt-8 text-center">
-        <Link
-          href="/music"
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
+        <Button href="/music" variant="outline">
           Continue Shopping
-        </Link>
+        </Button>
       </div>
     </div>
   );
@@ -250,9 +246,7 @@ function InvalidLink() {
       <p className="text-muted-foreground mb-6">
         This link is no longer valid. Please request a new one.
       </p>
-      <Link href="/orders/lookup" className={cn(buttonVariants())}>
-        Request New Link
-      </Link>
+      <Button href="/orders/lookup">Request New Link</Button>
     </div>
   );
 }

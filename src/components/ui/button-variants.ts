@@ -5,14 +5,18 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // Primary CTA — solid neon fill with hover glow.
         default:
           "bg-neon/90 text-black border-neon hover:bg-neon hover:shadow-[0_0_12px_rgba(173,253,2,0.5)]",
+        // Inverted primary — transparent fill with a neon border and neon text.
+        // Pairs with `default` at the same size + radius for primary/secondary pairings.
+        secondary:
+          "bg-transparent text-neon border-neon hover:bg-neon/10 hover:shadow-[0_0_12px_rgba(173,253,2,0.3)]",
+        // Reserved for circular icon-only buttons (player play/pause, release-card hover overlay).
         pill:
           "bg-neon text-black rounded-full font-semibold hover:opacity-90",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "text-neon/90 hover:text-neon hover:[filter:drop-shadow(0_0_6px_rgba(173,253,2,0.5))]",
         destructive:

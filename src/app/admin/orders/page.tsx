@@ -1,9 +1,8 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { formatCurrency, cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { formatCurrency } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -109,35 +108,26 @@ export default async function AdminOrdersPage({
             placeholder="Search by email..."
             className="rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
           />
-          <button type="submit" className={cn(buttonVariants({ size: "sm" }))}>
+          <Button type="submit" size="sm">
             Search
-          </button>
+          </Button>
           {query && (
-            <Link
-              href={buildUrl({ q: "" })}
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" })
-              )}
-            >
+            <Button href={buildUrl({ q: "" })} variant="ghost" size="sm">
               Clear
-            </Link>
+            </Button>
           )}
         </form>
 
         <div className="flex gap-1 items-center">
           {PERIODS.map((p) => (
-            <Link
+            <Button
               key={p.value}
               href={buildUrl({ period: p.value, page: 1 })}
-              className={cn(
-                buttonVariants({
-                  variant: p.value === period ? "default" : "ghost",
-                  size: "sm",
-                })
-              )}
+              variant={p.value === period ? "default" : "ghost"}
+              size="sm"
             >
               {p.label}
-            </Link>
+            </Button>
           ))}
         </div>
       </div>
@@ -239,20 +229,14 @@ export default async function AdminOrdersPage({
           </div>
           <div className="flex gap-2">
             {page > 1 && (
-              <Link
-                href={buildUrl({ page: page - 1 })}
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-              >
+              <Button href={buildUrl({ page: page - 1 })} variant="outline" size="sm">
                 Previous
-              </Link>
+              </Button>
             )}
             {page < totalPages && (
-              <Link
-                href={buildUrl({ page: page + 1 })}
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-              >
+              <Button href={buildUrl({ page: page + 1 })} variant="outline" size="sm">
                 Next
-              </Link>
+              </Button>
             )}
           </div>
         </div>

@@ -3,8 +3,8 @@
 import Image from "@/components/Image";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
 export default function CartPage() {
@@ -52,9 +52,7 @@ export default function CartPage() {
       <div className="mx-auto max-w-2xl px-4 py-10 text-center">
         <h1>Your Cart</h1>
         <p className="text-muted-foreground mb-6">Your cart is empty.</p>
-        <Link href="/music" className={cn(buttonVariants())}>
-          Browse Music
-        </Link>
+        <Button href="/music">Browse Music</Button>
       </div>
     );
   }
