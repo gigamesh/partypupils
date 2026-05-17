@@ -93,6 +93,9 @@ export default async function AdminOrdersPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1>Orders</h1>
+        <Button href="/admin/orders/demo" variant="secondary" size="sm">
+          Demo View
+        </Button>
       </div>
 
       {/* Search + Period Filters */}

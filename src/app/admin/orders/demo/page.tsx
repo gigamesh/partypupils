@@ -1,9 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { verifyAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Demo Orders",
@@ -58,8 +56,6 @@ function classify(order: {
 }
 
 export default async function DemoOrdersListPage() {
-  if (!(await verifyAdminSession())) notFound();
-
   const orders = await prisma.order.findMany({
     where: { status: "completed" },
     include: {
@@ -74,61 +70,65 @@ export default async function DemoOrdersListPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
+    <div>
+      <div className="mb-4">
+        <Button href="/admin/orders" size="sm" variant="ghost">
+          ← All orders
+        </Button>
+      </div>
       <h1>Demo: Orders</h1>
+      <p className="text-muted-foreground mb-6">
+        Preview what each completed order looks like from the customer&apos;s
+        download page.
+      </p>
 
       {orders.length === 0 ? (
         <p className="text-muted-foreground">
           No completed orders found in the connected database.
         </p>
       ) : (
-        <div className="glass-panel rounded-lg p-4">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground border-b border-border">
-                <th className="py-2 px-2">#</th>
-                <th className="py-2 px-2">Date</th>
-                <th className="py-2 px-2">Email</th>
-                <th className="py-2 px-2">Total</th>
-                <th className="py-2 px-2">Scenario</th>
-                <th className="py-2 px-2">Tracks</th>
-                <th className="py-2 px-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => {
-                const shape = classify(order);
-                return (
-                  <tr
-                    key={order.id}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="py-2 px-2 font-mono">{order.id}</td>
-                    <td className="py-2 px-2">
-                      {order.createdAt.toLocaleDateString()}
-                    </td>
-                    <td className="py-2 px-2 truncate max-w-[180px]">
-                      {order.email}
-                    </td>
-                    <td className="py-2 px-2">
+        <div className="space-y-3">
+          {orders.map((order) => {
+            const shape = classify(order);
+            return (
+              <div
+                key={order.id}
+                className="glass-panel rounded-lg p-4 flex flex-col gap-3"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-mono text-sm">#{order.id}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {order.createdAt.toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="truncate text-sm">{order.email}</div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span>
+                    <span className="text-foreground">
                       {formatCurrency(order.amountTotal)}
-                    </td>
-                    <td className="py-2 px-2">{shape.scenarioLabel}</td>
-                    <td className="py-2 px-2">{shape.totalTracks}</td>
-                    <td className="py-2 px-2">
-                      <Button
-                        href={`/demo/orders/${order.id}`}
-                        size="sm"
-                        variant="secondary"
-                      >
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </span>{" "}
+                    total
+                  </span>
+                  <span>
+                    <span className="text-foreground">{shape.scenarioLabel}</span>{" "}
+                    scenario
+                  </span>
+                  <span>
+                    <span className="text-foreground">{shape.totalTracks}</span>{" "}
+                    tracks
+                  </span>
+                </div>
+                <Button
+                  href={`/admin/orders/demo/${order.id}`}
+                  size="sm"
+                  variant="secondary"
+                  className="self-start"
+                >
+                  View
+                </Button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

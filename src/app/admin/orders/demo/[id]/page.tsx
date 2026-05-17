@@ -4,7 +4,6 @@ import { DownloadZipButtons } from "@/components/DownloadZipButtons";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { Button } from "@/components/ui/button";
-import { verifyAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/db";
 import { toPlayerTrack } from "@/lib/player-data";
 import { formatCurrency } from "@/lib/utils";
@@ -29,8 +28,6 @@ async function getOrCreateValidToken(orderId: number): Promise<string> {
 }
 
 export default async function DemoOrderDetailPage({ params }: Props) {
-  if (!(await verifyAdminSession())) notFound();
-
   const { id } = await params;
   const orderId = Number.parseInt(id, 10);
   if (!Number.isFinite(orderId)) notFound();
@@ -52,15 +49,16 @@ export default async function DemoOrderDetailPage({ params }: Props) {
   const token = await getOrCreateValidToken(order.id);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
+    <div className="mx-auto max-w-2xl">
       <div className="mb-4">
-        <Button href="/demo/orders" size="sm" variant="ghost">
+        <Button href="/admin/orders/demo" size="sm" variant="ghost">
           ← All demo orders
         </Button>
       </div>
       <h1>Demo: Order #{order.id}</h1>
       <p className="text-muted-foreground mb-8">
-        Rendered with the same components as the post-checkout success page. Email on file: <code>{order.email}</code>
+        Rendered with the same components as the post-checkout success page.
+        Email on file: <code>{order.email}</code>
       </p>
 
       <DownloadFAQ />
@@ -104,7 +102,9 @@ export default async function DemoOrderDetailPage({ params }: Props) {
                 {item.release.tracks.map((track) => {
                   const playerTrack = toPlayerTrack(track, releaseInfo);
                   const queueIndex = playerTrack
-                    ? playerTracks.findIndex((p) => p.trackId === playerTrack.trackId)
+                    ? playerTracks.findIndex(
+                        (p) => p.trackId === playerTrack.trackId,
+                      )
                     : -1;
                   return (
                     <div
@@ -184,7 +184,11 @@ export default async function DemoOrderDetailPage({ params }: Props) {
           const trackItems = order.items.filter((item) => item.track);
           if (trackItems.length < 2) return null;
           const formats = [
-            ...new Set(trackItems.flatMap((item) => item.track!.files.map((f) => f.format))),
+            ...new Set(
+              trackItems.flatMap((item) =>
+                item.track!.files.map((f) => f.format),
+              ),
+            ),
           ];
           return (
             <div className="border-t border-border pt-3">
