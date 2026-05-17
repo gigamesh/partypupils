@@ -91,8 +91,8 @@ export function ReleaseDetail({ release, header, highlightedTrackId }: Props) {
                 ? "text-sm text-neon w-6 text-right"
                 : "text-sm text-muted-foreground w-6 text-right";
               const nameClass = isCurrent
-                ? "text-sm font-medium truncate text-neon"
-                : "text-sm font-medium truncate";
+                ? "text-sm font-medium sm:truncate text-neon"
+                : "text-sm font-medium sm:truncate";
 
               return (
                 <div
@@ -100,9 +100,9 @@ export function ReleaseDetail({ release, header, highlightedTrackId }: Props) {
                   className={rowClass}
                   aria-current={isCurrent ? "page" : undefined}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     {isCurrent ? (
-                      <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
                         <span className={numberClass}>{track.trackNumber}</span>
                         <span className={nameClass}>{track.name}</span>
                       </div>
@@ -110,13 +110,13 @@ export function ReleaseDetail({ release, header, highlightedTrackId }: Props) {
                       <TracklistRowLink
                         href={`/music/${release.slug}/${track.slug}`}
                         playerTrack={playerTrack}
-                        className="flex min-w-0 items-center gap-3 hover:text-neon"
+                        className="flex w-full min-w-0 items-center gap-3 hover:text-neon sm:w-auto sm:flex-1"
                       >
                         <span className={numberClass}>{track.trackNumber}</span>
                         <span className={nameClass}>{track.name}</span>
                       </TracklistRowLink>
                     )}
-                    <div className="flex items-center gap-3">
+                    <div className="order-last ml-auto flex items-center gap-3 sm:order-none">
                       <span className="text-sm text-neon">
                         {formatCurrency(track.price)}
                       </span>
@@ -131,20 +131,20 @@ export function ReleaseDetail({ release, header, highlightedTrackId }: Props) {
                         }}
                       />
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-2">
-                    {playerTrack && queueIndex >= 0 ? (
-                      <PlayButton
-                        track={playerTrack}
-                        queue={playerTracks}
-                        index={queueIndex}
+                    <div className="flex w-full items-center gap-2">
+                      {playerTrack && queueIndex >= 0 ? (
+                        <PlayButton
+                          track={playerTrack}
+                          queue={playerTracks}
+                          index={queueIndex}
+                        />
+                      ) : null}
+                      <TrackProgress
+                        trackId={track.id}
+                        streamUrl={playerTrack?.streamUrl}
+                        alwaysShow
                       />
-                    ) : null}
-                    <TrackProgress
-                      trackId={track.id}
-                      streamUrl={playerTrack?.streamUrl}
-                      alwaysShow
-                    />
+                    </div>
                   </div>
                 </div>
               );
