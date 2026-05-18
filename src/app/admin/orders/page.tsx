@@ -121,7 +121,7 @@ export default async function AdminOrdersPage({
           )}
         </form>
 
-        <div className="flex gap-1 items-center">
+        <div className="flex flex-wrap gap-1 items-center">
           {PERIODS.map((p) => (
             <Button
               key={p.value}

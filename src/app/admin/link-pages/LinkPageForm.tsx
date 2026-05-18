@@ -381,9 +381,9 @@ export function LinkPageForm({ page, releases }: Props) {
           return (
             <div
               key={item.id}
-              className="flex items-center gap-3 rounded-lg glass-panel p-3"
+              className="flex items-start gap-3 rounded-lg glass-panel p-3"
             >
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5 shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -403,54 +403,58 @@ export function LinkPageForm({ page, releases }: Props) {
                   ▼
                 </Button>
               </div>
-              <div className="w-6 h-6 flex items-center justify-center text-muted-foreground">
+              <div className="w-6 h-6 flex items-center justify-center text-muted-foreground shrink-0 mt-1">
                 {platform ? <PlatformIcon platform={platform} size={20} /> : "—"}
               </div>
-              <Input
-                value={item.title}
-                onChange={(e) => updateItemField(item.id, "title", e.target.value)}
-                placeholder="Title"
-                className="flex-1"
-              />
-              <Input
-                value={item.url}
-                onChange={(e) => updateItemField(item.id, "url", e.target.value)}
-                placeholder="https://..."
-                className="flex-1"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => updateItemField(item.id, "isVisible", !item.isVisible)}
-              >
-                {item.isVisible ? "Visible" : "Hidden"}
-              </Button>
-              {savingItemIds.has(item.id) && (
-                <span className="text-xs text-muted-foreground">Saving...</span>
-              )}
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => deleteItem(item.id)}
-              >
-                Delete
-              </Button>
+              <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-2">
+                <Input
+                  value={item.title}
+                  onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                  placeholder="Title"
+                  className="w-full sm:flex-1 min-w-0"
+                />
+                <Input
+                  value={item.url}
+                  onChange={(e) => updateItemField(item.id, "url", e.target.value)}
+                  placeholder="https://..."
+                  className="w-full sm:flex-1 min-w-0"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => updateItemField(item.id, "isVisible", !item.isVisible)}
+                  >
+                    {item.isVisible ? "Visible" : "Hidden"}
+                  </Button>
+                  {savingItemIds.has(item.id) && (
+                    <span className="text-xs text-muted-foreground">Saving...</span>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteItem(item.id)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
             </div>
           );
         })}
 
-        <div className="flex items-center gap-3 rounded-lg glass-panel border-dashed p-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg glass-panel border-dashed p-3">
           <Input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder="Spotify, Apple Music, etc."
-            className="flex-1"
+            className="w-full sm:flex-1 min-w-0"
           />
           <Input
             value={newUrl}
             onChange={(e) => setNewUrl(e.target.value)}
             placeholder="https://..."
-            className="flex-1"
+            className="w-full sm:flex-1 min-w-0"
           />
           <Button onClick={addItem} disabled={!newTitle || !newUrl}>
             Add Link

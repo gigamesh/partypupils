@@ -114,9 +114,9 @@ export function LinksForm({ initialLinks }: LinksFormProps) {
         {links.map((link, index) => (
           <div
             key={link.id}
-            className="flex items-center gap-3 rounded-lg glass-panel p-3"
+            className="flex items-start gap-3 rounded-lg glass-panel p-3"
           >
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-0.5 shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
@@ -136,60 +136,70 @@ export function LinksForm({ initialLinks }: LinksFormProps) {
                 ▼
               </Button>
             </div>
-            <Input
-              value={link.title}
-              onChange={(e) => updateField(link.id, "title", e.target.value)}
-              placeholder="Title"
-              className="flex-1"
-            />
-            <Input
-              value={link.url}
-              onChange={(e) => updateField(link.id, "url", e.target.value)}
-              placeholder="URL"
-              className="flex-1"
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => updateField(link.id, "isVisible", !link.isVisible)}
-            >
-              {link.isVisible ? "Visible" : "Hidden"}
-            </Button>
-            <label className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer whitespace-nowrap">
-              <input
-                type="checkbox"
-                checked={link.showOnHero}
-                onChange={() => updateField(link.id, "showOnHero", !link.showOnHero)}
-                className="accent-neon"
+            <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-2">
+              <Input
+                value={link.title}
+                onChange={(e) => updateField(link.id, "title", e.target.value)}
+                placeholder="Title"
+                className="w-full sm:flex-1 min-w-0"
               />
-              homepage
-            </label>
-            {saving.has(link.id) && (
-              <span className="text-xs text-muted-foreground">Saving...</span>
-            )}
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => deleteLink(link.id)}
-            >
-              Delete
-            </Button>
+              <Input
+                value={link.url}
+                onChange={(e) => updateField(link.id, "url", e.target.value)}
+                placeholder="URL"
+                className="w-full sm:flex-1 min-w-0"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    updateField(link.id, "isVisible", !link.isVisible)
+                  }
+                >
+                  {link.isVisible ? "Visible" : "Hidden"}
+                </Button>
+                <label className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={link.showOnHero}
+                    onChange={() =>
+                      updateField(link.id, "showOnHero", !link.showOnHero)
+                    }
+                    className="accent-neon"
+                  />
+                  homepage
+                </label>
+                {saving.has(link.id) && (
+                  <span className="text-xs text-muted-foreground">
+                    Saving...
+                  </span>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deleteLink(link.id)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center gap-3 rounded-lg glass-panel border-dashed p-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg glass-panel border-dashed p-3">
         <Input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Link title"
-          className="flex-1"
+          className="w-full sm:flex-1 min-w-0"
         />
         <Input
           value={newUrl}
           onChange={(e) => setNewUrl(e.target.value)}
           placeholder="https://..."
-          className="flex-1"
+          className="w-full sm:flex-1 min-w-0"
         />
         <Button onClick={addLink} disabled={!newTitle || !newUrl}>
           Add Link
