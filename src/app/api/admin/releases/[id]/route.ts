@@ -103,10 +103,7 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
 
   const r2KeysToDelete: string[] = [
     ...(release.coverImageUrl ? [release.coverImageUrl] : []),
-    ...release.tracks.flatMap((t) => [
-      ...t.files.map((f) => f.storageKey),
-      ...(t.previewUrl ? [t.previewUrl] : []),
-    ]),
+    ...release.tracks.flatMap((t) => t.files.map((f) => f.storageKey)),
   ];
 
   await prisma.release.delete({ where: { id: releaseId } });

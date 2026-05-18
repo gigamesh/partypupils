@@ -20,6 +20,7 @@ import {
 import { slugify } from "@/lib/utils";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
+import { DownloadButtons } from "@/components/DownloadButtons";
 import type { PlayerTrack } from "@/lib/player-types";
 
 /** Checkbox that supports an indeterminate display state for "some children selected". */
@@ -52,7 +53,8 @@ function RadioCheckbox({
 
 interface TrackInput {
   existingId?: number;
-  name: string;
+  artist: string;
+  title: string;
   slug: string;
   priceStr: string;
   trackNumber: number;
@@ -61,7 +63,6 @@ interface TrackInput {
   existingWavName?: string;
   existingWavStorageKey?: string;
   existingWavFileSize?: number;
-  existingPreviewUrl?: string | null;
   existingMp3Name?: string;
   existingMp3StorageKey?: string;
   existingMp3FileSize?: number;
@@ -70,12 +71,26 @@ interface TrackInput {
 interface ExistingTrack {
   id: number;
   name: string;
+  artist: string | null;
   slug: string;
   price: number;
   trackNumber: number;
-  previewUrl: string | null;
   inRadio: boolean;
   files: { format: string; fileName: string; storageKey: string; fileSize: number | null }[];
+}
+
+/** Best-effort split of a legacy `"Artist - Title"` track name when no explicit artist is stored. */
+function splitArtistTitle(name: string): { artist: string; title: string } {
+  const idx = name.indexOf(" - ");
+  if (idx < 0) return { artist: "", title: name };
+  return { artist: name.slice(0, idx).trim(), title: name.slice(idx + 3).trim() };
+}
+
+/** Combine artist + title into the legacy single-string display name used in download filenames and listings. */
+function combinedName(artist: string, title: string): string {
+  const a = artist.trim();
+  const t = title.trim();
+  return a ? `${a} - ${t}` : t;
 }
 
 interface ReleaseFormProps {
@@ -121,9 +136,11 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
       return release.tracks.map((t) => {
         const wav = t.files.find((f) => f.format === "wav");
         const mp3 = t.files.find((f) => f.format === "mp3");
+        const split = t.artist == null ? splitArtistTitle(t.name) : { artist: t.artist, title: t.name.startsWith(`${t.artist} - `) ? t.name.slice(t.artist.length + 3) : t.name };
         return {
           existingId: t.id,
-          name: t.name,
+          artist: split.artist,
+          title: split.title,
           slug: t.slug,
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
@@ -132,20 +149,19 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
           existingWavName: wav?.fileName,
           existingWavStorageKey: wav?.storageKey,
           existingWavFileSize: wav?.fileSize ?? undefined,
-          existingPreviewUrl: t.previewUrl,
           existingMp3Name: mp3?.fileName,
           existingMp3StorageKey: mp3?.storageKey,
           existingMp3FileSize: mp3?.fileSize ?? undefined,
         };
       });
     }
-    return [{ name: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
+    return [{ artist: "", title: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
   });
 
   function addTrack() {
     setTracks((prev) => [
       ...prev,
-      { name: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
+      { artist: "", title: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
     ]);
   }
 
@@ -217,30 +233,39 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
     return publicUrl;
   }
 
-  async function uploadWav(file: File, prefix: string): Promise<{ url: string; previewUrl?: string; mp3Url?: string }> {
+  interface UploadMetadata {
+    title?: string;
+    artist?: string;
+    album?: string;
+    trackNumber?: number;
+    trackTotal?: number;
+    year?: number;
+  }
+
+  async function uploadWav(
+    file: File,
+    prefix: string,
+    metadata: UploadMetadata,
+  ): Promise<{ url: string; mp3Url: string }> {
     const key = `${prefix}/${file.name}`;
     const url = await presignAndUpload(file, key);
 
     const processRes = await fetch("/api/admin/upload/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key }),
+      body: JSON.stringify({ key, metadata }),
     });
     const data = await processRes.json();
 
     if (!processRes.ok) {
-      const detail = data.previewError || data.mp3Error || data.error || "Unknown error";
+      const detail = data.mp3Error || data.error || "Unknown error";
       throw new Error(`Transcoding ${file.name} failed: ${detail}`);
     }
-    if (!data.previewUrl || !data.mp3Url) {
-      const missing = [
-        !data.previewUrl ? `preview (${data.previewError || "missing"})` : null,
-        !data.mp3Url ? `mp3 (${data.mp3Error || "missing"})` : null,
-      ].filter(Boolean).join(", ");
-      throw new Error(`Transcoding ${file.name} incomplete: ${missing}`);
+    if (!data.mp3Url) {
+      throw new Error(`Transcoding ${file.name} incomplete: mp3 missing`);
     }
 
-    return { url, previewUrl: data.previewUrl, mp3Url: data.mp3Url };
+    return { url, mp3Url: data.mp3Url };
   }
 
   async function uploadFile(file: File, prefix: string): Promise<string> {
@@ -275,33 +300,40 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
         coverImageUrl = await uploadFile(coverImage, "images/covers");
       }
 
+      const releaseYear = releasedAt ? new Date(releasedAt + "T00:00:00Z").getUTCFullYear() : undefined;
+      const trackTotal = tracks.length;
+
       const trackData = [];
       for (let i = 0; i < tracks.length; i++) {
         const track = tracks[i];
         const trackPrice = Math.round(parseFloat(track.priceStr) * 100);
         const files: { format: string; fileName: string; storageKey: string; fileSize: number }[] = [];
-        let previewUrl: string | undefined;
+        const trackName = combinedName(track.artist, track.title);
 
         if (track.wavFile) {
           currentStep++;
           setProgress({ current: currentStep, total: totalSteps });
-          setStatus(`Uploading & generating preview for "${track.name || track.wavFile.name}"...`);
-          const result = await uploadWav(track.wavFile, `audio/${slug}/${track.trackNumber}`);
+          setStatus(`Uploading & transcoding "${trackName || track.wavFile.name}"...`);
+          const result = await uploadWav(track.wavFile, `audio/${slug}/${track.trackNumber}`, {
+            title: track.title || undefined,
+            artist: track.artist || undefined,
+            album: name || undefined,
+            trackNumber: track.trackNumber,
+            trackTotal,
+            year: releaseYear,
+          });
           files.push({
             format: "wav",
             fileName: track.wavFile.name,
             storageKey: result.url,
             fileSize: track.wavFile.size,
           });
-          if (result.mp3Url) {
-            files.push({
-              format: "mp3",
-              fileName: track.wavFile.name.replace(/\.wav$/i, ".mp3"),
-              storageKey: result.mp3Url,
-              fileSize: 0,
-            });
-          }
-          previewUrl = result.previewUrl;
+          files.push({
+            format: "mp3",
+            fileName: track.wavFile.name.replace(/\.wav$/i, ".mp3"),
+            storageKey: result.mp3Url,
+            fileSize: 0,
+          });
         } else if (track.existingWavStorageKey) {
           files.push({
             format: "wav",
@@ -317,16 +349,15 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
               fileSize: track.existingMp3FileSize || 0,
             });
           }
-          previewUrl = track.existingPreviewUrl ?? undefined;
         }
 
         trackData.push({
           id: track.existingId,
-          name: track.name,
-          slug: track.slug || slugify(track.name) || `track-${track.trackNumber}`,
+          name: trackName,
+          artist: track.artist || null,
+          slug: track.slug || slugify(trackName) || `track-${track.trackNumber}`,
           price: trackPrice,
           trackNumber: track.trackNumber,
-          previewUrl,
           inRadio: track.inRadio,
           files,
         });
@@ -529,13 +560,13 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                               </strong>
                               <br />
                               <br />
-                              <strong>{track.name || `Track ${track.trackNumber}`}</strong> will be
+                              <strong>{combinedName(track.artist, track.title) || `Track ${track.trackNumber}`}</strong> will be
                               deleted from the database and its audio file removed from storage when
                               you click Update Release. This cannot be undone.
                             </>
                           ) : (
                             <>
-                              Remove <strong>{track.name || `Track ${track.trackNumber}`}</strong>{" "}
+                              Remove <strong>{combinedName(track.artist, track.title) || `Track ${track.trackNumber}`}</strong>{" "}
                               from this release? It hasn&apos;t been saved yet, so no data will be
                               destroyed.
                             </>
@@ -560,9 +591,9 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Name</Label>
+                <Label>Artist</Label>
                 <Input
-                  value={track.name}
+                  value={track.artist}
                   onChange={(e) => {
                     const value = e.target.value;
                     setTracks((prev) =>
@@ -570,9 +601,28 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                         i === index
                           ? {
                               ...t,
-                              name: value,
-                              // Only auto-derive for unsaved tracks (matches release-slug behaviour).
-                              slug: t.existingId == null ? slugify(value) : t.slug,
+                              artist: value,
+                              slug: t.existingId == null ? slugify(combinedName(value, t.title)) : t.slug,
+                            }
+                          : t,
+                      ),
+                    );
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Track Title</Label>
+                <Input
+                  value={track.title}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTracks((prev) =>
+                      prev.map((t, i) =>
+                        i === index
+                          ? {
+                              ...t,
+                              title: value,
+                              slug: t.existingId == null ? slugify(combinedName(t.artist, value)) : t.slug,
                             }
                           : t,
                       ),
@@ -581,38 +631,63 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
                   required
                 />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Price (USD)</Label>
                 <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} required />
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Slug</Label>
-              <Input
-                value={track.slug}
-                onChange={(e) => updateTrack(index, "slug", e.target.value)}
-                required
-              />
+              <div className="space-y-1">
+                <Label>Slug</Label>
+                <Input
+                  value={track.slug}
+                  onChange={(e) => updateTrack(index, "slug", e.target.value)}
+                  required
+                />
+              </div>
             </div>
             {(() => {
               if (!track.existingId) return null;
-              const url = track.existingMp3StorageKey ?? track.existingPreviewUrl;
-              if (!url) return null;
-              const previewTrack: PlayerTrack = {
-                trackId: track.existingId,
-                trackName: track.name || `Track ${track.trackNumber}`,
-                trackSlug: track.slug,
-                trackNumber: track.trackNumber,
-                releaseId: release?.id ?? 0,
-                releaseName: name || "Release",
-                releaseSlug: slug,
-                coverImageUrl: release?.coverImageUrl ?? null,
-                streamUrl: url,
-              };
+              const mp3Url = track.existingMp3StorageKey;
+              const trackName = combinedName(track.artist, track.title) || `Track ${track.trackNumber}`;
+              const previewTrack: PlayerTrack | null = mp3Url
+                ? {
+                    trackId: track.existingId,
+                    trackName,
+                    trackSlug: track.slug,
+                    trackNumber: track.trackNumber,
+                    releaseId: release?.id ?? 0,
+                    releaseName: name || "Release",
+                    releaseSlug: slug,
+                    coverImageUrl: release?.coverImageUrl ?? null,
+                    streamUrl: mp3Url,
+                  }
+                : null;
               return (
-                <div className="flex items-center gap-2 pt-1">
-                  <PlayButton track={previewTrack} queue={[previewTrack]} index={0} />
-                  <TrackProgress trackId={track.existingId} alwaysShow />
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {previewTrack && (
+                    <>
+                      <PlayButton track={previewTrack} queue={[previewTrack]} index={0} />
+                      <TrackProgress trackId={track.existingId} alwaysShow />
+                    </>
+                  )}
+                  <DownloadButtons
+                    className="ml-auto"
+                    formats={[
+                      {
+                        format: "wav",
+                        href: track.existingWavStorageKey
+                          ? `/api/admin/download?trackId=${track.existingId}&format=wav`
+                          : null,
+                      },
+                      {
+                        format: "mp3",
+                        href: track.existingMp3StorageKey
+                          ? `/api/admin/download?trackId=${track.existingId}&format=mp3`
+                          : null,
+                      },
+                    ]}
+                  />
                 </div>
               );
             })()}
@@ -627,17 +702,17 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
               {track.existingWavName && !track.wavFile && (
                 <p className="text-xs text-muted-foreground">
                   Current: {track.existingWavName}
-                  {track.existingPreviewUrl && " (preview generated)"}
+                  {track.existingMp3StorageKey && " (320k mp3 generated)"}
                 </p>
               )}
               {!track.existingWavName && (
                 <p className="text-xs text-muted-foreground">
-                  A preview MP3 will be auto-generated from the WAV.
+                  A 320kbps MP3 will be auto-generated from the WAV with embedded ID3 tags.
                 </p>
               )}
               {track.wavFile && (
                 <p className="text-xs text-muted-foreground">
-                  New file selected — preview will be regenerated.
+                  New file selected — MP3 will be regenerated with current Artist / Title tags.
                 </p>
               )}
             </div>

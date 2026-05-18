@@ -88,9 +88,10 @@ export default async function TrackPage({ params, searchParams }: Props) {
 
           {showDownloads && availableFormats.length > 0 && token && (
             <DownloadButtons
-              token={token}
-              trackId={track.id}
-              availableFormats={availableFormats}
+              formats={availableFormats.map((format) => ({
+                format,
+                href: `/download/${token}?trackId=${track.id}&format=${format}`,
+              }))}
             />
           )}
         </>

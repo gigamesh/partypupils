@@ -5,7 +5,6 @@ interface TrackInput {
   name: string;
   slug: string;
   trackNumber: number;
-  previewUrl: string | null;
   files: { format: string; storageKey: string }[];
 }
 
@@ -27,11 +26,10 @@ function normaliseUrl(url: string): string {
   }
 }
 
-/** Build a PlayerTrack from raw Prisma data, falling back to previewUrl when no mp3 TrackFile exists. */
+/** Build a PlayerTrack from raw Prisma data. Returns null when no mp3 TrackFile exists. */
 export function toPlayerTrack(track: TrackInput, release: ReleaseInput): PlayerTrack | null {
   const mp3 = track.files.find((f) => f.format === "mp3");
-  const rawStream = mp3?.storageKey ?? track.previewUrl;
-  if (!rawStream) return null;
+  if (!mp3) return null;
   return {
     trackId: track.id,
     trackName: track.name,
@@ -41,7 +39,7 @@ export function toPlayerTrack(track: TrackInput, release: ReleaseInput): PlayerT
     releaseName: release.name,
     releaseSlug: release.slug,
     coverImageUrl: release.coverImageUrl ? normaliseUrl(release.coverImageUrl) : null,
-    streamUrl: normaliseUrl(rawStream),
+    streamUrl: normaliseUrl(mp3.storageKey),
   };
 }
 

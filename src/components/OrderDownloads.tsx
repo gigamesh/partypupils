@@ -114,9 +114,10 @@ export function OrderDownloads({
                       </span>
                       {token && (
                         <DownloadButtons
-                          token={token}
-                          trackId={track.id}
-                          availableFormats={track.files.map((f) => f.format)}
+                          formats={track.files.map((f) => ({
+                            format: f.format,
+                            href: `/download/${token}?trackId=${track.id}&format=${f.format}`,
+                          }))}
                           className={trackButtonClass}
                         />
                       )}
@@ -143,9 +144,10 @@ export function OrderDownloads({
                   </div>
                   {token && (
                     <DownloadButtons
-                      token={token}
-                      trackId={item.track.id}
-                      availableFormats={item.track.files.map((f) => f.format)}
+                      formats={item.track.files.map((f) => ({
+                        format: f.format,
+                        href: `/download/${token}?trackId=${item.track!.id}&format=${f.format}`,
+                      }))}
                       className={trackButtonClass}
                     />
                   )}

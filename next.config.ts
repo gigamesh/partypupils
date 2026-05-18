@@ -17,10 +17,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Force the ffmpeg-static binary into the upload routes' function bundles —
+  // ffmpeg-static exports the absolute path to its prebuilt binary as a string.
+  // Bundlers (Turbopack/Webpack) rewrite that string to a virtual `/ROOT/...` path
+  // during build, which then fails at spawn time. Keeping ffmpeg-static external
+  // means the path is resolved at runtime against the actual node_modules.
+  serverExternalPackages: ["ffmpeg-static"],
+  // Force the ffmpeg-static binary into the upload route's function bundle —
   // Next's static tracing won't follow the runtime path lookup inside the package.
   outputFileTracingIncludes: {
-    "/api/admin/upload": ["./node_modules/ffmpeg-static/ffmpeg"],
     "/api/admin/upload/process": ["./node_modules/ffmpeg-static/ffmpeg"],
   },
 };

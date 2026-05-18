@@ -21,11 +21,11 @@ export interface TrackInput {
   /** Present for tracks that already exist in the DB; absent for new tracks. */
   id?: number;
   name: string;
+  artist?: string | null;
   /** Optional in the incoming payload — `normalizeTrackSlugs` slugifies and falls back to `track-${trackNumber}` when empty. */
   slug?: string;
   price: number;
   trackNumber: number;
-  previewUrl?: string | null;
   inRadio?: boolean;
   files: FileInput[];
 }
@@ -144,10 +144,9 @@ export async function syncReleaseAndTracks(
 
   // R2 storage keys for objects that the DB delete will leave orphaned. Cleaned up
   // best-effort after the transaction commits — DB consistency is the priority.
-  const r2KeysToDelete: string[] = tracksBeingDeleted.flatMap((t) => [
-    ...t.files.map((f) => f.storageKey),
-    ...(t.previewUrl ? [t.previewUrl] : []),
-  ]);
+  const r2KeysToDelete: string[] = tracksBeingDeleted.flatMap((t) =>
+    t.files.map((f) => f.storageKey),
+  );
 
   const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.release.update({
@@ -176,10 +175,10 @@ export async function syncReleaseAndTracks(
         where: { id: t.id },
         data: {
           name: t.name,
+          artist: t.artist ?? null,
           slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,
-          previewUrl: t.previewUrl || null,
           inRadio: t.inRadio ?? true,
         },
       }),
@@ -210,10 +209,10 @@ export async function syncReleaseAndTracks(
         data: {
           releaseId,
           name: t.name,
+          artist: t.artist ?? null,
           slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,
-          previewUrl: t.previewUrl || null,
           inRadio: t.inRadio ?? true,
           files: t.files.length > 0 ? { create: t.files } : undefined,
         },
