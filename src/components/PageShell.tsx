@@ -2,13 +2,18 @@
 
 import { usePathname } from "next/navigation";
 import { Navigation } from "./Navigation";
+import { PlayerBar } from "./PlayerBar";
+import { PlayerSpacer } from "./PlayerSpacer";
+import { RandomMixSeeder } from "./RandomMixSeeder";
 import { SocialLinks } from "./SocialLinks";
 
-const STANDALONE_ROUTES = ["/links"];
+const STANDALONE_PREFIXES = ["/links"];
 
 export function PageShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isStandalone = STANDALONE_ROUTES.includes(pathname);
+  const isStandalone = STANDALONE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 
   if (isStandalone) {
     return <main className="flex-1">{children}</main>;
@@ -18,6 +23,9 @@ export function PageShell({ children }: { children: React.ReactNode }) {
     <>
       <Navigation />
       <main className="flex-1">{children}</main>
+      <PlayerBar />
+      <PlayerSpacer />
+      <RandomMixSeeder />
       <footer
         className="relative z-10 py-8"
         style={{

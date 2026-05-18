@@ -4,3 +4,4 @@
 
 export const RADIO_TRACKS_TAG = "radio-tracks";
 export const RELEASES_TAG = "releases";
+export const LINK_PAGES_TAG = "link-pages";

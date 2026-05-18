@@ -21,6 +21,12 @@ export default async function EditReleasePage({ params }: Props) {
 
   if (!release) notFound();
 
+  const linkPages = await prisma.linkPage.findMany({
+    where: { releaseId: release.id },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, slug: true, title: true, isPublished: true },
+  });
+
   return (
     <div className="max-w-2xl">
       <a href={`/music/${release.slug}`} className="neon-link text-sm">View public page →</a>
@@ -30,7 +36,7 @@ export default async function EditReleasePage({ params }: Props) {
           <DeleteReleaseButton releaseId={release.id} releaseName={release.name} redirectOnDelete />
         </div>
       </div>
-      <ReleaseForm release={release} />
+      <ReleaseForm release={release} linkPages={linkPages} />
     </div>
   );
 }

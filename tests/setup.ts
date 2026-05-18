@@ -97,6 +97,8 @@ beforeEach(async () => {
     prisma.downloadToken.deleteMany(),
     prisma.track.deleteMany(),
     prisma.order.deleteMany(),
+    prisma.linkPageItem.deleteMany(),
+    prisma.linkPage.deleteMany(),
     prisma.release.deleteMany(),
     prisma.siteSetting.deleteMany(),
     prisma.link.deleteMany(),

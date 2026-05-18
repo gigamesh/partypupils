@@ -93,6 +93,13 @@ function combinedName(artist: string, title: string): string {
   return a ? `${a} - ${t}` : t;
 }
 
+interface LinkPageSummary {
+  id: number;
+  slug: string;
+  title: string;
+  isPublished: boolean;
+}
+
 interface ReleaseFormProps {
   release?: {
     id: number;
@@ -107,9 +114,10 @@ interface ReleaseFormProps {
     inRadio: boolean;
     tracks?: ExistingTrack[];
   };
+  linkPages?: LinkPageSummary[];
 }
 
-export function ReleaseForm({ release }: ReleaseFormProps) {
+export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
@@ -740,6 +748,45 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
           <span className="text-xs text-muted-foreground">(uncheck to exclude every track in this release from the radio mix)</span>
         </div>
       </div>
+
+      {release && (
+        <div className="space-y-2 rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between">
+            <Label>Link Pages</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              href={`/admin/link-pages/new?releaseId=${release.id}`}
+            >
+              + New link page for this release
+            </Button>
+          </div>
+          {linkPages && linkPages.length > 0 ? (
+            <ul className="text-sm space-y-1">
+              {linkPages.map((lp) => (
+                <li key={lp.id} className="flex items-center justify-between gap-3">
+                  <a
+                    href={`/admin/link-pages/${lp.id}/edit`}
+                    className="hover:underline"
+                  >
+                    {lp.title}
+                  </a>
+                  <span className="text-xs text-muted-foreground">
+                    <code>/links/{lp.slug}</code>
+                    {!lp.isPublished && " · draft"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              No link pages yet. Create one to share a single URL with
+              Spotify/Apple/YouTube buttons for this release.
+            </p>
+          )}
+        </div>
+      )}
 
       {loading && status && (
         <div className="space-y-2 rounded-lg border border-border p-4">
