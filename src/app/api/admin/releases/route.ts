@@ -51,10 +51,10 @@ export async function POST(req: NextRequest) {
         tracks: {
           create: incomingTracks.map((t) => ({
             name: t.name,
+            artist: t.artist ?? null,
             slug: t.slug,
             price: t.price,
             trackNumber: t.trackNumber,
-            previewUrl: t.previewUrl || null,
             inRadio: t.inRadio ?? true,
             files: { create: t.files },
           })),
