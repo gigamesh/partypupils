@@ -46,7 +46,6 @@ model Track {
   slug        String
   price       Int // cents — price for individual track purchase
   trackNumber Int
-  previewUrl  String?
   inRadio     Boolean  @default(true)
   createdAt   DateTime @default(now())
 
