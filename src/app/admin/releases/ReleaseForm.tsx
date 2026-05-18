@@ -20,6 +20,7 @@ import {
 import { slugify } from "@/lib/utils";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
+import { DownloadButtons } from "@/components/DownloadButtons";
 import type { PlayerTrack } from "@/lib/player-types";
 
 /** Checkbox that supports an indeterminate display state for "some children selected". */
@@ -647,24 +648,46 @@ export function ReleaseForm({ release }: ReleaseFormProps) {
             </div>
             {(() => {
               if (!track.existingId) return null;
-              const url = track.existingMp3StorageKey;
-              if (!url) return null;
+              const mp3Url = track.existingMp3StorageKey;
               const trackName = combinedName(track.artist, track.title) || `Track ${track.trackNumber}`;
-              const previewTrack: PlayerTrack = {
-                trackId: track.existingId,
-                trackName,
-                trackSlug: track.slug,
-                trackNumber: track.trackNumber,
-                releaseId: release?.id ?? 0,
-                releaseName: name || "Release",
-                releaseSlug: slug,
-                coverImageUrl: release?.coverImageUrl ?? null,
-                streamUrl: url,
-              };
+              const previewTrack: PlayerTrack | null = mp3Url
+                ? {
+                    trackId: track.existingId,
+                    trackName,
+                    trackSlug: track.slug,
+                    trackNumber: track.trackNumber,
+                    releaseId: release?.id ?? 0,
+                    releaseName: name || "Release",
+                    releaseSlug: slug,
+                    coverImageUrl: release?.coverImageUrl ?? null,
+                    streamUrl: mp3Url,
+                  }
+                : null;
               return (
-                <div className="flex items-center gap-2 pt-1">
-                  <PlayButton track={previewTrack} queue={[previewTrack]} index={0} />
-                  <TrackProgress trackId={track.existingId} alwaysShow />
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {previewTrack && (
+                    <>
+                      <PlayButton track={previewTrack} queue={[previewTrack]} index={0} />
+                      <TrackProgress trackId={track.existingId} alwaysShow />
+                    </>
+                  )}
+                  <DownloadButtons
+                    className="ml-auto"
+                    formats={[
+                      {
+                        format: "wav",
+                        href: track.existingWavStorageKey
+                          ? `/api/admin/download?trackId=${track.existingId}&format=wav`
+                          : null,
+                      },
+                      {
+                        format: "mp3",
+                        href: track.existingMp3StorageKey
+                          ? `/api/admin/download?trackId=${track.existingId}&format=mp3`
+                          : null,
+                      },
+                    ]}
+                  />
                 </div>
               );
             })()}
