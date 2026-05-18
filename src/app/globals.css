@@ -131,10 +131,12 @@
   }
   html {
     background: #1f70b2;
+    overflow-x: hidden;
   }
   body {
     @apply text-foreground;
     font-family: var(--font-body-var), sans-serif;
+    overflow-x: hidden;
   }
   h1,
   h2 {
@@ -166,9 +168,34 @@
 }
 
 /* Frosted glass container */
-.glass-panel {
-  @apply border bg-background/50 backdrop-blur-sm overflow-hidden;
-  border-radius: 6px;
+@layer components {
+  .glass-panel {
+    @apply border bg-background/50 backdrop-blur-sm;
+    border-radius: 6px;
+  }
+}
+
+/* Horizontal-scrolling container with an always-visible thin scrollbar.
+ * macOS hides scrollbars by default ("Show scroll bars: When scrolling"),
+ * so we force-render one here as a clear scroll affordance. */
+.h-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+.h-scroll::-webkit-scrollbar {
+  height: 6px;
+  -webkit-appearance: none;
+}
+.h-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.h-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+.h-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Reserve space for the fixed PlayerBar when a track is active. */

@@ -16,7 +16,7 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-4 border-b border-border pb-4 mb-6 overflow-x-auto -mx-4 px-4">
+    <nav className="h-scroll flex items-center gap-4 border-b border-border pb-4 mb-6 -mx-4 px-4">
       {LINKS.map(({ href, label, exact }) => {
         const active = exact
           ? pathname === href
@@ -27,8 +27,8 @@ export function AdminNav() {
             href={href}
             className={
               active
-                ? "text-sm font-semibold hover:underline whitespace-nowrap"
-                : "text-sm text-muted-foreground hover:underline whitespace-nowrap"
+                ? "text-sm font-semibold hover:underline whitespace-nowrap shrink-0"
+                : "text-sm text-muted-foreground hover:underline whitespace-nowrap shrink-0"
             }
           >
             {label}
