@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "concurrently -n db,stripe,next -c blue,magenta,green \"prisma dev\" \"./scripts/stripe-listen.sh\" \"sleep 3 && tsx scripts/guard-local-db.ts && tsx scripts/backfill-track-slugs.ts && prisma db push --accept-data-loss && next dev\"",
     "dev:prod": "dotenv -e .env.prod -- next dev",
-    "build": "next build",
+    "build": "node scripts/prepare-ffmpeg.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",

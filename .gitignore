@@ -20,6 +20,9 @@
 # production
 /build
 
+# ffmpeg binary copied at build time (see scripts/prepare-ffmpeg.mjs)
+/bin
+
 # misc
 .DS_Store
 *.pem

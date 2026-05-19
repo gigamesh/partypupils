@@ -1,8 +1,18 @@
 import { spawn } from "child_process";
 import { Readable } from "stream";
+import { resolve } from "node:path";
 import ffmpegStatic from "ffmpeg-static";
 
+/**
+ * Resolve the ffmpeg binary path. In production we use ./bin/ffmpeg (placed
+ * there by scripts/prepare-ffmpeg.mjs at build time) so the bundle has a
+ * stable, non-symlinked path that Vercel's tracer can include reliably. In
+ * dev we fall back to the ffmpeg-static package path.
+ */
 function ffmpegBinary(): string {
+  if (process.env.NODE_ENV === "production") {
+    return resolve(process.cwd(), "bin", "ffmpeg");
+  }
   if (!ffmpegStatic) {
     throw new Error(
       `ffmpeg-static has no prebuilt binary for ${process.platform}/${process.arch}`
