@@ -24,8 +24,13 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["ffmpeg-static"],
   // Force the ffmpeg-static binary into the upload route's function bundle —
   // Next's static tracing won't follow the runtime path lookup inside the package.
+  // The pnpm path is the real location ffmpeg-static resolves __dirname to at
+  // runtime; the bare path covers non-pnpm installs.
   outputFileTracingIncludes: {
-    "/api/admin/upload/process": ["./node_modules/ffmpeg-static/ffmpeg"],
+    "/api/admin/upload/process": [
+      "./node_modules/ffmpeg-static/ffmpeg",
+      "./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg",
+    ],
   },
 };
 
