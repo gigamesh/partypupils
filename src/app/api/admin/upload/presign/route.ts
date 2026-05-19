@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { getPresignedUploadUrl } from "@/lib/storage";
 
-// Path segments are alphanumerics, dashes, dots, underscores, spaces, parens.
-// Must start with a known top-level prefix and end with one of the allowed
-// extensions. Rejects "..", absolute paths, and surprising bucket layouts.
+// Path segments allow the punctuation common in real-world track filenames
+// (apostrophes, ampersands, commas, plus, brackets, exclamation, equals)
+// alongside alphanumerics, dashes, dots, underscores, spaces, parens, and
+// slashes. Must start with a known top-level prefix and end with one of the
+// allowed extensions (case-insensitive). Path traversal is blocked separately.
 const KEY_RE =
-  /^(audio|images|uploads)\/[A-Za-z0-9_.\-() /]+\.(wav|mp3|jpg|jpeg|png|webp)$/;
+  /^(audio|images|uploads)\/[A-Za-z0-9_.\-() /'&,!+\[\]=]+\.(wav|mp3|jpg|jpeg|png|webp)$/i;
 
 const ALLOWED_CONTENT_TYPES = new Set([
   "audio/wav",
