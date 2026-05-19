@@ -17,9 +17,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // The ffmpeg binary is copied to ./bin/ffmpeg at build time (see
-  // scripts/prepare-ffmpeg.mjs) — a stable, non-symlinked project path that
-  // Next's output file tracing bundles reliably into the function.
+  // ffmpeg-static exports the absolute path to its binary as a string. Bundlers
+  // (Turbopack/Webpack) rewrite that string to a virtual `/ROOT/...` path that
+  // doesn't exist at spawn time. Marking the package external keeps the path
+  // intact for the dev fallback in preview.ts.
+  serverExternalPackages: ["ffmpeg-static"],
+  // In production we don't trust the package-resolved path through pnpm's
+  // symlinks. scripts/prepare-ffmpeg.mjs copies the binary to ./bin/ffmpeg at
+  // build time and preview.ts spawns from there; this entry bundles it.
   outputFileTracingIncludes: {
     "/api/admin/upload/process": ["./bin/ffmpeg"],
   },

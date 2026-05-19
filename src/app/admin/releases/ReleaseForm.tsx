@@ -223,12 +223,18 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   }
 
   async function presignAndUpload(file: File, key: string): Promise<string> {
+    const contentType = file.type || "application/octet-stream";
     const presignRes = await fetch("/api/admin/upload/presign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, contentType: file.type || "application/octet-stream" }),
+      body: JSON.stringify({ key, contentType }),
     });
-    if (!presignRes.ok) throw new Error("Failed to get upload URL");
+    if (!presignRes.ok) {
+      const body = await presignRes.text();
+      throw new Error(
+        `Failed to get upload URL (${presignRes.status}) for key="${key}" contentType="${contentType}": ${body.slice(0, 300)}`,
+      );
+    }
     const { url, publicUrl } = await presignRes.json();
 
     const uploadRes = await fetch(url, {
