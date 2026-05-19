@@ -7,6 +7,10 @@ import {
   normalizeTrackSlugs,
   type TrackInput,
 } from "@/lib/release-tracks";
+import {
+  applyDraftDefaults,
+  validateReleasePayload,
+} from "@/lib/release-validation";
 import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 
 function isUniqueConstraintError(err: unknown): boolean {
@@ -23,9 +27,34 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, slug, description, price, type, coverImageUrl, releasedAt, isPublished, inRadio, tracks } = body;
+  const validation = validateReleasePayload(body);
+  if (!validation.ok) {
+    return NextResponse.json(
+      { error: "Validation failed", ...validation.errors },
+      { status: 400 },
+    );
+  }
 
-  const incomingTracks: TrackInput[] = Array.isArray(tracks) ? tracks : [];
+  const data = validation.data.isPublished
+    ? validation.data
+    : applyDraftDefaults(validation.data);
+
+  const incomingTracks: TrackInput[] = (data.tracks ?? []).map((t) => ({
+    id: t.id,
+    name: t.name ?? "",
+    artist: t.artist ?? null,
+    slug: t.slug,
+    price: t.price ?? 0,
+    trackNumber: t.trackNumber,
+    inRadio: t.inRadio ?? true,
+    files: (t.files ?? []).map((f) => ({
+      format: f.format,
+      fileName: f.fileName,
+      storageKey: f.storageKey,
+      fileSize: f.fileSize ?? 0,
+    })),
+  }));
+
   try {
     normalizeTrackSlugs(incomingTracks);
   } catch (err) {
@@ -39,20 +68,20 @@ export async function POST(req: NextRequest) {
   try {
     release = await prisma.release.create({
       data: {
-        name,
-        slug,
-        description,
-        price,
-        type,
-        coverImageUrl,
-        releasedAt: releasedAt ? new Date(releasedAt) : null,
-        isPublished,
-        inRadio: inRadio ?? true,
+        name: data.name,
+        slug: data.slug!,
+        description: data.description ?? null,
+        price: data.price!,
+        type: data.type!,
+        coverImageUrl: data.coverImageUrl ?? null,
+        releasedAt: data.releasedAt ? new Date(data.releasedAt) : null,
+        isPublished: data.isPublished,
+        inRadio: data.inRadio ?? true,
         tracks: {
           create: incomingTracks.map((t) => ({
             name: t.name,
             artist: t.artist ?? null,
-            slug: t.slug,
+            slug: t.slug!,
             price: t.price,
             trackNumber: t.trackNumber,
             inRadio: t.inRadio ?? true,

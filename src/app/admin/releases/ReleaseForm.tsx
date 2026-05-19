@@ -123,6 +123,8 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [unpublishConfirmOpen, setUnpublishConfirmOpen] = useState(false);
   const [name, setName] = useState(release?.name || "");
   const [slug, setSlug] = useState(release?.slug || "");
   const [description, setDescription] = useState(release?.description || "");
@@ -289,13 +291,24 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Confirm before silently unpublishing a release that's currently live.
+    if (release?.isPublished && !isPublished) {
+      setUnpublishConfirmOpen(true);
+      return;
+    }
+    await executeSubmit();
+  }
+
+  async function executeSubmit() {
     setLoading(true);
     setError("");
+    setFieldErrors({});
     setStatus("");
 
     try {
-      const price = Math.round(parseFloat(priceStr) * 100);
-      if (isNaN(price) || price <= 0) {
+      const parsedPrice = parseFloat(priceStr);
+      const price = isNaN(parsedPrice) ? 0 : Math.round(parsedPrice * 100);
+      if (isPublished && price <= 0) {
         setError("Please enter a valid release price.");
         setLoading(false);
         return;
@@ -320,7 +333,10 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       const trackData = [];
       for (let i = 0; i < tracks.length; i++) {
         const track = tracks[i];
-        const trackPrice = Math.round(parseFloat(track.priceStr) * 100);
+        const parsedTrackPrice = parseFloat(track.priceStr);
+        const trackPrice = isNaN(parsedTrackPrice)
+          ? 0
+          : Math.round(parsedTrackPrice * 100);
         const files: { format: string; fileName: string; storageKey: string; fileSize: number }[] = [];
         const trackName = combinedName(track.artist, track.title);
 
@@ -407,6 +423,17 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Something went wrong");
+        // Server returns { fieldErrors: { "tracks[0].artist": [msg], ... } }
+        // Flatten to first-message-per-field for inline display.
+        if (data.fieldErrors && typeof data.fieldErrors === "object") {
+          const flat: Record<string, string> = {};
+          for (const [key, msgs] of Object.entries(data.fieldErrors)) {
+            if (Array.isArray(msgs) && msgs.length > 0 && typeof msgs[0] === "string") {
+              flat[key] = msgs[0];
+            }
+          }
+          setFieldErrors(flat);
+        }
         setLoading(false);
         setStatus("");
         return;
@@ -445,7 +472,10 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
       <div className="space-y-2">
         <Label htmlFor="slug">Slug</Label>
-        <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} required />
+        <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+        {fieldErrors.slug && (
+          <p className="text-xs text-destructive">{fieldErrors.slug}</p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -456,7 +486,10 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="price">Release Price (USD)</Label>
-          <Input id="price" type="number" step="0.01" min="0" value={priceStr} onChange={(e) => setPriceStr(e.target.value)} required />
+          <Input id="price" type="number" step="0.01" min="0" value={priceStr} onChange={(e) => setPriceStr(e.target.value)} />
+          {fieldErrors.price && (
+            <p className="text-xs text-destructive">{fieldErrors.price}</p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="type">Type</Label>
@@ -623,6 +656,9 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                     );
                   }}
                 />
+                {fieldErrors[`tracks[${index}].artist`] && (
+                  <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].artist`]}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Track Title</Label>
@@ -642,21 +678,25 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                       ),
                     );
                   }}
-                  required
                 />
+                {fieldErrors[`tracks[${index}].name`] && (
+                  <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].name`]}</p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Price (USD)</Label>
-                <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} required />
+                <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} />
+                {fieldErrors[`tracks[${index}].price`] && (
+                  <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].price`]}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Slug</Label>
                 <Input
                   value={track.slug}
                   onChange={(e) => updateTrack(index, "slug", e.target.value)}
-                  required
                 />
               </div>
             </div>
@@ -706,13 +746,19 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               );
             })()}
             <div className="space-y-1">
-              <Label>WAV File {!track.existingWavName && "(required)"}</Label>
+              <Label>
+                WAV File
+                {isPublished && !track.existingWavName && " (required to publish)"}
+              </Label>
               <Input
                 type="file"
                 accept=".wav"
                 onChange={(e) => updateTrack(index, "wavFile", e.target.files?.[0] || null)}
-                required={!release && !track.existingWavName}
+                required={isPublished && !track.existingWavName}
               />
+              {fieldErrors[`tracks[${index}].files`] && (
+                <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].files`]}</p>
+              )}
               {track.existingWavName && !track.wavFile && (
                 <p className="text-xs text-muted-foreground">
                   Current: {track.existingWavName}
@@ -743,6 +789,9 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           <input id="published" type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} className="h-4 w-4" />
           <Label htmlFor="published">Published</Label>
         </div>
+        <p className="text-xs text-muted-foreground -mt-1 ml-6">
+          Required fields are only checked when publishing. Save as draft to keep working on it.
+        </p>
         <div className="flex items-center gap-2">
           <RadioCheckbox
             id="inRadio"
@@ -824,12 +873,47 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
       <div className="flex gap-3">
         <Button type="submit" disabled={loading}>
-          {loading ? "Saving..." : release ? "Update Release" : "Create Release"}
+          {loading ? "Saving..." : submitButtonLabel(release, isPublished)}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
       </div>
+
+      <Dialog open={unpublishConfirmOpen} onOpenChange={setUnpublishConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unpublish this release?</DialogTitle>
+            <DialogDescription>
+              <strong>{name || "This release"}</strong> is currently live. Unpublishing will
+              remove it from the storefront, sitemap, and checkout immediately. Existing
+              customers keep access to their downloads.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>
+              Cancel
+            </DialogClose>
+            <DialogClose
+              render={<Button type="button" variant="destructive" />}
+              onClick={() => void executeSubmit()}
+            >
+              Unpublish &amp; save
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
+}
+
+/** Picks the submit button label based on the current vs. target publish state. */
+function submitButtonLabel(
+  release: ReleaseFormProps["release"],
+  isPublished: boolean,
+): string {
+  if (!release) return isPublished ? "Publish Release" : "Save Draft";
+  if (release.isPublished && !isPublished) return "Unpublish & Save";
+  if (!release.isPublished && isPublished) return "Publish";
+  return isPublished ? "Update Release" : "Save Draft";
 }

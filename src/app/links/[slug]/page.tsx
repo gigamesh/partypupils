@@ -8,7 +8,9 @@ interface Props {
 }
 
 function resolveCoverImage(page: NonNullable<Awaited<ReturnType<typeof getPublicLinkPageBySlug>>>) {
-  return page.coverImageUrl ?? page.release?.coverImageUrl ?? null;
+  // Refuse to leak a draft release's cover image when the link page has no override.
+  const releaseCover = page.release?.isPublished ? page.release.coverImageUrl : null;
+  return page.coverImageUrl ?? releaseCover ?? null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

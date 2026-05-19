@@ -22,6 +22,7 @@ interface ReleaseOption {
   name: string;
   slug: string;
   coverImageUrl: string | null;
+  isPublished: boolean;
 }
 
 interface LinkPage {
@@ -319,9 +320,16 @@ export function LinkPageForm({ page, releases }: Props) {
             {releases.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
+                {!r.isPublished && " (draft)"}
               </option>
             ))}
           </select>
+          {selectedRelease && !selectedRelease.isPublished && (
+            <p className="text-xs text-destructive">
+              This release is a draft and is hidden from the storefront. Publish
+              it before sharing this link page.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">

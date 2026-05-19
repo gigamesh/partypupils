@@ -12,6 +12,7 @@ interface Release {
   id: number;
   name: string;
   slug: string;
+  isPublished: boolean;
 }
 
 interface Props {
@@ -102,9 +103,24 @@ export function NewLinkPageForm({ releases, initialRelease }: Props) {
           {releases.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}
+              {!r.isPublished && " (draft)"}
             </option>
           ))}
         </select>
+        {(() => {
+          const picked = releaseId
+            ? releases.find((r) => r.id === Number(releaseId))
+            : null;
+          if (picked && !picked.isPublished) {
+            return (
+              <p className="text-xs text-destructive">
+                This release is a draft and is hidden from the storefront. Publish
+                it before sharing this link page.
+              </p>
+            );
+          }
+          return null;
+        })()}
         <p className="text-xs text-muted-foreground">
           When set, the page falls back to the release&rsquo;s cover image.
         </p>

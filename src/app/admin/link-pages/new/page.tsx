@@ -9,7 +9,7 @@ export default async function NewLinkPagePage({ searchParams }: Props) {
   const { releaseId } = await searchParams;
   const releases = await prisma.release.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, slug: true },
+    select: { id: true, name: true, slug: true, isPublished: true },
   });
 
   const initialRelease = releaseId

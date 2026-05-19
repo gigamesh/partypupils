@@ -16,14 +16,16 @@ export const getPublicLinkPageBySlug = cache(
       prisma.linkPage.findFirst({
         where: { slug, isPublished: true },
         include: {
-          release: true,
+          // Only fields the public surface actually uses, plus isPublished so
+          // callers can refuse to fall back through a draft release.
+          release: { select: { coverImageUrl: true, isPublished: true } },
           items: {
             where: { isVisible: true },
             orderBy: { position: "asc" },
           },
         },
       }),
-    ["public-link-page-by-slug-v1"],
+    ["public-link-page-by-slug-v2"],
     { tags: [LINK_PAGES_TAG], revalidate: REVALIDATE_SECONDS },
   ),
 );

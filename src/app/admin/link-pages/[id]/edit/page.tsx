@@ -14,12 +14,12 @@ export default async function EditLinkPagePage({ params }: Props) {
       where: { id: Number(id) },
       include: {
         items: { orderBy: { position: "asc" } },
-        release: { select: { id: true, name: true, slug: true, coverImageUrl: true } },
+        release: { select: { id: true, name: true, slug: true, coverImageUrl: true, isPublished: true } },
       },
     }),
     prisma.release.findMany({
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, slug: true, coverImageUrl: true },
+      select: { id: true, name: true, slug: true, coverImageUrl: true, isPublished: true },
     }),
   ]);
 

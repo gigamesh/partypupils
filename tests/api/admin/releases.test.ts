@@ -9,7 +9,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import { POST as createRelease } from "@/app/api/admin/releases/route";
-import { PUT as updateRelease, DELETE as deleteRelease } from "@/app/api/admin/releases/[id]/route";
+import {
+  PUT as updateRelease,
+  PATCH as patchRelease,
+  DELETE as deleteRelease,
+} from "@/app/api/admin/releases/[id]/route";
 import { syncReleaseAndTracks } from "@/lib/release-tracks";
 import { deleteFile } from "@/lib/storage";
 import { prisma } from "@/lib/db";
@@ -277,8 +281,26 @@ describe("POST /api/admin/releases", () => {
         type: "album",
         isPublished: true,
         tracks: [
-          { name: "T1", price: 150, trackNumber: 1, files: [{ format: "mp3", fileName: "a.mp3", storageKey: "https://r2/a.mp3", fileSize: 10 }] },
-          { name: "T2", price: 150, trackNumber: 2, files: [{ format: "mp3", fileName: "b.mp3", storageKey: "https://r2/b.mp3", fileSize: 10 }] },
+          {
+            name: "T1",
+            artist: "Artist",
+            price: 150,
+            trackNumber: 1,
+            files: [
+              { format: "wav", fileName: "a.wav", storageKey: "https://r2/a.wav", fileSize: 10 },
+              { format: "mp3", fileName: "a.mp3", storageKey: "https://r2/a.mp3", fileSize: 10 },
+            ],
+          },
+          {
+            name: "T2",
+            artist: "Artist",
+            price: 150,
+            trackNumber: 2,
+            files: [
+              { format: "wav", fileName: "b.wav", storageKey: "https://r2/b.wav", fileSize: 10 },
+              { format: "mp3", fileName: "b.mp3", storageKey: "https://r2/b.mp3", fileSize: 10 },
+            ],
+          },
         ],
       }),
     );
@@ -288,7 +310,7 @@ describe("POST /api/admin/releases", () => {
       include: { tracks: { include: { files: true }, orderBy: { trackNumber: "asc" } } },
     });
     expect(created?.tracks).toHaveLength(2);
-    expect(created?.tracks[0].files).toHaveLength(1);
+    expect(created?.tracks[0].files).toHaveLength(2);
   });
 
   it("rejects duplicate slug with 400", async () => {
@@ -306,7 +328,8 @@ describe("POST /api/admin/releases", () => {
 
 describe("PUT/DELETE /api/admin/releases/[id] (route wiring)", () => {
   it("PUT routes through to syncReleaseAndTracks (smoke test for handler glue)", async () => {
-    const release = await makeRelease();
+    // Draft release — smoke test is about route wiring, not strict publish validation.
+    const release = await makeRelease({ isPublished: false });
     const t = await makeTrackWithFile(release.id, { name: "Original" });
 
     const res = await updateRelease(
@@ -368,5 +391,211 @@ describe("PUT/DELETE /api/admin/releases/[id] (route wiring)", () => {
     );
     expect(res.status).toBe(404);
     expect(vi.mocked(deleteFile)).not.toHaveBeenCalled();
+  });
+});
+
+describe("Draft / publish validation flows", () => {
+  /** Build a minimal valid published payload for the API. Override per test. */
+  function validPublishedPayload(overrides: Record<string, unknown> = {}) {
+    return {
+      name: "Album",
+      slug: `pub-${Math.random().toString(36).slice(2, 8)}`,
+      price: 1000,
+      type: "album",
+      isPublished: true,
+      tracks: [
+        {
+          name: "T1",
+          artist: "Artist",
+          price: 200,
+          trackNumber: 1,
+          files: [
+            { format: "wav", fileName: "t.wav", storageKey: "https://r2/t.wav", fileSize: 10 },
+            { format: "mp3", fileName: "t.mp3", storageKey: "https://r2/t.mp3", fileSize: 10 },
+          ],
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  it("POST creates a draft with only a name (sentinels fill the rest)", async () => {
+    const res = await createRelease(
+      jsonRequest("POST", { name: "Untitled Draft", isPublished: false }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.isPublished).toBe(false);
+    expect(body.slug).toMatch(/^draft-[a-f0-9]+$/);
+    expect(body.price).toBe(0);
+    expect(body.type).toBe("single");
+
+    const tracks = await prisma.track.count({ where: { releaseId: body.id } });
+    expect(tracks).toBe(0);
+  });
+
+  it("POST with isPublished:true rejects missing price with structured fieldErrors", async () => {
+    const { price: _omit, ...withoutPrice } = validPublishedPayload();
+    void _omit;
+    const res = await createRelease(jsonRequest("POST", withoutPrice));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.fieldErrors.price).toBeDefined();
+  });
+
+  it("POST with isPublished:true rejects a track that lacks a WAV", async () => {
+    const payload = validPublishedPayload({
+      tracks: [
+        {
+          name: "T",
+          artist: "A",
+          price: 200,
+          trackNumber: 1,
+          files: [
+            { format: "mp3", fileName: "t.mp3", storageKey: "https://r2/t.mp3", fileSize: 10 },
+          ],
+        },
+      ],
+    });
+    const res = await createRelease(jsonRequest("POST", payload));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.fieldErrors["tracks[0].files"]).toBeDefined();
+  });
+
+  it("POST with isPublished:true rejects a track that lacks an artist", async () => {
+    const payload = validPublishedPayload({
+      tracks: [
+        {
+          name: "T",
+          price: 200,
+          trackNumber: 1,
+          files: [
+            { format: "wav", fileName: "t.wav", storageKey: "https://r2/t.wav", fileSize: 10 },
+          ],
+        },
+      ],
+    });
+    const res = await createRelease(jsonRequest("POST", payload));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.fieldErrors["tracks[0].artist"]).toBeDefined();
+  });
+
+  it("PUT promotes a draft to published when the payload is valid", async () => {
+    const draft = await prisma.release.create({
+      data: {
+        name: "Promo",
+        slug: `draft-${Math.random().toString(36).slice(2, 8)}`,
+        price: 0,
+        type: "single",
+        isPublished: false,
+      },
+    });
+
+    const res = await updateRelease(
+      jsonRequest("PUT", validPublishedPayload({ name: "Promo", slug: "promo-final" })),
+      ctx(draft.id),
+    );
+    expect(res.status).toBe(200);
+    const after = await prisma.release.findUnique({ where: { id: draft.id } });
+    expect(after?.isPublished).toBe(true);
+    expect(after?.slug).toBe("promo-final");
+  });
+
+  it("PUT rejects a publish payload whose slug is still auto-generated", async () => {
+    const draft = await prisma.release.create({
+      data: {
+        name: "x",
+        slug: `draft-${Math.random().toString(36).slice(2, 8)}`,
+        price: 0,
+        type: "single",
+        isPublished: false,
+      },
+    });
+    const res = await updateRelease(
+      jsonRequest("PUT", validPublishedPayload({ slug: "draft-leftover" })),
+      ctx(draft.id),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.fieldErrors.slug).toBeDefined();
+  });
+
+  it("PATCH refuses to flip an invalid draft to published", async () => {
+    const draft = await prisma.release.create({
+      data: {
+        name: "x",
+        slug: `draft-${Math.random().toString(36).slice(2, 8)}`,
+        price: 0,
+        type: "single",
+        isPublished: false,
+      },
+    });
+
+    const res = await patchRelease(
+      jsonRequest("PATCH", { isPublished: true }),
+      ctx(draft.id),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.fieldErrors).toBeDefined();
+    const stillDraft = await prisma.release.findUnique({ where: { id: draft.id } });
+    expect(stillDraft?.isPublished).toBe(false);
+  });
+
+  it("PATCH flips a fully-valid draft to published", async () => {
+    const draft = await prisma.release.create({
+      data: {
+        name: "Ready",
+        slug: "ready-to-go",
+        price: 1500,
+        type: "album",
+        isPublished: false,
+        tracks: {
+          create: [
+            {
+              name: "Solo",
+              artist: "Solo Artist",
+              slug: "solo",
+              price: 300,
+              trackNumber: 1,
+              files: {
+                create: [
+                  { format: "wav", fileName: "s.wav", storageKey: "https://r2/s.wav", fileSize: 99 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const res = await patchRelease(
+      jsonRequest("PATCH", { isPublished: true }),
+      ctx(draft.id),
+    );
+    expect(res.status).toBe(200);
+    const after = await prisma.release.findUnique({ where: { id: draft.id } });
+    expect(after?.isPublished).toBe(true);
+  });
+
+  it("PATCH ignores re-publish of an already-published release without re-validation", async () => {
+    // Already-true → still-true bypasses validation. This guards against forcing
+    // admins to fix unrelated data when they only toggle inRadio etc.
+    const release = await prisma.release.create({
+      data: {
+        name: "Live",
+        slug: `live-${Math.random().toString(36).slice(2, 8)}`,
+        price: 1000,
+        type: "single",
+        isPublished: true,
+      },
+    });
+    const res = await patchRelease(
+      jsonRequest("PATCH", { isPublished: true }),
+      ctx(release.id),
+    );
+    expect(res.status).toBe(200);
   });
 });

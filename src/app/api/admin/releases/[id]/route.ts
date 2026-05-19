@@ -9,6 +9,11 @@ import {
   syncReleaseAndTracks,
   type TrackInput,
 } from "@/lib/release-tracks";
+import {
+  applyDraftDefaults,
+  validatePublishedRelease,
+  validateReleasePayload,
+} from "@/lib/release-validation";
 import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 
 interface RouteContext {
@@ -23,21 +28,48 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const releaseId = parseInt(id);
   const body = await req.json();
-  const incoming: TrackInput[] = Array.isArray(body.tracks) ? body.tracks : [];
+
+  const validation = validateReleasePayload(body);
+  if (!validation.ok) {
+    return NextResponse.json(
+      { error: "Validation failed", ...validation.errors },
+      { status: 400 },
+    );
+  }
+
+  const data = validation.data.isPublished
+    ? validation.data
+    : applyDraftDefaults(validation.data);
+
+  const incoming: TrackInput[] = (data.tracks ?? []).map((t) => ({
+    id: t.id,
+    name: t.name ?? "",
+    artist: t.artist ?? null,
+    slug: t.slug,
+    price: t.price ?? 0,
+    trackNumber: t.trackNumber,
+    inRadio: t.inRadio ?? true,
+    files: (t.files ?? []).map((f) => ({
+      format: f.format,
+      fileName: f.fileName,
+      storageKey: f.storageKey,
+      fileSize: f.fileSize ?? 0,
+    })),
+  }));
 
   try {
     await syncReleaseAndTracks(
       releaseId,
       {
-        name: body.name,
-        slug: body.slug,
-        description: body.description,
-        price: body.price,
-        type: body.type,
-        coverImageUrl: body.coverImageUrl,
-        releasedAt: body.releasedAt,
-        isPublished: body.isPublished,
-        inRadio: body.inRadio,
+        name: data.name,
+        slug: data.slug!,
+        description: data.description ?? null,
+        price: data.price!,
+        type: data.type!,
+        coverImageUrl: data.coverImageUrl ?? null,
+        releasedAt: data.releasedAt ?? null,
+        isPublished: data.isPublished,
+        inRadio: data.inRadio,
       },
       incoming,
     );
@@ -60,6 +92,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const releaseId = parseInt(id);
   const body = await req.json();
 
   const data: { inRadio?: boolean; isPublished?: boolean } = {};
@@ -70,8 +103,39 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "No supported fields to update" }, { status: 400 });
   }
 
+  // Side-door guard: PATCH can flip isPublished without going through the form,
+  // so re-validate against the persisted state before letting an invalid draft
+  // go live.
+  if (data.isPublished === true) {
+    const current = await prisma.release.findUnique({
+      where: { id: releaseId },
+      include: {
+        tracks: {
+          orderBy: { trackNumber: "asc" },
+          include: { files: true },
+        },
+      },
+    });
+    if (!current) {
+      return NextResponse.json({ error: "Release not found" }, { status: 404 });
+    }
+    if (!current.isPublished) {
+      const validation = validatePublishedRelease({
+        ...current,
+        isPublished: true,
+        releasedAt: current.releasedAt ?? null,
+      });
+      if (!validation.ok) {
+        return NextResponse.json(
+          { error: "Cannot publish — required fields are missing", ...validation.errors },
+          { status: 400 },
+        );
+      }
+    }
+  }
+
   const release = await prisma.release.update({
-    where: { id: parseInt(id) },
+    where: { id: releaseId },
     data,
   });
 

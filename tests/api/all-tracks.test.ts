@@ -97,13 +97,14 @@ describe("GET /api/all-tracks", () => {
 
 describe("admin mutations invalidate the radio-tracks cache tag", () => {
   it("POST /api/admin/releases calls revalidateTag(radio-tracks)", async () => {
+    // Draft payload — this test is about cache-tag wiring, not publish validation.
     const res = await createRelease(
       jsonRequest("POST", {
         name: "Inv",
         slug: "inv-post",
         price: 100,
         type: "single",
-        isPublished: true,
+        isPublished: false,
         tracks: [],
       }),
     );
@@ -113,7 +114,8 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
   });
 
   it("PUT /api/admin/releases/[id] calls revalidateTag(radio-tracks)", async () => {
-    const release = await makeRelease({ slug: "inv-put" });
+    // Draft release — strict publish validation isn't the subject of this test.
+    const release = await makeRelease({ slug: "inv-put", isPublished: false });
     const t = await makeTrackWithFile(release.id);
 
     await updateRelease(
@@ -125,7 +127,7 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
         type: release.type,
         coverImageUrl: null,
         releasedAt: null,
-        isPublished: release.isPublished,
+        isPublished: false,
         tracks: [
           {
             id: t.id,
