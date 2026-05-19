@@ -161,13 +161,29 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(res.status).toBe(403);
   });
 
-  // TODO: re-enable. After cfd4164 ("Improving order page UX on mobile") the zip route no longer 400s when both params are missing — it serves the whole order. Test needs rewriting.
-  it.skip("400s when both releaseId and trackIds are missing", async () => {
-    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [] });
+  it("returns a manifest of the whole order when both releaseId and trackIds are missing", async () => {
+    const release = await makeRelease({ name: "Whole Album" });
+    await makeTrackWithFile(release.id, { name: "One", trackNumber: 1 });
+    await makeTrackWithFile(release.id, { name: "Two", trackNumber: 2 });
+    const aLaCarteRelease = await makeRelease({ slug: "ala", name: "Solo Source" });
+    const aLaCarteTrack = await makeTrackWithFile(aLaCarteRelease.id, { name: "Solo" });
+    const order = await makeCompletedOrder({
+      email: "x@y",
+      releaseIds: [release.id],
+      trackIds: [aLaCarteTrack.id],
+    });
     const token = order.downloadTokens[0].token;
 
     const res = await downloadZip(tokenReq(token, "format=mp3"), ctx(token));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.zipName).toBe(`Party Pupils - Order ${order.id} (MP3).zip`);
+    expect(body.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+      "Whole Album - 01 - One.mp3",
+      "Whole Album - 02 - Two.mp3",
+      "Solo Source - Solo.mp3",
+    ]);
   });
 
   it("returns a manifest of presigned URLs for a release the order owns", async () => {

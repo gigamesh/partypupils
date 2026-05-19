@@ -169,6 +169,21 @@ export async function syncReleaseAndTracks(
     ops.push(prisma.track.deleteMany({ where: { id: { in: toDeleteIds } } }));
   }
 
+  // Park any track whose trackNumber is changing at a unique negative sentinel
+  // first, so the per-row UPDATEs below can't collide on the @@unique([releaseId,
+  // trackNumber]) constraint during an in-place reorder/swap.
+  for (const t of toUpdate) {
+    const existingTrack = existingById.get(t.id)!;
+    if (existingTrack.trackNumber !== t.trackNumber) {
+      ops.push(
+        prisma.track.update({
+          where: { id: t.id },
+          data: { trackNumber: -t.id },
+        }),
+      );
+    }
+  }
+
   for (const t of toUpdate) {
     ops.push(
       prisma.track.update({

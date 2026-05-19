@@ -175,8 +175,7 @@ describe("syncReleaseAndTracks", () => {
     expect((await prisma.release.findUnique({ where: { id: release.id } }))?.name).toBe(release.name);
   });
 
-  // TODO: re-enable. Broke after d23cbde added @@unique([releaseId, trackNumber]) — per-row updates collide on the intermediate state during a swap.
-  it.skip("reorders tracks (same IDs, different trackNumber values)", async () => {
+  it("reorders tracks (same IDs, different trackNumber values)", async () => {
     const release = await makeRelease();
     const a = await makeTrackWithFile(release.id, { name: "A", trackNumber: 1 });
     const b = await makeTrackWithFile(release.id, { name: "B", trackNumber: 2 });
@@ -191,8 +190,7 @@ describe("syncReleaseAndTracks", () => {
     expect(sorted.map((t) => t.id)).toEqual([b.id, a.id]);
   });
 
-  // TODO: re-enable. State pollution cascades from the skipped reorder test above.
-  it.skip("cleans up R2 objects when tracks are deleted (best-effort, after the DB commit)", async () => {
+  it("cleans up R2 objects when tracks are deleted (best-effort, after the DB commit)", async () => {
     const release = await makeRelease();
     const keep = await makeTrackWithFile(release.id, { name: "Keep", trackNumber: 1 });
     await makeTrackWithFile(release.id, {
@@ -209,8 +207,7 @@ describe("syncReleaseAndTracks", () => {
     expect(calls).toEqual(["https://r2/dropped.mp3"]);
   });
 
-  // TODO: re-enable. Flaky @prisma/adapter-pg prepared-statement bug ("bind message supplies N parameters, but prepared statement requires 0").
-  it.skip("does not call deleteFile when no tracks were deleted", async () => {
+  it("does not call deleteFile when no tracks were deleted", async () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id);
 
