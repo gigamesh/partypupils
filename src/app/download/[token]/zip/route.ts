@@ -13,14 +13,39 @@ function sanitizeSegment(name: string): string {
 }
 
 /**
+ * Detects extended-mix tracks from their filename. The catalog marks them
+ * inconsistently ("Extended", "(Extended)", "[EXTENDED MIX]"), so a loose
+ * whole-word match on "extended" catches every variant.
+ */
+function isExtendedMix(fileName: string): boolean {
+  return /\bextended\b/i.test(fileName);
+}
+
+/**
+ * Builds a zip entry path: `[Release Name/][Extended/]filename`. Extended mixes
+ * are nested in their own `Extended/` subfolder so they don't clutter the main
+ * release listing. `releaseName` is null for single-release zips (which stay
+ * flat apart from the `Extended/` split).
+ */
+function zipEntryPath(releaseName: string | null, fileName: string): string {
+  const clean = cleanDownloadFilename(fileName);
+  const segments: string[] = [];
+  if (releaseName) segments.push(sanitizeSegment(releaseName));
+  if (isExtendedMix(clean)) segments.push("Extended");
+  segments.push(clean);
+  return segments.join("/");
+}
+
+/**
  * Returns a JSON manifest of presigned R2 GET URLs and target filenames so the
  * client (via a Service Worker + `client-zip`) can stream the archive directly
  * from R2 without ever routing audio bytes through the Vercel function.
  *
  * Multi-release archives nest each track under a `Release Name/` folder;
- * single-release archives stay flat. Either way the entry keeps the original
- * uploaded filename (whitespace-trimmed) — no track-number prefix is added,
- * since some uploaded filenames already carry their own numbering.
+ * single-release archives stay flat. Extended mixes go in an `Extended/`
+ * subfolder. Either way the entry keeps the original uploaded filename
+ * (whitespace-trimmed) — no track-number prefix is added, since some uploaded
+ * filenames already carry their own numbering.
  */
 export async function GET(req: NextRequest, context: RouteContext) {
   const { token } = await context.params;
@@ -68,7 +93,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       .map((id) => trackById.get(id))
       .filter((t): t is NonNullable<typeof t> => t !== undefined && t.files.length > 0)
       .map((t) => ({
-        fileName: `${sanitizeSegment(t.release.name)}/${cleanDownloadFilename(t.files[0].fileName)}`,
+        fileName: zipEntryPath(t.release.name, t.files[0].fileName),
         storageKey: t.files[0].storageKey,
       }));
 
@@ -101,14 +126,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
       release.tracks
         .filter((t) => t.files.length > 0)
         .map((track) => ({
-          fileName: `${sanitizeSegment(release.name)}/${cleanDownloadFilename(track.files[0].fileName)}`,
+          fileName: zipEntryPath(release.name, track.files[0].fileName),
           storageKey: track.files[0].storageKey,
         })),
     );
     const aLaCarteFiles = aLaCarteTracks
       .filter((t) => t.files.length > 0)
       .map((t) => ({
-        fileName: `${sanitizeSegment(t.release.name)}/${cleanDownloadFilename(t.files[0].fileName)}`,
+        fileName: zipEntryPath(t.release.name, t.files[0].fileName),
         storageKey: t.files[0].storageKey,
       }));
 
@@ -142,7 +167,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     trackFiles = release.tracks
       .filter((t) => t.files.length > 0)
       .map((track) => ({
-        fileName: cleanDownloadFilename(track.files[0].fileName),
+        fileName: zipEntryPath(null, track.files[0].fileName),
         storageKey: track.files[0].storageKey,
       }));
 

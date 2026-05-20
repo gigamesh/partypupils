@@ -215,6 +215,37 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(body.files[1].fileName).toBe("Georgy Porgy (Remix).mp3");
   });
 
+  it("nests extended-mix tracks in an Extended/ subfolder", async () => {
+    const release = await makeRelease({ name: "Yacht House" });
+    await makeTrackWithFile(release.id, { name: "Peg", trackNumber: 1, fileName: "Steely Dan - Peg (Remix).mp3" });
+    await makeTrackWithFile(release.id, { name: "Peg Ext", trackNumber: 2, fileName: "Steely Dan - Peg (Remix) Extended.mp3" });
+    // "[EXTENDED MIX]" is another marker variant seen in the catalog.
+    await makeTrackWithFile(release.id, { name: "Africa Ext", trackNumber: 3, fileName: "Africa (Remix) [EXTENDED MIX].mp3" });
+    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
+    const token = order.downloadTokens[0].token;
+
+    // Whole-order zip → release folder, with extended mixes in Extended/.
+    const orderRes = await downloadZip(tokenReq(token, "format=mp3"), ctx(token));
+    const orderBody = await orderRes.json();
+    expect(orderBody.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+      "Yacht House/Steely Dan - Peg (Remix).mp3",
+      "Yacht House/Extended/Steely Dan - Peg (Remix) Extended.mp3",
+      "Yacht House/Extended/Africa (Remix) [EXTENDED MIX].mp3",
+    ]);
+
+    // Single-release zip → flat, but extended mixes still get an Extended/ folder.
+    const relRes = await downloadZip(
+      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      ctx(token),
+    );
+    const relBody = await relRes.json();
+    expect(relBody.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+      "Steely Dan - Peg (Remix).mp3",
+      "Extended/Steely Dan - Peg (Remix) Extended.mp3",
+      "Extended/Africa (Remix) [EXTENDED MIX].mp3",
+    ]);
+  });
+
   it("returns a flat manifest (no folder) for a single-release zip", async () => {
     const release = await makeRelease({ name: "Album One" });
     await makeTrackWithFile(release.id, { name: "Track A", trackNumber: 1, fileName: "trackA_final.mp3" });
