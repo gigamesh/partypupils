@@ -1,6 +1,8 @@
+import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
+import { LINKS_TAG } from "@/lib/cache-tags";
 
 export async function GET() {
   if (!(await verifyAdminSession())) {
@@ -25,6 +27,8 @@ export async function POST(req: NextRequest) {
   const link = await prisma.link.create({
     data: { title, url, position: (maxPosition._max.position ?? -1) + 1 },
   });
+
+  revalidateTag(LINKS_TAG, "max");
 
   return NextResponse.json(link);
 }
@@ -55,6 +59,8 @@ export async function PUT(req: NextRequest) {
     },
   });
 
+  revalidateTag(LINKS_TAG, "max");
+
   return NextResponse.json(link);
 }
 
@@ -67,6 +73,8 @@ export async function DELETE(req: NextRequest) {
   const id = Number(searchParams.get("id"));
 
   await prisma.link.delete({ where: { id } });
+
+  revalidateTag(LINKS_TAG, "max");
 
   return NextResponse.json({ ok: true });
 }

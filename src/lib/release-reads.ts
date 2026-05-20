@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { prisma } from "./db";
-import { RELEASES_TAG } from "./cache-tags";
+import { LINKS_TAG, RELEASES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;
 
@@ -102,5 +102,5 @@ export const getHeroLinks = unstable_cache(
       orderBy: { position: "asc" },
     }),
   ["hero-links-v1"],
-  { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
+  { tags: [LINKS_TAG], revalidate: REVALIDATE_SECONDS },
 );
