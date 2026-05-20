@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { prisma } from "./db";
+import { prisma, withDbRetry } from "./db";
 import { LINKS_TAG, RELEASES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;
@@ -11,17 +11,19 @@ const REVALIDATE_SECONDS = 3600;
  */
 export const getFeaturedReleases = unstable_cache(
   () =>
-    prisma.release.findMany({
-      where: { isPublished: true },
-      orderBy: { releasedAt: "desc" },
-      take: 4,
-      include: {
-        tracks: {
-          orderBy: { trackNumber: "asc" },
-          include: { files: true },
+    withDbRetry(() =>
+      prisma.release.findMany({
+        where: { isPublished: true },
+        orderBy: { releasedAt: "desc" },
+        take: 4,
+        include: {
+          tracks: {
+            orderBy: { trackNumber: "asc" },
+            include: { files: true },
+          },
         },
-      },
-    }),
+      }),
+    ),
   ["featured-releases-v1"],
   { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
 );
@@ -29,16 +31,18 @@ export const getFeaturedReleases = unstable_cache(
 /** Full published catalog for /music. Same tag as featured. */
 export const getPublishedReleases = unstable_cache(
   () =>
-    prisma.release.findMany({
-      where: { isPublished: true },
-      orderBy: { releasedAt: "desc" },
-      include: {
-        tracks: {
-          orderBy: { trackNumber: "asc" },
-          include: { files: true },
+    withDbRetry(() =>
+      prisma.release.findMany({
+        where: { isPublished: true },
+        orderBy: { releasedAt: "desc" },
+        include: {
+          tracks: {
+            orderBy: { trackNumber: "asc" },
+            include: { files: true },
+          },
         },
-      },
-    }),
+      }),
+    ),
   ["published-releases-v1"],
   { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
 );
@@ -52,15 +56,17 @@ export const getPublishedReleases = unstable_cache(
 export const getReleaseBySlug = cache(
   unstable_cache(
     (slug: string) =>
-      prisma.release.findUnique({
-        where: { slug, isPublished: true },
-        include: {
-          tracks: {
-            orderBy: { trackNumber: "asc" },
-            include: { files: true },
+      withDbRetry(() =>
+        prisma.release.findUnique({
+          where: { slug, isPublished: true },
+          include: {
+            tracks: {
+              orderBy: { trackNumber: "asc" },
+              include: { files: true },
+            },
           },
-        },
-      }),
+        }),
+      ),
     ["release-by-slug-v1"],
     { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
   ),
@@ -75,20 +81,22 @@ export const getReleaseBySlug = cache(
 export const getTrackByReleaseAndSlug = cache(
   unstable_cache(
     (releaseSlug: string, trackSlug: string) =>
-      prisma.track.findFirst({
-        where: {
-          slug: trackSlug,
-          release: { slug: releaseSlug, isPublished: true },
-        },
-        include: {
-          files: true,
-          release: {
-            include: {
-              tracks: { orderBy: { trackNumber: "asc" }, include: { files: true } },
+      withDbRetry(() =>
+        prisma.track.findFirst({
+          where: {
+            slug: trackSlug,
+            release: { slug: releaseSlug, isPublished: true },
+          },
+          include: {
+            files: true,
+            release: {
+              include: {
+                tracks: { orderBy: { trackNumber: "asc" }, include: { files: true } },
+              },
             },
           },
-        },
-      }),
+        }),
+      ),
     ["track-by-release-and-slug-v1"],
     { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
   ),
@@ -97,10 +105,12 @@ export const getTrackByReleaseAndSlug = cache(
 /** Visible hero links — small list, but it's on the homepage so we cache it too. */
 export const getHeroLinks = unstable_cache(
   () =>
-    prisma.link.findMany({
-      where: { isVisible: true, showOnHero: true },
-      orderBy: { position: "asc" },
-    }),
+    withDbRetry(() =>
+      prisma.link.findMany({
+        where: { isVisible: true, showOnHero: true },
+        orderBy: { position: "asc" },
+      }),
+    ),
   ["hero-links-v1"],
   { tags: [LINKS_TAG], revalidate: REVALIDATE_SECONDS },
 );
