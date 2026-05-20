@@ -40,9 +40,10 @@ interface LinkPage {
 interface Props {
   page: LinkPage;
   releases: ReleaseOption[];
+  baseUrl: string;
 }
 
-export function LinkPageForm({ page, releases }: Props) {
+export function LinkPageForm({ page, releases, baseUrl }: Props) {
   const router = useRouter();
 
   // Page meta
@@ -133,7 +134,7 @@ export function LinkPageForm({ page, releases }: Props) {
   }
 
   async function copyPublicUrl() {
-    const fullUrl = `${window.location.origin}/links/${slug}`;
+    const fullUrl = `${baseUrl}/links/${slug}`;
     await navigator.clipboard.writeText(fullUrl);
   }
 

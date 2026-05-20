@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getBaseUrl } from "@/lib/utils";
 import { LinkPageForm } from "../../LinkPageForm";
 import { DeleteLinkPageButton } from "../../DeleteLinkPageButton";
 
@@ -45,7 +46,7 @@ export default async function EditLinkPagePage({ params }: Props) {
           />
         </div>
       </div>
-      <LinkPageForm page={page} releases={releases} />
+      <LinkPageForm page={page} releases={releases} baseUrl={getBaseUrl()} />
     </div>
   );
 }
