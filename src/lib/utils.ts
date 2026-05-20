@@ -23,3 +23,14 @@ export function slugify(text: string): string {
 export function getBaseUrl(): string {
   return env.NEXT_PUBLIC_BASE_URL();
 }
+
+/**
+ * Trim stray leading/trailing whitespace from a download filename while keeping
+ * its extension intact. Some stored filenames carry accidental spaces (e.g.
+ * " Track.wav" or "Track .wav") that would otherwise surface in downloads.
+ */
+export function cleanDownloadFilename(name: string): string {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return name.trim();
+  return `${name.slice(0, dot).trim()}${name.slice(dot).trim()}`;
+}

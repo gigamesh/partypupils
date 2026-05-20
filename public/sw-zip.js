@@ -102,8 +102,11 @@ async function* zipEntries(files) {
       const message =
         `Failed to download "${f.fileName}" from R2: ${detail}.\n` +
         `Try downloading the track individually from your order page.\n`;
+      // Keep the placeholder at the zip root (drop any folder prefix) so a
+      // failure is obvious instead of buried inside a release folder.
+      const baseName = f.fileName.split("/").pop() || f.fileName;
       yield {
-        name: `_FAILED_${f.fileName}.txt`,
+        name: `_FAILED_${baseName}.txt`,
         input: new Response(message, { headers: { "Content-Type": "text/plain" } }),
       };
     }

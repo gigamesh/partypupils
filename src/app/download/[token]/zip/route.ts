@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getPresignedDownloadUrl } from "@/lib/storage";
+import { cleanDownloadFilename } from "@/lib/utils";
 
 interface RouteContext {
   params: Promise<{ token: string }>;
+}
+
+/** Strip path separators so a release/track name can't spawn unintended zip subfolders. */
+function sanitizeSegment(name: string): string {
+  return name.replace(/[/\\]+/g, "-").trim();
 }
 
 /**
@@ -11,8 +17,10 @@ interface RouteContext {
  * client (via a Service Worker + `client-zip`) can stream the archive directly
  * from R2 without ever routing audio bytes through the Vercel function.
  *
- * Ownership and naming logic is unchanged from the previous server-zip
- * implementation; only the response shape and downstream assembly differ.
+ * Multi-release archives nest each track under a `Release Name/` folder;
+ * single-release archives stay flat. Either way the entry keeps the original
+ * uploaded filename (whitespace-trimmed) — no track-number prefix is added,
+ * since some uploaded filenames already carry their own numbering.
  */
 export async function GET(req: NextRequest, context: RouteContext) {
   const { token } = await context.params;
@@ -60,7 +68,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       .map((id) => trackById.get(id))
       .filter((t): t is NonNullable<typeof t> => t !== undefined && t.files.length > 0)
       .map((t) => ({
-        fileName: `${t.release.name} - ${t.name}.${format}`,
+        fileName: `${sanitizeSegment(t.release.name)}/${cleanDownloadFilename(t.files[0].fileName)}`,
         storageKey: t.files[0].storageKey,
       }));
 
@@ -93,14 +101,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
       release.tracks
         .filter((t) => t.files.length > 0)
         .map((track) => ({
-          fileName: `${release.name} - ${String(track.trackNumber).padStart(2, "0")} - ${track.name}.${format}`,
+          fileName: `${sanitizeSegment(release.name)}/${cleanDownloadFilename(track.files[0].fileName)}`,
           storageKey: track.files[0].storageKey,
         })),
     );
     const aLaCarteFiles = aLaCarteTracks
       .filter((t) => t.files.length > 0)
       .map((t) => ({
-        fileName: `${t.release.name} - ${t.name}.${format}`,
+        fileName: `${sanitizeSegment(t.release.name)}/${cleanDownloadFilename(t.files[0].fileName)}`,
         storageKey: t.files[0].storageKey,
       }));
 
@@ -134,7 +142,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     trackFiles = release.tracks
       .filter((t) => t.files.length > 0)
       .map((track) => ({
-        fileName: `${String(track.trackNumber).padStart(2, "0")} - ${track.name}.${format}`,
+        fileName: cleanDownloadFilename(track.files[0].fileName),
         storageKey: track.files[0].storageKey,
       }));
 
@@ -153,7 +161,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     trackFiles.map(async (t) => ({
       fileName: t.fileName,
       url: await getPresignedDownloadUrl(t.storageKey, {
-        filename: t.fileName,
+        filename: t.fileName.split("/").pop() ?? t.fileName,
         contentType,
       }),
     })),

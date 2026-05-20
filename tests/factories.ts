@@ -24,6 +24,7 @@ export async function makeTrackWithFile(releaseId: number, overrides: Partial<{
   trackNumber: number;
   price: number;
   storageKey: string;
+  fileName: string;
 }> = {}) {
   return prisma.track.create({
     data: {
@@ -36,7 +37,7 @@ export async function makeTrackWithFile(releaseId: number, overrides: Partial<{
         create: [
           {
             format: "mp3",
-            fileName: `${overrides.name ?? "track"}.mp3`,
+            fileName: overrides.fileName ?? `${overrides.name ?? "track"}.mp3`,
             storageKey: overrides.storageKey ?? `https://r2.example/${Math.random().toString(36).slice(2, 8)}.mp3`,
             fileSize: 1234,
           },

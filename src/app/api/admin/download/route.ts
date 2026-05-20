@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { getPresignedDownloadUrl } from "@/lib/storage";
+import { cleanDownloadFilename } from "@/lib/utils";
 
 /**
  * Admin-only mirror of the customer `/download/[token]` flow: 302s to a
@@ -23,7 +24,6 @@ export async function GET(req: NextRequest) {
 
   const file = await prisma.trackFile.findFirst({
     where: { trackId, format },
-    include: { track: { select: { name: true } } },
   });
 
   if (!file) {
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   }
 
   const url = await getPresignedDownloadUrl(file.storageKey, {
-    filename: `${file.track.name}.${format}`,
+    filename: cleanDownloadFilename(file.fileName),
     contentType: format === "wav" ? "audio/wav" : "audio/mpeg",
   });
   return NextResponse.redirect(url, 302);

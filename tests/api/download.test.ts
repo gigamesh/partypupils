@@ -64,9 +64,13 @@ describe("GET /download/[token]", () => {
     expect(res.status).toBe(400);
   });
 
-  it("302s to a presigned R2 URL when the order owns the track", async () => {
+  it("302s to a presigned R2 URL with the original uploaded filename when the order owns the track", async () => {
     const release = await makeRelease();
-    const t = await makeTrackWithFile(release.id, { name: "Owned" });
+    // Leading space mirrors real prod data — it must be trimmed off.
+    const t = await makeTrackWithFile(release.id, {
+      name: "Owned",
+      fileName: " owned_master_v3.mp3",
+    });
     const order = await makeCompletedOrder({ email: "x@y", trackIds: [t.id] });
     const token = order.downloadTokens[0].token;
 
@@ -76,15 +80,17 @@ describe("GET /download/[token]", () => {
     );
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toMatch(/^https:\/\/r2\/signed/);
+    // Filename comes from the stored TrackFile.fileName (whitespace-trimmed),
+    // not the track name.
     expect(vi.mocked(getPresignedDownloadUrl)).toHaveBeenCalledWith(
       t.files[0].storageKey,
-      { filename: "Owned.mp3", contentType: "audio/mpeg" },
+      { filename: "owned_master_v3.mp3", contentType: "audio/mpeg" },
     );
     // Critical: the function must NOT have fetched the audio body.
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("uses the wav content-type when format=wav", async () => {
+  it("uses the wav content-type and original wav filename when format=wav", async () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id, { name: "Wave" });
     // makeTrackWithFile only seeds an mp3; add a wav so format=wav resolves a row.
@@ -92,7 +98,7 @@ describe("GET /download/[token]", () => {
       data: {
         trackId: t.id,
         format: "wav",
-        fileName: "Wave.wav",
+        fileName: "wave_master_24bit.wav",
         storageKey: "https://r2/wave.wav",
         fileSize: 100,
       },
@@ -106,7 +112,7 @@ describe("GET /download/[token]", () => {
     );
     expect(vi.mocked(getPresignedDownloadUrl)).toHaveBeenCalledWith(
       "https://r2/wave.wav",
-      { filename: "Wave.wav", contentType: "audio/wav" },
+      { filename: "wave_master_24bit.wav", contentType: "audio/wav" },
     );
   });
 
@@ -161,12 +167,12 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns a manifest of the whole order when both releaseId and trackIds are missing", async () => {
+  it("returns a manifest of the whole order, nesting each release in its own folder", async () => {
     const release = await makeRelease({ name: "Whole Album" });
-    await makeTrackWithFile(release.id, { name: "One", trackNumber: 1 });
-    await makeTrackWithFile(release.id, { name: "Two", trackNumber: 2 });
+    await makeTrackWithFile(release.id, { name: "One", trackNumber: 1, fileName: "track-one_MASTER.mp3" });
+    await makeTrackWithFile(release.id, { name: "Two", trackNumber: 2, fileName: "track-two_MASTER.mp3" });
     const aLaCarteRelease = await makeRelease({ slug: "ala", name: "Solo Source" });
-    const aLaCarteTrack = await makeTrackWithFile(aLaCarteRelease.id, { name: "Solo" });
+    const aLaCarteTrack = await makeTrackWithFile(aLaCarteRelease.id, { name: "Solo", fileName: "solo_MASTER.mp3" });
     const order = await makeCompletedOrder({
       email: "x@y",
       releaseIds: [release.id],
@@ -179,17 +185,40 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     const body = await res.json();
 
     expect(body.zipName).toBe(`Party Pupils - Order ${order.id} (MP3).zip`);
+    // Each track sits under a "Release Name/" folder and keeps its original
+    // uploaded filename verbatim — no track-number prefix is added.
     expect(body.files.map((f: { fileName: string }) => f.fileName)).toEqual([
-      "Whole Album - 01 - One.mp3",
-      "Whole Album - 02 - Two.mp3",
-      "Solo Source - Solo.mp3",
+      "Whole Album/track-one_MASTER.mp3",
+      "Whole Album/track-two_MASTER.mp3",
+      "Solo Source/solo_MASTER.mp3",
     ]);
   });
 
-  it("returns a manifest of presigned URLs for a release the order owns", async () => {
+  it("keeps already-numbered filenames intact and trims stray whitespace", async () => {
+    // Mirrors real prod data: some uploaded filenames already carry their own
+    // track number, and some carry accidental leading/trailing spaces.
+    const release = await makeRelease({ name: "Numbered Album" });
+    await makeTrackWithFile(release.id, { name: "First", trackNumber: 1, fileName: "01 Summer Breeze (Remix).mp3" });
+    await makeTrackWithFile(release.id, { name: "Second", trackNumber: 2, fileName: " Georgy Porgy (Remix) .mp3" });
+    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
+    const token = order.downloadTokens[0].token;
+
+    const res = await downloadZip(
+      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      ctx(token),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    // No "01 - 01 ..." doubling; whitespace around the name is trimmed.
+    expect(body.files[0].fileName).toBe("01 Summer Breeze (Remix).mp3");
+    expect(body.files[1].fileName).toBe("Georgy Porgy (Remix).mp3");
+  });
+
+  it("returns a flat manifest (no folder) for a single-release zip", async () => {
     const release = await makeRelease({ name: "Album One" });
-    await makeTrackWithFile(release.id, { name: "Track A", trackNumber: 1 });
-    await makeTrackWithFile(release.id, { name: "Track B", trackNumber: 2 });
+    await makeTrackWithFile(release.id, { name: "Track A", trackNumber: 1, fileName: "trackA_final.mp3" });
+    await makeTrackWithFile(release.id, { name: "Track B", trackNumber: 2, fileName: "trackB_final.mp3" });
     const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
     const token = order.downloadTokens[0].token;
 
@@ -203,8 +232,9 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
 
     expect(body.zipName).toBe("Album One (MP3).zip");
     expect(body.files).toHaveLength(2);
-    expect(body.files[0].fileName).toBe("01 - Track A.mp3");
-    expect(body.files[1].fileName).toBe("02 - Track B.mp3");
+    // Single-release zip stays flat — the zip itself is named after the release.
+    expect(body.files[0].fileName).toBe("trackA_final.mp3");
+    expect(body.files[1].fileName).toBe("trackB_final.mp3");
     body.files.forEach((f: { url: string }) => {
       expect(f.url).toMatch(/^https:\/\/r2\/signed/);
     });
@@ -212,10 +242,10 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns a manifest of presigned URLs for a list of owned trackIds (preserving order)", async () => {
+  it("returns a manifest for a list of owned trackIds (preserving order, nested by release)", async () => {
     const release = await makeRelease({ name: "Mix Album" });
-    const t1 = await makeTrackWithFile(release.id, { name: "Alpha", trackNumber: 1 });
-    const t2 = await makeTrackWithFile(release.id, { name: "Beta", trackNumber: 2 });
+    const t1 = await makeTrackWithFile(release.id, { name: "Alpha", trackNumber: 1, fileName: "alpha_v2.mp3" });
+    const t2 = await makeTrackWithFile(release.id, { name: "Beta", trackNumber: 2, fileName: "beta_v2.mp3" });
     const order = await makeCompletedOrder({ email: "x@y", trackIds: [t1.id, t2.id] });
     const token = order.downloadTokens[0].token;
 
@@ -230,8 +260,8 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
 
     expect(body.zipName).toBe("Party Pupils - Tracks (MP3).zip");
     expect(body.files.map((f: { fileName: string }) => f.fileName)).toEqual([
-      "Mix Album - Beta.mp3",
-      "Mix Album - Alpha.mp3",
+      "Mix Album/beta_v2.mp3",
+      "Mix Album/alpha_v2.mp3",
     ]);
   });
 });
