@@ -27,6 +27,11 @@ const s3 = new S3Client({
 const bucket = env.R2_BUCKET_NAME();
 const publicUrl = env.R2_PUBLIC_URL();
 
+/** Strip the R2 public-URL prefix from a stored URL to recover the bare object key. */
+export function keyFromPublicUrl(url: string): string {
+  return url.replace(`${publicUrl}/`, "");
+}
+
 /** Upload a File object and return its public URL. */
 export async function uploadFile(
   file: File,
@@ -87,7 +92,7 @@ export async function getPresignedDownloadUrl(
   storageKey: string,
   { filename, contentType }: { filename: string; contentType: string },
 ): Promise<string> {
-  const key = storageKey.replace(`${publicUrl}/`, "");
+  const key = keyFromPublicUrl(storageKey);
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: key,
@@ -139,7 +144,7 @@ export async function uploadStream(
 
 /** Delete a file by its public URL (storageKey). */
 export async function deleteFile(storageKey: string) {
-  const key = storageKey.replace(`${publicUrl}/`, "");
+  const key = keyFromPublicUrl(storageKey);
   await s3.send(
     new DeleteObjectCommand({
       Bucket: bucket,

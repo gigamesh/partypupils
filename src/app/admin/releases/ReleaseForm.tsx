@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
+import { combinedName, deriveTrackArtistTitle } from "@/lib/track-name";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { DownloadButtons } from "@/components/DownloadButtons";
@@ -55,11 +56,16 @@ interface TrackInput {
   existingId?: number;
   artist: string;
   title: string;
+  genre: string;
   slug: string;
   priceStr: string;
   trackNumber: number;
   inRadio: boolean;
   wavFile: File | null;
+  /** Embedded tags read from the selected WAV — kept so the UI can flag overrides. */
+  wavTags?: { artist?: string; title?: string; genre?: string };
+  /** Cover art embedded in the selected WAV as a `data:` URL — `null` if the WAV has none. */
+  wavArtDataUrl?: string | null;
   existingWavName?: string;
   existingWavStorageKey?: string;
   existingWavFileSize?: number;
@@ -72,6 +78,7 @@ interface ExistingTrack {
   id: number;
   name: string;
   artist: string | null;
+  genre: string | null;
   slug: string;
   price: number;
   trackNumber: number;
@@ -79,18 +86,14 @@ interface ExistingTrack {
   files: { format: string; fileName: string; storageKey: string; fileSize: number | null }[];
 }
 
-/** Best-effort split of a legacy `"Artist - Title"` track name when no explicit artist is stored. */
-function splitArtistTitle(name: string): { artist: string; title: string } {
-  const idx = name.indexOf(" - ");
-  if (idx < 0) return { artist: "", title: name };
-  return { artist: name.slice(0, idx).trim(), title: name.slice(idx + 3).trim() };
-}
-
-/** Combine artist + title into the legacy single-string display name used in download filenames and listings. */
-function combinedName(artist: string, title: string): string {
-  const a = artist.trim();
-  const t = title.trim();
-  return a ? `${a} - ${t}` : t;
+/** Read a Blob into a base64 `data:` URL — used for inline artwork preview and transport. */
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 interface LinkPageSummary {
@@ -146,11 +149,12 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       return release.tracks.map((t) => {
         const wav = t.files.find((f) => f.format === "wav");
         const mp3 = t.files.find((f) => f.format === "mp3");
-        const split = t.artist == null ? splitArtistTitle(t.name) : { artist: t.artist, title: t.name.startsWith(`${t.artist} - `) ? t.name.slice(t.artist.length + 3) : t.name };
+        const split = deriveTrackArtistTitle(t.name, t.artist);
         return {
           existingId: t.id,
           artist: split.artist,
           title: split.title,
+          genre: t.genre ?? "",
           slug: t.slug,
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
@@ -165,13 +169,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         };
       });
     }
-    return [{ artist: "", title: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
+    return [{ artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
   });
 
   function addTrack() {
     setTracks((prev) => [
       ...prev,
-      { artist: "", title: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
+      { artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
     ]);
   }
 
@@ -190,6 +194,53 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
   function updateTrack(index: number, field: keyof TrackInput, value: string | boolean | File | null) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  }
+
+  /**
+   * Read embedded ID3/RIFF tags and cover art from a freshly selected WAV and
+   * auto-fill the track's still-empty fields. The parsed tags and artwork are
+   * retained on the track so the UI can flag overrides and preview the art that
+   * will be embedded in the MP3. Release-level fields (name, slug) are
+   * deliberately never touched here.
+   */
+  async function handleWavSelect(index: number, file: File | null) {
+    updateTrack(index, "wavFile", file);
+    if (!file) return;
+    try {
+      const { parseBlob } = await import("music-metadata");
+      const { common } = await parseBlob(file);
+      const wavArtist = common.artist?.trim() || undefined;
+      const wavTitle = common.title?.trim() || undefined;
+      const wavGenre = common.genre?.[0]?.trim() || undefined;
+      const picture = common.picture?.[0];
+      const wavArtDataUrl = picture
+        ? await blobToDataUrl(
+            new Blob([new Uint8Array(picture.data)], {
+              type: picture.format || "image/jpeg",
+            }),
+          )
+        : null;
+
+      setTracks((prev) =>
+        prev.map((t, i) => {
+          if (i !== index) return t;
+          const artist = t.artist || wavArtist || "";
+          const title = t.title || wavTitle || "";
+          const genre = t.genre || wavGenre || "";
+          return {
+            ...t,
+            artist,
+            title,
+            genre,
+            slug: t.existingId == null ? slugify(combinedName(artist, title)) : t.slug,
+            wavTags: { artist: wavArtist, title: wavTitle, genre: wavGenre },
+            wavArtDataUrl,
+          };
+        }),
+      );
+    } catch (err) {
+      console.warn("Could not read WAV metadata:", err);
+    }
   }
 
   /** Toggle track.inRadio with immediate persistence for existing tracks (skips the heavy PUT). */
@@ -253,6 +304,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     title?: string;
     artist?: string;
     album?: string;
+    genre?: string;
     trackNumber?: number;
     trackTotal?: number;
     year?: number;
@@ -262,6 +314,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     file: File,
     prefix: string,
     metadata: UploadMetadata,
+    artwork: { artDataUrl?: string | null; coverImageUrl?: string | null },
   ): Promise<{ url: string; mp3Url: string }> {
     const key = `${prefix}/${file.name}`;
     const url = await presignAndUpload(file, key);
@@ -269,7 +322,12 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     const processRes = await fetch("/api/admin/upload/process", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, metadata }),
+      body: JSON.stringify({
+        key,
+        metadata,
+        artDataUrl: artwork.artDataUrl || undefined,
+        coverImageUrl: artwork.coverImageUrl || undefined,
+      }),
     });
     const data = await processRes.json();
 
@@ -344,14 +402,20 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           currentStep++;
           setProgress({ current: currentStep, total: totalSteps });
           setStatus(`Uploading & transcoding "${trackName || track.wavFile.name}"...`);
-          const result = await uploadWav(track.wavFile, `audio/${slug}/${track.trackNumber}`, {
-            title: track.title || undefined,
-            artist: track.artist || undefined,
-            album: name || undefined,
-            trackNumber: track.trackNumber,
-            trackTotal,
-            year: releaseYear,
-          });
+          const result = await uploadWav(
+            track.wavFile,
+            `audio/${slug}/${track.trackNumber}`,
+            {
+              title: track.title || undefined,
+              artist: track.artist || undefined,
+              album: name || undefined,
+              genre: track.genre || undefined,
+              trackNumber: track.trackNumber,
+              trackTotal,
+              year: releaseYear,
+            },
+            { artDataUrl: track.wavArtDataUrl, coverImageUrl },
+          );
           files.push({
             format: "wav",
             fileName: track.wavFile.name,
@@ -385,6 +449,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           id: track.existingId,
           name: trackName,
           artist: track.artist || null,
+          genre: track.genre || null,
           slug: track.slug || slugify(trackName) || `track-${track.trackNumber}`,
           price: trackPrice,
           trackNumber: track.trackNumber,
@@ -440,8 +505,35 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       }
 
       const saved = await res.json();
-      // Reset state explicitly — on edits the URL doesn't change so the form
-      // stays mounted and would otherwise be stuck in "Saving..." forever.
+      // Merge server-assigned track IDs + stored file URLs back into form state.
+      // This makes the download buttons appear and lets a re-save carry the IDs,
+      // without remounting the form — a remount would drop the client-parsed WAV
+      // artwork preview and reset other transient state.
+      if (Array.isArray(saved.tracks)) {
+        setTracks((prev) =>
+          prev.map((t) => {
+            const savedTrack = saved.tracks.find(
+              (st: { trackNumber: number }) => st.trackNumber === t.trackNumber,
+            );
+            if (!savedTrack) return t;
+            const savedFiles: ExistingTrack["files"] = savedTrack.files ?? [];
+            const wav = savedFiles.find((f) => f.format === "wav");
+            const mp3 = savedFiles.find((f) => f.format === "mp3");
+            return {
+              ...t,
+              existingId: savedTrack.id,
+              slug: savedTrack.slug,
+              wavFile: null,
+              existingWavName: wav?.fileName,
+              existingWavStorageKey: wav?.storageKey,
+              existingWavFileSize: wav?.fileSize ?? undefined,
+              existingMp3Name: mp3?.fileName,
+              existingMp3StorageKey: mp3?.storageKey,
+              existingMp3FileSize: mp3?.fileSize ?? undefined,
+            };
+          }),
+        );
+      }
       setLoading(false);
       setStatus("");
       setProgress({ current: 0, total: 0 });
@@ -472,7 +564,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
       <div className="space-y-2">
         <Label htmlFor="slug">Slug</Label>
-        <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+        <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} required />
         {fieldErrors.slug && (
           <p className="text-xs text-destructive">{fieldErrors.slug}</p>
         )}
@@ -659,6 +751,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 {fieldErrors[`tracks[${index}].artist`] && (
                   <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].artist`]}</p>
                 )}
+                {track.wavTags?.artist &&
+                  track.artist.trim() &&
+                  track.artist.trim() !== track.wavTags.artist && (
+                    <p className="text-xs text-amber-500">
+                      Overrides WAV tag: «{track.wavTags.artist}»
+                    </p>
+                  )}
               </div>
               <div className="space-y-1">
                 <Label>Track Title</Label>
@@ -682,6 +781,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 {fieldErrors[`tracks[${index}].name`] && (
                   <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].name`]}</p>
                 )}
+                {track.wavTags?.title &&
+                  track.title.trim() &&
+                  track.title.trim() !== track.wavTags.title && (
+                    <p className="text-xs text-amber-500">
+                      Overrides WAV tag: «{track.wavTags.title}»
+                    </p>
+                  )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -699,6 +805,20 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                   onChange={(e) => updateTrack(index, "slug", e.target.value)}
                 />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Genre</Label>
+              <Input
+                value={track.genre}
+                onChange={(e) => updateTrack(index, "genre", e.target.value)}
+              />
+              {track.wavTags?.genre &&
+                track.genre.trim() &&
+                track.genre.trim() !== track.wavTags.genre && (
+                  <p className="text-xs text-amber-500">
+                    Overrides WAV tag: «{track.wavTags.genre}»
+                  </p>
+                )}
             </div>
             {(() => {
               if (!track.existingId) return null;
@@ -753,7 +873,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               <Input
                 type="file"
                 accept=".wav"
-                onChange={(e) => updateTrack(index, "wavFile", e.target.files?.[0] || null)}
+                onChange={(e) => void handleWavSelect(index, e.target.files?.[0] || null)}
                 required={isPublished && !track.existingWavName}
               />
               {fieldErrors[`tracks[${index}].files`] && (
@@ -772,9 +892,33 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               )}
               {track.wavFile && (
                 <p className="text-xs text-muted-foreground">
-                  New file selected — MP3 will be regenerated with current Artist / Title tags.
+                  {track.wavTags
+                    ? "Empty fields were filled from the file's tags. The MP3 is tagged from the form fields above — any “Overrides WAV tag” note means the file's own value won't be used."
+                    : "New file selected — the MP3 will be tagged from the form fields above."}
                 </p>
               )}
+            </div>
+            <div className="space-y-1">
+              <Label>Artwork</Label>
+              {(() => {
+                const releaseCover = coverPreviewSrc || release?.coverImageUrl || null;
+                const src = track.wavArtDataUrl || releaseCover;
+                const caption = track.wavArtDataUrl
+                  ? "From the WAV file — embedded in the generated MP3."
+                  : releaseCover
+                    ? "Release cover shown. A track's own embedded art previews here only right after you select its WAV."
+                    : "No artwork — add a release cover image above.";
+                return (
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
+                      {src && (
+                        <Image src={src} alt="Track artwork" fill className="object-cover" />
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{caption}</p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ))}
@@ -854,8 +998,8 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               {status}
             </span>
             {progress.total > 0 && (
-              <span className="text-muted-foreground">
-                {progress.current}/{progress.total}
+              <span className="text-muted-foreground whitespace-nowrap">
+                Step {progress.current} of {progress.total}
               </span>
             )}
           </div>

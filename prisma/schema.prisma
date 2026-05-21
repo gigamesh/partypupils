@@ -44,6 +44,7 @@ model Track {
   releaseId   Int
   name        String
   artist      String?
+  genre       String?
   slug        String
   price       Int // cents — price for individual track purchase
   trackNumber Int

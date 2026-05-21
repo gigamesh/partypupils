@@ -76,6 +76,7 @@ vi.mock("@/lib/storage", async () => {
     getPresignedDownloadUrl: vi.fn(async () => "https://r2/signed?response-content-disposition=stub"),
     getFileBuffer: vi.fn(async () => Buffer.from("")),
     getFileStream: vi.fn(async () => Readable.from(Buffer.from(""))),
+    keyFromPublicUrl: vi.fn((url: string) => url),
   };
 });
 

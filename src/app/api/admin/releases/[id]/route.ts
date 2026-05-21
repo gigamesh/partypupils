@@ -45,6 +45,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     id: t.id,
     name: t.name ?? "",
     artist: t.artist ?? null,
+    genre: t.genre ?? null,
     slug: t.slug,
     price: t.price ?? 0,
     trackNumber: t.trackNumber,
@@ -80,7 +81,15 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     throw err;
   }
 
-  const release = await prisma.release.findUnique({ where: { id: releaseId } });
+  const release = await prisma.release.findUnique({
+    where: { id: releaseId },
+    include: {
+      tracks: {
+        orderBy: { trackNumber: "asc" },
+        include: { files: true },
+      },
+    },
+  });
   revalidateTag(RADIO_TRACKS_TAG, "max");
   revalidateTag(RELEASES_TAG, "max");
   return NextResponse.json(release);
