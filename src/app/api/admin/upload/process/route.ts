@@ -15,15 +15,20 @@ import { convertWavStreamToMp3, type Mp3Metadata } from "@/lib/preview";
 
 export const maxDuration = 300;
 
-/** Coerce arbitrary client input into a clean Mp3Metadata object (or undefined). */
+/**
+ * Coerce arbitrary client input into a clean Mp3Metadata object (or undefined).
+ * String fields are trimmed: stray whitespace (e.g. a trailing space in the
+ * artist) embeds into the file and makes players like Apple Music treat
+ * otherwise-identical tracks as belonging to separate albums.
+ */
 function parseMetadata(raw: unknown): Mp3Metadata | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
   const out: Mp3Metadata = {};
-  if (typeof r.title === "string") out.title = r.title;
-  if (typeof r.artist === "string") out.artist = r.artist;
-  if (typeof r.album === "string") out.album = r.album;
-  if (typeof r.genre === "string") out.genre = r.genre;
+  if (typeof r.title === "string" && r.title.trim()) out.title = r.title.trim();
+  if (typeof r.artist === "string" && r.artist.trim()) out.artist = r.artist.trim();
+  if (typeof r.album === "string" && r.album.trim()) out.album = r.album.trim();
+  if (typeof r.genre === "string" && r.genre.trim()) out.genre = r.genre.trim();
   if (typeof r.trackNumber === "number") out.trackNumber = r.trackNumber;
   if (typeof r.trackTotal === "number") out.trackTotal = r.trackTotal;
   if (typeof r.year === "number") out.year = r.year;
