@@ -47,8 +47,7 @@ function metadataArgs(meta?: Mp3Metadata): string[] {
     pairs.push(["track", value]);
   }
   if (meta.year != null) pairs.push(["date", String(meta.year)]);
-  // album_artist mirrors artist for compatibility with players that split the two.
-  if (meta.artist) pairs.push(["album_artist", meta.artist]);
+  // Note: album_artist is deliberately never written — it must stay unpopulated.
   return pairs.flatMap(([k, v]) => ["-metadata", `${k}=${v}`]);
 }
 

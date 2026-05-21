@@ -133,6 +133,8 @@ describe("convertWavStreamToMp3", () => {
       expect(tags.album).toBe("Yacht House Summer Vol 1");
       expect(tags.track).toBe("15/22");
       expect(tags.date).toBe("2024");
+      // Album Artist must never be written — it has to stay unpopulated.
+      expect(tags.album_artist).toBeUndefined();
     } finally {
       await unlink(mp3Path).catch(() => {});
     }
