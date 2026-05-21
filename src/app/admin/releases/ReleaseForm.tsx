@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
+import { combinedName, deriveTrackArtistTitle } from "@/lib/track-name";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { DownloadButtons } from "@/components/DownloadButtons";
@@ -85,20 +86,6 @@ interface ExistingTrack {
   files: { format: string; fileName: string; storageKey: string; fileSize: number | null }[];
 }
 
-/** Best-effort split of a legacy `"Artist - Title"` track name when no explicit artist is stored. */
-function splitArtistTitle(name: string): { artist: string; title: string } {
-  const idx = name.indexOf(" - ");
-  if (idx < 0) return { artist: "", title: name };
-  return { artist: name.slice(0, idx).trim(), title: name.slice(idx + 3).trim() };
-}
-
-/** Combine artist + title into the legacy single-string display name used in download filenames and listings. */
-function combinedName(artist: string, title: string): string {
-  const a = artist.trim();
-  const t = title.trim();
-  return a ? `${a} - ${t}` : t;
-}
-
 /** Read a Blob into a base64 `data:` URL — used for inline artwork preview and transport. */
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -162,7 +149,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       return release.tracks.map((t) => {
         const wav = t.files.find((f) => f.format === "wav");
         const mp3 = t.files.find((f) => f.format === "mp3");
-        const split = t.artist == null ? splitArtistTitle(t.name) : { artist: t.artist, title: t.name.startsWith(`${t.artist} - `) ? t.name.slice(t.artist.length + 3) : t.name };
+        const split = deriveTrackArtistTitle(t.name, t.artist);
         return {
           existingId: t.id,
           artist: split.artist,

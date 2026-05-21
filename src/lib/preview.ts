@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
 import { Readable } from "stream";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import ffmpegStatic from "ffmpeg-static";
 
@@ -9,9 +10,12 @@ import ffmpegStatic from "ffmpeg-static";
  * stable, non-symlinked path that Vercel's tracer can include reliably. In
  * dev we fall back to the ffmpeg-static package path.
  */
-function ffmpegBinary(): string {
+export function ffmpegBinary(): string {
   if (process.env.NODE_ENV === "production") {
-    return resolve(process.cwd(), "bin", "ffmpeg");
+    const bundled = resolve(process.cwd(), "bin", "ffmpeg");
+    if (existsSync(bundled)) return bundled;
+    // Falls through to ffmpeg-static — e.g. a maintenance script run locally with a
+    // prod env file where ./bin/ffmpeg (a build artifact) isn't present.
   }
   if (!ffmpegStatic) {
     throw new Error(
@@ -32,7 +36,7 @@ export interface Mp3Metadata {
 }
 
 /** Build the `-metadata key=value` flag pairs ffmpeg needs, skipping empty values. */
-function metadataArgs(meta?: Mp3Metadata): string[] {
+export function metadataArgs(meta?: Mp3Metadata): string[] {
   if (!meta) return [];
   const pairs: Array<[string, string]> = [];
   if (meta.title) pairs.push(["title", meta.title]);
