@@ -91,6 +91,12 @@ export async function POST(req: NextRequest) {
           })),
         },
       },
+      include: {
+        tracks: {
+          orderBy: { trackNumber: "asc" },
+          include: { files: true },
+        },
+      },
     });
   } catch (err) {
     // Rely on the DB-level unique constraint instead of a separate findUnique

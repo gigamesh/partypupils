@@ -1,16 +1,20 @@
 /**
- * Tests for the streaming WAV → MP3 transcoding route.
+ * Tests for the WAV → MP3 transcoding route.
  *
- * The end-to-end pipeline (R2 GET → ffmpeg → R2 PUT) is exercised against the
- * real ffmpeg-static binary by piping a tiny generated WAV (1s silence) through
- * `convertWavStreamToMp3` directly. The route handler is then tested with the
- * storage layer mocked — we just verify it wires GET→ffmpeg→PUT and surfaces
- * errors rather than swallowing them.
+ * The transcode is exercised against the real ffmpeg-static binary by piping a
+ * tiny generated WAV (1s silence) through `convertWavStreamToMp3` directly —
+ * the MP3 is written to a temp file (ffmpeg corrupts artwork-embedded MP3s
+ * written to a pipe). The route handler is then tested with the storage layer
+ * mocked — we just verify it wires GET→ffmpeg→PUT and surfaces errors.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import { Readable } from "stream";
 import { spawnSync } from "child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { readFile, writeFile, unlink } from "node:fs/promises";
 import ffmpegStatic from "ffmpeg-static";
 import { POST as processUpload } from "@/app/api/admin/upload/process/route";
 import { convertWavStreamToMp3 } from "@/lib/preview";
@@ -51,6 +55,20 @@ function generateSilentWav(): Buffer {
   return result.stdout;
 }
 
+/** Generate a tiny PNG via the bundled ffmpeg binary, for cover-art tests. */
+function generatePng(): Buffer {
+  if (!ffmpegStatic) throw new Error("ffmpeg-static missing for this platform");
+  const result = spawnSync(
+    ffmpegStatic,
+    ["-f", "lavfi", "-i", "color=c=red:s=16x16:d=1", "-frames:v", "1", "-c:v", "png", "-f", "image2pipe", "pipe:1"],
+    { encoding: "buffer", maxBuffer: 1024 * 1024 },
+  );
+  if (result.status !== 0) {
+    throw new Error(`ffmpeg png setup failed: ${result.stderr.toString()}`);
+  }
+  return result.stdout;
+}
+
 /** Probe the MP3 buffer for ID3v2 frame text via ffprobe (bundled with ffmpeg-static). */
 function readId3Tags(mp3: Buffer): Record<string, string> {
   if (!ffmpegStatic) throw new Error("ffmpeg-static missing");
@@ -70,35 +88,80 @@ function readId3Tags(mp3: Buffer): Record<string, string> {
 }
 
 describe("convertWavStreamToMp3", () => {
-  it("transcodes a small WAV stream to a non-empty MP3 stream", async () => {
+  it("transcodes a small WAV stream to a non-empty MP3 file", async () => {
     const wav = generateSilentWav();
-    const mp3 = await streamToBuffer(convertWavStreamToMp3(Readable.from(wav), "320k"));
-    expect(mp3.length).toBeGreaterThan(0);
-    // First three bytes of an MP3: either an ID3 tag or an MPEG sync (0xFF 0xFB/0xFA/0xF3/0xF2).
-    const isId3 = mp3.toString("ascii", 0, 3) === "ID3";
-    const isSync = mp3[0] === 0xff && (mp3[1] & 0xe0) === 0xe0;
-    expect(isId3 || isSync).toBe(true);
+    const mp3Path = join(tmpdir(), `${randomUUID()}.mp3`);
+    try {
+      await convertWavStreamToMp3({
+        wavStream: Readable.from(wav),
+        mp3Path,
+        bitrate: "320k",
+      });
+      const mp3 = await readFile(mp3Path);
+      expect(mp3.length).toBeGreaterThan(0);
+      // First three bytes of an MP3: either an ID3 tag or an MPEG sync (0xFF 0xFB/0xFA/0xF3/0xF2).
+      const isId3 = mp3.toString("ascii", 0, 3) === "ID3";
+      const isSync = mp3[0] === 0xff && (mp3[1] & 0xe0) === 0xe0;
+      expect(isId3 || isSync).toBe(true);
+    } finally {
+      await unlink(mp3Path).catch(() => {});
+    }
   });
 
   it("embeds title/artist/album/track/date ID3v2 tags when metadata is supplied", async () => {
     const wav = generateSilentWav();
-    const mp3 = await streamToBuffer(
-      convertWavStreamToMp3(Readable.from(wav), "320k", {
-        title: "The Way It Is (Party Pupils Remix) Extended",
-        artist: "Bruce Hornsby",
-        album: "Yacht House Summer Vol 1",
-        trackNumber: 15,
-        trackTotal: 22,
-        year: 2024,
-      }),
-    );
-    expect(mp3.toString("ascii", 0, 3)).toBe("ID3");
-    const tags = readId3Tags(mp3);
-    expect(tags.title).toBe("The Way It Is (Party Pupils Remix) Extended");
-    expect(tags.artist).toBe("Bruce Hornsby");
-    expect(tags.album).toBe("Yacht House Summer Vol 1");
-    expect(tags.track).toBe("15/22");
-    expect(tags.date).toBe("2024");
+    const mp3Path = join(tmpdir(), `${randomUUID()}.mp3`);
+    try {
+      await convertWavStreamToMp3({
+        wavStream: Readable.from(wav),
+        mp3Path,
+        bitrate: "320k",
+        metadata: {
+          title: "The Way It Is (Party Pupils Remix) Extended",
+          artist: "Bruce Hornsby",
+          album: "Yacht House Summer Vol 1",
+          trackNumber: 15,
+          trackTotal: 22,
+          year: 2024,
+        },
+      });
+      const mp3 = await readFile(mp3Path);
+      expect(mp3.toString("ascii", 0, 3)).toBe("ID3");
+      const tags = readId3Tags(mp3);
+      expect(tags.title).toBe("The Way It Is (Party Pupils Remix) Extended");
+      expect(tags.artist).toBe("Bruce Hornsby");
+      expect(tags.album).toBe("Yacht House Summer Vol 1");
+      expect(tags.track).toBe("15/22");
+      expect(tags.date).toBe("2024");
+    } finally {
+      await unlink(mp3Path).catch(() => {});
+    }
+  });
+
+  it("embeds cover art into the MP3 when a coverPath is supplied", async () => {
+    const wav = generateSilentWav();
+    const coverPath = join(tmpdir(), `${randomUUID()}.png`);
+    const mp3Path = join(tmpdir(), `${randomUUID()}.mp3`);
+    try {
+      await writeFile(coverPath, generatePng());
+      await convertWavStreamToMp3({
+        wavStream: Readable.from(wav),
+        mp3Path,
+        bitrate: "320k",
+        coverPath,
+      });
+      const mp3 = await readFile(mp3Path);
+      // ffmpeg lists input streams on stderr; an embedded cover shows up as a Video stream.
+      const probe = spawnSync(ffmpegStatic!, ["-hide_banner", "-i", "pipe:0"], {
+        input: mp3,
+        encoding: "buffer",
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      expect(probe.stderr.toString()).toMatch(/Video:/);
+    } finally {
+      await unlink(coverPath).catch(() => {});
+      await unlink(mp3Path).catch(() => {});
+    }
   });
 });
 
