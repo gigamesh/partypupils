@@ -7,6 +7,7 @@ export async function makeRelease(overrides: Partial<{
   price: number;
   type: "single" | "album";
   isPublished: boolean;
+  coverImageUrl: string;
 }> = {}) {
   return prisma.release.create({
     data: {
@@ -15,6 +16,7 @@ export async function makeRelease(overrides: Partial<{
       price: overrides.price ?? 999,
       type: overrides.type ?? "single",
       isPublished: overrides.isPublished ?? true,
+      coverImageUrl: overrides.coverImageUrl,
     },
   });
 }

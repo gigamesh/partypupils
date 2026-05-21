@@ -49,6 +49,32 @@ function coverArtFilename(releaseName: string): string {
 }
 
 /**
+ * Cover-art zip entries for a full-release download: the artwork alongside the
+ * tracks, plus a copy inside the `Extended/` subfolder when the track entries
+ * use one. `folder` is the release's `Name/` prefix for multi-release zips, or
+ * an empty string for flat single-release zips.
+ */
+function coverArtEntries(
+  releaseName: string,
+  coverImageUrl: string,
+  folder: string,
+  trackEntries: ZipFile[],
+): ZipFile[] {
+  const file = coverArtFilename(releaseName);
+  const entries: ZipFile[] = [
+    { fileName: `${folder}${file}`, storageKey: coverImageUrl, contentType: "image/jpeg" },
+  ];
+  if (trackEntries.some((e) => e.fileName.split("/").includes("Extended"))) {
+    entries.push({
+      fileName: `${folder}Extended/${file}`,
+      storageKey: coverImageUrl,
+      contentType: "image/jpeg",
+    });
+  }
+  return entries;
+}
+
+/**
  * Returns a JSON manifest of presigned R2 GET URLs and target filenames so the
  * client (via a Service Worker + `client-zip`) can stream the archive directly
  * from R2 without ever routing audio bytes through the Vercel function.
@@ -56,7 +82,8 @@ function coverArtFilename(releaseName: string): string {
  * Multi-release archives nest each track under a `Release Name/` folder;
  * single-release archives stay flat. Extended mixes go in an `Extended/`
  * subfolder. A full-release purchase also includes the release's cover art file
- * alongside its tracks; à la carte track purchases do not.
+ * alongside its tracks — plus a copy inside `Extended/` when that subfolder
+ * exists; à la carte track purchases get no cover art.
  */
 export async function GET(req: NextRequest, context: RouteContext) {
   const { token } = await context.params;
@@ -145,11 +172,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
           contentType: audioContentType,
         }));
       if (entries.length > 0 && release.coverImageUrl) {
-        entries.push({
-          fileName: `${sanitizeSegment(release.name)}/${coverArtFilename(release.name)}`,
-          storageKey: release.coverImageUrl,
-          contentType: "image/jpeg",
-        });
+        entries.push(
+          ...coverArtEntries(
+            release.name,
+            release.coverImageUrl,
+            `${sanitizeSegment(release.name)}/`,
+            entries,
+          ),
+        );
       }
       return entries;
     });
@@ -197,11 +227,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
       }));
     // Full-release download — include the cover art alongside the tracks.
     if (trackFiles.length > 0 && release.coverImageUrl) {
-      trackFiles.push({
-        fileName: coverArtFilename(release.name),
-        storageKey: release.coverImageUrl,
-        contentType: "image/jpeg",
-      });
+      trackFiles.push(
+        ...coverArtEntries(release.name, release.coverImageUrl, "", trackFiles),
+      );
     }
 
     zipName = `${release.name} (${format.toUpperCase()}).zip`;

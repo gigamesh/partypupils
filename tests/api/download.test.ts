@@ -246,6 +246,60 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     ]);
   });
 
+  it("places the release cover art in the Extended/ subfolder too", async () => {
+    const release = await makeRelease({
+      name: "Yacht House",
+      coverImageUrl: "https://r2.example/covers/yacht-house.png",
+    });
+    await makeTrackWithFile(release.id, { name: "Peg", trackNumber: 1, fileName: "Peg (Remix).mp3" });
+    await makeTrackWithFile(release.id, { name: "Peg Ext", trackNumber: 2, fileName: "Peg (Remix) Extended.mp3" });
+    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
+    const token = order.downloadTokens[0].token;
+
+    // Single-release zip → flat cover, plus a copy inside Extended/.
+    const relRes = await downloadZip(
+      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      ctx(token),
+    );
+    const relBody = await relRes.json();
+    expect(relBody.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+      "Peg (Remix).mp3",
+      "Extended/Peg (Remix) Extended.mp3",
+      "Yacht House - COVER ART.jpg",
+      "Extended/Yacht House - COVER ART.jpg",
+    ]);
+
+    // Whole-order zip → cover nested under the release folder and its Extended/.
+    const orderRes = await downloadZip(tokenReq(token, "format=mp3"), ctx(token));
+    const orderBody = await orderRes.json();
+    expect(orderBody.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+      "Yacht House/Peg (Remix).mp3",
+      "Yacht House/Extended/Peg (Remix) Extended.mp3",
+      "Yacht House/Yacht House - COVER ART.jpg",
+      "Yacht House/Extended/Yacht House - COVER ART.jpg",
+    ]);
+  });
+
+  it("omits the Extended/ cover copy when the release has no extended mixes", async () => {
+    const release = await makeRelease({
+      name: "Album One",
+      coverImageUrl: "https://r2.example/covers/album-one.png",
+    });
+    await makeTrackWithFile(release.id, { name: "Track A", trackNumber: 1, fileName: "trackA.mp3" });
+    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
+    const token = order.downloadTokens[0].token;
+
+    const res = await downloadZip(
+      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      ctx(token),
+    );
+    const body = await res.json();
+    expect(body.files.map((f: { fileName: string }) => f.fileName)).toEqual([
+      "trackA.mp3",
+      "Album One - COVER ART.jpg",
+    ]);
+  });
+
   it("returns a flat manifest (no folder) for a single-release zip", async () => {
     const release = await makeRelease({ name: "Album One" });
     await makeTrackWithFile(release.id, { name: "Track A", trackNumber: 1, fileName: "trackA_final.mp3" });
