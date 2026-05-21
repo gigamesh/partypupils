@@ -13,6 +13,7 @@ function parseMetadata(raw: unknown): Mp3Metadata | undefined {
   if (typeof r.title === "string") out.title = r.title;
   if (typeof r.artist === "string") out.artist = r.artist;
   if (typeof r.album === "string") out.album = r.album;
+  if (typeof r.genre === "string") out.genre = r.genre;
   if (typeof r.trackNumber === "number") out.trackNumber = r.trackNumber;
   if (typeof r.trackTotal === "number") out.trackTotal = r.trackTotal;
   if (typeof r.year === "number") out.year = r.year;

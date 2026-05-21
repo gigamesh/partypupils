@@ -25,6 +25,7 @@ export interface Mp3Metadata {
   title?: string;
   artist?: string;
   album?: string;
+  genre?: string;
   trackNumber?: number;
   trackTotal?: number;
   year?: number;
@@ -37,6 +38,7 @@ function metadataArgs(meta?: Mp3Metadata): string[] {
   if (meta.title) pairs.push(["title", meta.title]);
   if (meta.artist) pairs.push(["artist", meta.artist]);
   if (meta.album) pairs.push(["album", meta.album]);
+  if (meta.genre) pairs.push(["genre", meta.genre]);
   if (meta.trackNumber != null) {
     const value =
       meta.trackTotal != null

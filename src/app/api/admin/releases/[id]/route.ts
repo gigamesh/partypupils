@@ -45,6 +45,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     id: t.id,
     name: t.name ?? "",
     artist: t.artist ?? null,
+    genre: t.genre ?? null,
     slug: t.slug,
     price: t.price ?? 0,
     trackNumber: t.trackNumber,

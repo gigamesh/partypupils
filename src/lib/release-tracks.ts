@@ -22,6 +22,7 @@ export interface TrackInput {
   id?: number;
   name: string;
   artist?: string | null;
+  genre?: string | null;
   /** Optional in the incoming payload — `normalizeTrackSlugs` slugifies and falls back to `track-${trackNumber}` when empty. */
   slug?: string;
   price: number;
@@ -191,6 +192,7 @@ export async function syncReleaseAndTracks(
         data: {
           name: t.name,
           artist: t.artist ?? null,
+          genre: t.genre ?? null,
           slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,
@@ -225,6 +227,7 @@ export async function syncReleaseAndTracks(
           releaseId,
           name: t.name,
           artist: t.artist ?? null,
+          genre: t.genre ?? null,
           slug: t.slug,
           price: t.price,
           trackNumber: t.trackNumber,

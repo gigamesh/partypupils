@@ -55,11 +55,14 @@ interface TrackInput {
   existingId?: number;
   artist: string;
   title: string;
+  genre: string;
   slug: string;
   priceStr: string;
   trackNumber: number;
   inRadio: boolean;
   wavFile: File | null;
+  /** Embedded tags read from the selected WAV — kept so the UI can flag overrides. */
+  wavTags?: { artist?: string; title?: string; genre?: string };
   existingWavName?: string;
   existingWavStorageKey?: string;
   existingWavFileSize?: number;
@@ -72,6 +75,7 @@ interface ExistingTrack {
   id: number;
   name: string;
   artist: string | null;
+  genre: string | null;
   slug: string;
   price: number;
   trackNumber: number;
@@ -151,6 +155,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           existingId: t.id,
           artist: split.artist,
           title: split.title,
+          genre: t.genre ?? "",
           slug: t.slug,
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
@@ -165,13 +170,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         };
       });
     }
-    return [{ artist: "", title: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
+    return [{ artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
   });
 
   function addTrack() {
     setTracks((prev) => [
       ...prev,
-      { artist: "", title: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
+      { artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
     ]);
   }
 
@@ -190,6 +195,44 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
   function updateTrack(index: number, field: keyof TrackInput, value: string | boolean | File | null) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  }
+
+  /**
+   * Read embedded ID3/RIFF tags from a freshly selected WAV and auto-fill the
+   * track's still-empty fields. The parsed tags are retained on the track so
+   * the UI can flag fields the admin later edits away from the file's own
+   * metadata — the generated MP3 is tagged from the form, not the WAV itself.
+   * Release-level fields (name, slug) are deliberately never touched here.
+   */
+  async function handleWavSelect(index: number, file: File | null) {
+    updateTrack(index, "wavFile", file);
+    if (!file) return;
+    try {
+      const { parseBlob } = await import("music-metadata");
+      const { common } = await parseBlob(file);
+      const wavArtist = common.artist?.trim() || undefined;
+      const wavTitle = common.title?.trim() || undefined;
+      const wavGenre = common.genre?.[0]?.trim() || undefined;
+
+      setTracks((prev) =>
+        prev.map((t, i) => {
+          if (i !== index) return t;
+          const artist = t.artist || wavArtist || "";
+          const title = t.title || wavTitle || "";
+          const genre = t.genre || wavGenre || "";
+          return {
+            ...t,
+            artist,
+            title,
+            genre,
+            slug: t.existingId == null ? slugify(combinedName(artist, title)) : t.slug,
+            wavTags: { artist: wavArtist, title: wavTitle, genre: wavGenre },
+          };
+        }),
+      );
+    } catch (err) {
+      console.warn("Could not read WAV metadata:", err);
+    }
   }
 
   /** Toggle track.inRadio with immediate persistence for existing tracks (skips the heavy PUT). */
@@ -253,6 +296,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     title?: string;
     artist?: string;
     album?: string;
+    genre?: string;
     trackNumber?: number;
     trackTotal?: number;
     year?: number;
@@ -348,6 +392,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
             title: track.title || undefined,
             artist: track.artist || undefined,
             album: name || undefined,
+            genre: track.genre || undefined,
             trackNumber: track.trackNumber,
             trackTotal,
             year: releaseYear,
@@ -385,6 +430,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           id: track.existingId,
           name: trackName,
           artist: track.artist || null,
+          genre: track.genre || null,
           slug: track.slug || slugify(trackName) || `track-${track.trackNumber}`,
           price: trackPrice,
           trackNumber: track.trackNumber,
@@ -472,7 +518,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
       <div className="space-y-2">
         <Label htmlFor="slug">Slug</Label>
-        <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+        <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} required />
         {fieldErrors.slug && (
           <p className="text-xs text-destructive">{fieldErrors.slug}</p>
         )}
@@ -659,6 +705,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 {fieldErrors[`tracks[${index}].artist`] && (
                   <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].artist`]}</p>
                 )}
+                {track.wavTags?.artist &&
+                  track.artist.trim() &&
+                  track.artist.trim() !== track.wavTags.artist && (
+                    <p className="text-xs text-amber-500">
+                      Overrides WAV tag: «{track.wavTags.artist}»
+                    </p>
+                  )}
               </div>
               <div className="space-y-1">
                 <Label>Track Title</Label>
@@ -682,6 +735,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 {fieldErrors[`tracks[${index}].name`] && (
                   <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].name`]}</p>
                 )}
+                {track.wavTags?.title &&
+                  track.title.trim() &&
+                  track.title.trim() !== track.wavTags.title && (
+                    <p className="text-xs text-amber-500">
+                      Overrides WAV tag: «{track.wavTags.title}»
+                    </p>
+                  )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -699,6 +759,20 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                   onChange={(e) => updateTrack(index, "slug", e.target.value)}
                 />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Genre</Label>
+              <Input
+                value={track.genre}
+                onChange={(e) => updateTrack(index, "genre", e.target.value)}
+              />
+              {track.wavTags?.genre &&
+                track.genre.trim() &&
+                track.genre.trim() !== track.wavTags.genre && (
+                  <p className="text-xs text-amber-500">
+                    Overrides WAV tag: «{track.wavTags.genre}»
+                  </p>
+                )}
             </div>
             {(() => {
               if (!track.existingId) return null;
@@ -753,7 +827,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               <Input
                 type="file"
                 accept=".wav"
-                onChange={(e) => updateTrack(index, "wavFile", e.target.files?.[0] || null)}
+                onChange={(e) => void handleWavSelect(index, e.target.files?.[0] || null)}
                 required={isPublished && !track.existingWavName}
               />
               {fieldErrors[`tracks[${index}].files`] && (
@@ -772,7 +846,9 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               )}
               {track.wavFile && (
                 <p className="text-xs text-muted-foreground">
-                  New file selected — MP3 will be regenerated with current Artist / Title tags.
+                  {track.wavTags
+                    ? "Empty fields were filled from the file's tags. The MP3 is tagged from the form fields above — any “Overrides WAV tag” note means the file's own value won't be used."
+                    : "New file selected — the MP3 will be tagged from the form fields above."}
                 </p>
               )}
             </div>

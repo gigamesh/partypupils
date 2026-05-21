@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     id: t.id,
     name: t.name ?? "",
     artist: t.artist ?? null,
+    genre: t.genre ?? null,
     slug: t.slug,
     price: t.price ?? 0,
     trackNumber: t.trackNumber,
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
           create: incomingTracks.map((t) => ({
             name: t.name,
             artist: t.artist ?? null,
+            genre: t.genre ?? null,
             slug: t.slug!,
             price: t.price,
             trackNumber: t.trackNumber,
