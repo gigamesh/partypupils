@@ -15,6 +15,8 @@ export async function getFaqContent(): Promise<FaqContent> {
       return {
         ...parsed.data,
         items: parsed.data.items.map(migrateLegacyItem),
+        // An absent video falls back to the default; an explicit null stays removed.
+        video: parsed.data.video === undefined ? FAQ_DEFAULTS.video : parsed.data.video,
       };
     }
     console.error("[faq] Stored FAQ content failed schema validation", parsed.error);

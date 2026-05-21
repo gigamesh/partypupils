@@ -29,6 +29,11 @@ const RAW_DEFAULTS: FaqContent = {
         "<p>It&rsquo;s a complicated licensing issue. The music business is still catching up with the current technology, which creates copyright issues with some platforms. My team and I are constantly in the process of making as many remixes official as we possibly can.</p>",
     },
   ],
+  video: {
+    url: "https://www.youtube.com/shorts/LOppa3dOl14",
+    heading:
+      "Please watch this video and read the section below if you have any questions about downloading & listening.",
+  },
 };
 
 export const FAQ_DEFAULTS: FaqContent = FaqContentSchema.parse(RAW_DEFAULTS);

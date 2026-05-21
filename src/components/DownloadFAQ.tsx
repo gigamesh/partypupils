@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { getFaqContent } from "@/lib/faq";
 import type { FaqContent } from "@/lib/faq-schema";
+import { FaqVideo } from "./FaqVideo";
 
 /** Tailwind class list applied to the wrapper of FAQ answer HTML, scoped via descendant selectors. */
 const ANSWER_CLASSES =
@@ -9,14 +10,17 @@ const ANSWER_CLASSES =
 /** Renders a list of FAQ items inside the standard glass panel — shared between the public /faq page and post-purchase pages. */
 export function FaqList({
   items,
+  video,
   title = "Download FAQ",
 }: {
   items: FaqContent["items"];
+  video?: FaqContent["video"];
   title?: string;
 }) {
   return (
     <div className="glass-panel rounded-lg border p-6 space-y-5">
       <h2>{title}</h2>
+      {video && <FaqVideo url={video.url} heading={video.heading} />}
       {items.map((item) => (
         <Fragment key={item.id}>
           <div className="space-y-1.5">
@@ -34,6 +38,6 @@ export function FaqList({
 
 /** Server component: loads admin-editable FAQ content and renders it on post-purchase pages. */
 export async function DownloadFAQ() {
-  const { items } = await getFaqContent();
-  return <FaqList items={items} />;
+  const { items, video } = await getFaqContent();
+  return <FaqList items={items} video={video} />;
 }

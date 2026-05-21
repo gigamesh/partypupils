@@ -15,7 +15,12 @@ export default async function AdminFaqPage() {
         Answers use a rich-text editor — bold, italic, links, and paragraph
         breaks are supported.
       </p>
-      <FaqEditor initialItems={content.items} defaultItems={FAQ_DEFAULTS.items} />
+      <FaqEditor
+        initialItems={content.items}
+        defaultItems={FAQ_DEFAULTS.items}
+        initialVideo={content.video ?? null}
+        defaultVideo={FAQ_DEFAULTS.video ?? null}
+      />
     </div>
   );
 }
