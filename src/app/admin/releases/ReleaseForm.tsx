@@ -902,19 +902,12 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               <Label>Artwork</Label>
               {(() => {
                 const releaseCover = coverPreviewSrc || release?.coverImageUrl || null;
-                // Saved tracks: read the art actually embedded in the track's MP3.
-                const trackArt =
-                  track.existingId != null && track.existingMp3StorageKey
-                    ? `/api/admin/track-artwork?trackId=${track.existingId}`
-                    : null;
-                const src = track.wavArtDataUrl || trackArt || releaseCover;
+                const src = track.wavArtDataUrl || releaseCover;
                 const caption = track.wavArtDataUrl
                   ? "From the WAV file — embedded in the generated MP3."
-                  : trackArt
-                    ? "Artwork embedded in this track's MP3."
-                    : releaseCover
-                      ? "Will use the release cover."
-                      : "No artwork — add a release cover image above.";
+                  : releaseCover
+                    ? "Release cover shown. A track's own embedded art previews here only right after you select its WAV."
+                    : "No artwork — add a release cover image above.";
                 return (
                   <div className="flex items-center gap-3">
                     <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
