@@ -16,6 +16,9 @@
  * Apply to everything:
  *   npx dotenv -e .env.prod -- npx tsx scripts/retag-audio-files.ts --apply
  *
+ * Resume after an interrupted run — skip the N oldest (already-done) releases:
+ *   npx dotenv -e .env.prod -- npx tsx scripts/retag-audio-files.ts --apply --skip <n>
+ *
  * Idempotent and re-runnable. Reads the DB only; overwrites R2 objects in place.
  */
 import { tmpdir } from "node:os";
@@ -68,7 +71,17 @@ async function main() {
     }
   }
 
-  const releases = await prisma.release.findMany({
+  const skipIdx = process.argv.indexOf("--skip");
+  let skipCount = 0;
+  if (skipIdx >= 0) {
+    skipCount = Number.parseInt(process.argv[skipIdx + 1] ?? "", 10);
+    if (!Number.isInteger(skipCount) || skipCount < 0) {
+      console.error("--skip requires a non-negative integer (count of oldest releases to skip)");
+      process.exit(1);
+    }
+  }
+
+  const allReleases = await prisma.release.findMany({
     where:
       trackId !== undefined
         ? { tracks: { some: { id: trackId } } }
@@ -79,10 +92,18 @@ async function main() {
     orderBy: { id: "asc" },
   });
 
-  if (releases.length === 0) {
+  if (allReleases.length === 0) {
     if (trackId !== undefined) console.log(`No track with id ${trackId}.`);
     else if (releaseSlug) console.log(`No release with slug "${releaseSlug}".`);
     else console.log("No releases found.");
+    return;
+  }
+
+  // Releases come back oldest-first (id asc); --skip drops the first N so an
+  // interrupted run can resume without reprocessing releases already done.
+  const releases = allReleases.slice(skipCount);
+  if (releases.length === 0) {
+    console.log(`--skip ${skipCount} skipped all ${allReleases.length} release(s) — nothing to do.`);
     return;
   }
 
@@ -91,7 +112,9 @@ async function main() {
       ? ` (track id ${trackId})`
       : releaseSlug
         ? ` (release "${releaseSlug}")`
-        : "";
+        : skipCount > 0
+          ? ` (skipped ${skipCount} oldest)`
+          : "";
   console.log(`${apply ? "APPLY" : "DRY RUN"} — ${releases.length} release(s)${scope}\n`);
 
   let ok = 0;
