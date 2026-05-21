@@ -7,6 +7,13 @@ interface RouteContext {
   params: Promise<{ token: string }>;
 }
 
+/** A file destined for the zip, paired with the storage object it streams from. */
+interface ZipFile {
+  fileName: string;
+  storageKey: string;
+  contentType: string;
+}
+
 /** Strip path separators so a release/track name can't spawn unintended zip subfolders. */
 function sanitizeSegment(name: string): string {
   return name.replace(/[/\\]+/g, "-").trim();
@@ -36,6 +43,11 @@ function zipEntryPath(releaseName: string | null, fileName: string): string {
   return segments.join("/");
 }
 
+/** Zip filename for a release's cover art, e.g. `Yacht House Summer - Vol 2 - COVER ART.jpg`. */
+function coverArtFilename(releaseName: string): string {
+  return `${sanitizeSegment(releaseName)} - COVER ART.jpg`;
+}
+
 /**
  * Returns a JSON manifest of presigned R2 GET URLs and target filenames so the
  * client (via a Service Worker + `client-zip`) can stream the archive directly
@@ -43,15 +55,15 @@ function zipEntryPath(releaseName: string | null, fileName: string): string {
  *
  * Multi-release archives nest each track under a `Release Name/` folder;
  * single-release archives stay flat. Extended mixes go in an `Extended/`
- * subfolder. Either way the entry keeps the original uploaded filename
- * (whitespace-trimmed) — no track-number prefix is added, since some uploaded
- * filenames already carry their own numbering.
+ * subfolder. A full-release purchase also includes the release's cover art file
+ * alongside its tracks; à la carte track purchases do not.
  */
 export async function GET(req: NextRequest, context: RouteContext) {
   const { token } = await context.params;
   const releaseId = parseInt(req.nextUrl.searchParams.get("releaseId") || "0");
   const trackIdsParam = req.nextUrl.searchParams.get("trackIds");
   const format = req.nextUrl.searchParams.get("format") || "mp3";
+  const audioContentType = format === "wav" ? "audio/wav" : "audio/mpeg";
 
   const downloadToken = await prisma.downloadToken.findUnique({
     where: { token },
@@ -69,7 +81,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Invalid download link" }, { status: 404 });
   }
 
-  let trackFiles: { fileName: string; storageKey: string }[];
+  let trackFiles: ZipFile[];
   let zipName: string;
 
   if (trackIdsParam) {
@@ -95,6 +107,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       .map((t) => ({
         fileName: zipEntryPath(t.release.name, t.files[0].fileName),
         storageKey: t.files[0].storageKey,
+        contentType: audioContentType,
       }));
 
     zipName = `Party Pupils - Tracks (${format.toUpperCase()}).zip`;
@@ -122,19 +135,30 @@ export async function GET(req: NextRequest, context: RouteContext) {
       }),
     ]);
 
-    const releaseFiles = releases.flatMap((release) =>
-      release.tracks
+    // Each full release contributes its tracks, plus its cover art when present.
+    const releaseFiles = releases.flatMap((release) => {
+      const entries: ZipFile[] = release.tracks
         .filter((t) => t.files.length > 0)
         .map((track) => ({
           fileName: zipEntryPath(release.name, track.files[0].fileName),
           storageKey: track.files[0].storageKey,
-        })),
-    );
-    const aLaCarteFiles = aLaCarteTracks
+          contentType: audioContentType,
+        }));
+      if (entries.length > 0 && release.coverImageUrl) {
+        entries.push({
+          fileName: `${sanitizeSegment(release.name)}/${coverArtFilename(release.name)}`,
+          storageKey: release.coverImageUrl,
+          contentType: "image/jpeg",
+        });
+      }
+      return entries;
+    });
+    const aLaCarteFiles: ZipFile[] = aLaCarteTracks
       .filter((t) => t.files.length > 0)
       .map((t) => ({
         fileName: zipEntryPath(t.release.name, t.files[0].fileName),
         storageKey: t.files[0].storageKey,
+        contentType: audioContentType,
       }));
 
     trackFiles = [...releaseFiles, ...aLaCarteFiles];
@@ -169,7 +193,16 @@ export async function GET(req: NextRequest, context: RouteContext) {
       .map((track) => ({
         fileName: zipEntryPath(null, track.files[0].fileName),
         storageKey: track.files[0].storageKey,
+        contentType: audioContentType,
       }));
+    // Full-release download — include the cover art alongside the tracks.
+    if (trackFiles.length > 0 && release.coverImageUrl) {
+      trackFiles.push({
+        fileName: coverArtFilename(release.name),
+        storageKey: release.coverImageUrl,
+        contentType: "image/jpeg",
+      });
+    }
 
     zipName = `${release.name} (${format.toUpperCase()}).zip`;
   }
@@ -181,13 +214,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
     );
   }
 
-  const contentType = format === "wav" ? "audio/wav" : "audio/mpeg";
   const files = await Promise.all(
     trackFiles.map(async (t) => ({
       fileName: t.fileName,
       url: await getPresignedDownloadUrl(t.storageKey, {
         filename: t.fileName.split("/").pop() ?? t.fileName,
-        contentType,
+        contentType: t.contentType,
       }),
     })),
   );
