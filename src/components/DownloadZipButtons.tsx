@@ -6,9 +6,8 @@ import { cn } from "@/lib/utils";
 import { Loader2Icon } from "lucide-react";
 
 interface DownloadZipButtonsProps {
-  token: string;
-  releaseId?: number;
-  trackIds?: number[];
+  /** Manifest endpoint; the chosen `format` is appended as a query param. */
+  manifestEndpoint: string;
   availableFormats: string[];
   className?: string;
 }
@@ -29,7 +28,7 @@ type SwState = "registering" | "ready" | "unavailable";
  * Browsers without `navigator.serviceWorker` (or where registration fails)
  * see a fallback message; per-track downloads still work via PR 1's bypass.
  */
-export function DownloadZipButtons({ token, releaseId, trackIds, availableFormats, className }: DownloadZipButtonsProps) {
+export function DownloadZipButtons({ manifestEndpoint, availableFormats, className }: DownloadZipButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [swState, setSwState] = useState<SwState>("registering");
   const swRef = useRef<ServiceWorker | null>(null);
@@ -73,12 +72,9 @@ export function DownloadZipButtons({ token, releaseId, trackIds, availableFormat
     setLoading(format);
 
     try {
-      const query = releaseId
-        ? `releaseId=${releaseId}&format=${format}`
-        : trackIds
-          ? `trackIds=${trackIds.join(",")}&format=${format}`
-          : `format=${format}`;
-      const res = await fetch(`/download/${token}/zip?${query}`);
+      const manifestUrl = new URL(manifestEndpoint, window.location.origin);
+      manifestUrl.searchParams.set("format", format);
+      const res = await fetch(manifestUrl);
       if (!res.ok) throw new Error(`Manifest fetch failed: ${res.status}`);
       const manifest = (await res.json()) as Manifest;
 
