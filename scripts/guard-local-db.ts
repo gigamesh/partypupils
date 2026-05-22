@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "@dotenvx/dotenvx/config";
 
 const url = process.env.DATABASE_URL || "";
 

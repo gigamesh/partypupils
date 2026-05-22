@@ -9,7 +9,7 @@
  *
  * Refuses to run against any non-localhost connection.
  */
-import "dotenv/config";
+import "@dotenvx/dotenvx/config";
 import { spawnSync } from "child_process";
 
 const base = process.env.DATABASE_URL;

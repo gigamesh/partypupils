@@ -33,8 +33,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — only the encrypted .env and .env.prod are committed (via dotenvx).
+# .env.keys holds the decryption keys and must NEVER be committed.
 .env*
+!.env
+!.env.prod
 
 # audio/media files
 *.wav

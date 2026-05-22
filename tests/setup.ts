@@ -6,7 +6,7 @@
  *
  * This file therefore only handles per-test data isolation and module mocks.
  */
-import "dotenv/config";
+import "@dotenvx/dotenvx/config";
 import { afterAll, beforeAll, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/db";
 

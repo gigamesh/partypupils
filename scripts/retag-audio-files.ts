@@ -5,19 +5,19 @@
  * losslessly (audio copied bit-for-bit) and given the MP3's own ID3v2 tag.
  *
  * Dry-run (default) — lists the metadata that would be written, touches nothing:
- *   npx dotenv -e .env.prod -- npx tsx scripts/retag-audio-files.ts
+ *   npx dotenvx run -f .env.prod -- npx tsx scripts/retag-audio-files.ts
  *
  * Pilot one release first:
- *   npx dotenv -e .env.prod -- npx tsx scripts/retag-audio-files.ts --apply --release <slug>
+ *   npx dotenvx run -f .env.prod -- npx tsx scripts/retag-audio-files.ts --apply --release <slug>
  *
  * Or pilot a single track (by Track id, e.g. from the dry-run output):
- *   npx dotenv -e .env.prod -- npx tsx scripts/retag-audio-files.ts --apply --track <id>
+ *   npx dotenvx run -f .env.prod -- npx tsx scripts/retag-audio-files.ts --apply --track <id>
  *
  * Apply to everything:
- *   npx dotenv -e .env.prod -- npx tsx scripts/retag-audio-files.ts --apply
+ *   npx dotenvx run -f .env.prod -- npx tsx scripts/retag-audio-files.ts --apply
  *
  * Resume after an interrupted run — skip the N oldest (already-done) releases:
- *   npx dotenv -e .env.prod -- npx tsx scripts/retag-audio-files.ts --apply --skip <n>
+ *   npx dotenvx run -f .env.prod -- npx tsx scripts/retag-audio-files.ts --apply --skip <n>
  *
  * Idempotent and re-runnable. Reads the DB only; overwrites R2 objects in place.
  */

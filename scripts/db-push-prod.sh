@@ -23,7 +23,7 @@ echo
 # `process.env.DATABASE_URL` — so loading .env.prod makes it point at prod.
 # `--exit-code` returns: 0 = no changes, 2 = has changes, 1 = error.
 set +e
-DIFF=$(npx dotenv -e .env.prod -- npx prisma migrate diff \
+DIFF=$(npx dotenvx -q run -f .env.prod -- npx prisma migrate diff \
   --from-config-datasource \
   --to-schema prisma/schema.prisma \
   --script \
@@ -68,4 +68,4 @@ fi
 
 echo
 echo "→ Running prisma db push against prod..."
-npx dotenv -e .env.prod -- npx prisma db push
+npx dotenvx run -f .env.prod -- npx prisma db push
