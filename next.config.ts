@@ -5,6 +5,22 @@ const r2Hostname = process.env.R2_PUBLIC_URL
   : "localhost";
 
 const nextConfig: NextConfig = {
+  // @gigamusic/* packages are linked via `link:../gigamusic/packages/*` and
+  // some of them (notably `links` and `config`) ship raw TypeScript sources
+  // from their package "main". Listing them in `transpilePackages` tells
+  // Next.js (and Turbopack) to follow the symlinks and compile their `src/`.
+  transpilePackages: [
+    "@gigamusic/admin",
+    "@gigamusic/audio",
+    "@gigamusic/checkout",
+    "@gigamusic/config",
+    "@gigamusic/core",
+    "@gigamusic/db",
+    "@gigamusic/email",
+    "@gigamusic/links",
+    "@gigamusic/storage",
+    "@gigamusic/ui",
+  ],
   images: {
     remotePatterns: [
       {
