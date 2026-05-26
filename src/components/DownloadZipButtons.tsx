@@ -8,6 +8,15 @@ import { useEffect, useRef, useState } from "react";
 interface DownloadZipButtonsProps {
   /** Manifest endpoint; the chosen `format` is appended as a query param. */
   manifestEndpoint: string;
+  /**
+   * Server-side zip-streaming endpoint used as the fallback when the
+   * service worker isn't available. Direct navigation to this URL with
+   * `?format=...` triggers a download — slower than the SW path (audio
+   * proxies through Vercel) but works in private browsing and on browsers
+   * with broken SW support. Omit to keep the legacy "use per-track
+   * buttons" message instead.
+   */
+  streamEndpoint?: string;
   availableFormats: string[];
   className?: string;
 }
@@ -18,6 +27,30 @@ interface Manifest {
 }
 
 type SwState = "registering" | "ready" | "unavailable";
+
+/**
+ * Detect WebKit-based browsers (Safari desktop, iOS Safari, and every iOS
+ * browser — Chrome/Firefox/Edge on iOS are all forced to use WKWebView and
+ * inherit Apple's vendor string). WebKit aggressively terminates service
+ * workers mid-stream, producing truncated zips that won't unzip. We opt
+ * these browsers out of the SW path entirely when a streaming fallback is
+ * wired up.
+ *
+ * `navigator.vendor` is the most reliable signal — Chromium reports
+ * "Google Inc.", Firefox reports "". It's technically deprecated but Apple
+ * has shown no signs of removing it; UA matching covers stripped/spoofed
+ * vendor cases.
+ *
+ * Cost of a false positive (non-WebKit tagged as WebKit): slower download.
+ * Cost of a false negative (Safari user missed): same broken SW path as
+ * today. Asymmetric in the right direction.
+ */
+function isWebKitBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (navigator.vendor === "Apple Computer, Inc.") return true;
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || /^((?!chrome|android).)*safari/i.test(ua);
+}
 
 /**
  * Resolve a usable service worker at click time. `controller` is the source
@@ -59,15 +92,36 @@ async function getActiveServiceWorker(): Promise<ServiceWorker | null> {
  */
 export function DownloadZipButtons({
   manifestEndpoint,
+  streamEndpoint,
   availableFormats,
   className,
 }: DownloadZipButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [swState, setSwState] = useState<SwState>("registering");
   const swRef = useRef<ServiceWorker | null>(null);
+  // Tracks the active keepalive interval so we can clear it on unmount —
+  // a click that fires the interval but then leaves the page (back to the
+  // order list, route change) used to leak it for the full keepalive window.
+  const keepaliveRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (keepaliveRef.current !== null) {
+        window.clearInterval(keepaliveRef.current);
+        keepaliveRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+      setSwState("unavailable");
+      return;
+    }
+    // WebKit kills SWs mid-stream → truncated zips. When a server-side
+    // fallback is available, skip the SW path entirely for these browsers
+    // and let the unavailable-state render serve a direct streaming link.
+    if (streamEndpoint && isWebKitBrowser()) {
       setSwState("unavailable");
       return;
     }
@@ -104,7 +158,7 @@ export function DownloadZipButtons({
         onControllerChange,
       );
     };
-  }, []);
+  }, [streamEndpoint]);
 
   async function handleClick(format: string) {
     if (loading) return;
@@ -148,15 +202,20 @@ export function DownloadZipButtons({
         sw.postMessage({ type: "register-zip", id, manifest });
       });
 
-      // Keep the SW alive across slow first-byte on iOS Safari. Cleared on
-      // pagehide or after 60s — the download has either started streaming
-      // or failed by then.
+      // Keep the SW alive across slow first-byte and slow downloads (large
+      // orders on slow connections). Cleared on pagehide, on unmount via
+      // `keepaliveRef`, or after 10 min — by then the download has either
+      // started streaming or failed.
       const keepalive = window.setInterval(() => {
         sw.postMessage({ type: "keepalive" });
       }, 10_000);
-      const stopKeepalive = () => window.clearInterval(keepalive);
+      keepaliveRef.current = keepalive;
+      const stopKeepalive = () => {
+        window.clearInterval(keepalive);
+        if (keepaliveRef.current === keepalive) keepaliveRef.current = null;
+      };
       window.addEventListener("pagehide", stopKeepalive, { once: true });
-      window.setTimeout(stopKeepalive, 60_000);
+      window.setTimeout(stopKeepalive, 600_000);
 
       window.location.href = `/sw-zip/${id}/${encodeURIComponent(manifest.zipName)}`;
     } catch (err) {
@@ -171,11 +230,45 @@ export function DownloadZipButtons({
   }
 
   if (swState === "unavailable") {
+    if (!streamEndpoint) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          Bulk download requires a modern browser. Use the per-track download
+          buttons above.
+        </p>
+      );
+    }
+    // Server-side fallback: hard navigation triggers the download via
+    // Content-Disposition. Matches the per-track DownloadButtons pattern
+    // (Next Link with `download` + `prefetch={false}`) so the browser
+    // doesn't try to SPA-navigate to an attachment response.
     return (
-      <p className="text-xs text-muted-foreground">
-        Bulk download requires a modern browser. Use the per-track download
-        buttons above.
-      </p>
+      <div className={cn("flex gap-2", className)}>
+        {availableFormats.map((format) => {
+          const href = `${streamEndpoint}?format=${encodeURIComponent(format)}`;
+          return (
+            <Button
+              key={format}
+              href={href}
+              download
+              prefetch={false}
+              size="sm"
+              onClick={() => {
+                setLoading(format);
+                window.setTimeout(() => setLoading(null), 3000);
+              }}
+            >
+              {loading === format ? (
+                <>
+                  <Loader2Icon className="h-4 w-4 animate-spin" /> Zipping
+                </>
+              ) : (
+                `${format.toUpperCase()} ZIP`
+              )}
+            </Button>
+          );
+        })}
+      </div>
     );
   }
 

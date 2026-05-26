@@ -91,6 +91,7 @@ export function OrderDownloads({
           </span>
           <DownloadZipButtons
             manifestEndpoint={`/download/${token}/zip`}
+            streamEndpoint={`/download/${token}/zip-stream`}
             availableFormats={formats}
             className={trackButtonClass}
           />
