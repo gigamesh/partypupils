@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Loader2Icon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface DownloadZipButtonsProps {
   /** Manifest endpoint; the chosen `format` is appended as a query param. */
@@ -20,6 +20,28 @@ interface Manifest {
 type SwState = "registering" | "ready" | "unavailable";
 
 /**
+ * Resolve a usable service worker at click time. `controller` is the source
+ * of truth — it's non-null if a SW is actively controlling this page and
+ * will intercept its navigations. `registration.active` is a best-effort
+ * fallback for the first-activation race where `clients.claim()` hasn't
+ * propagated yet.
+ */
+async function getActiveServiceWorker(): Promise<ServiceWorker | null> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return null;
+  }
+  if (navigator.serviceWorker.controller) {
+    return navigator.serviceWorker.controller;
+  }
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    return reg?.active ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Bulk download via Service Worker + `client-zip`. The button fetches a
  * manifest of presigned R2 URLs, hands it to the SW, then navigates the
  * browser to a SW-intercepted URL that streams the zip directly from R2 —
@@ -27,8 +49,19 @@ type SwState = "registering" | "ready" | "unavailable";
  *
  * Browsers without `navigator.serviceWorker` (or where registration fails)
  * see a fallback message; per-track downloads still work via PR 1's bypass.
+ *
+ * Click-time recheck: cached `swState` lies when the SW was evicted or
+ * unregistered after mount (long-lived tabs, private browsing, browser
+ * cleanup). We re-resolve the worker on every click and flip to the
+ * unavailable fallback if it's gone — otherwise the navigation would hit
+ * the `/sw-zip/[...path]` route and the customer would save a styled HTML
+ * error page under a `.zip` filename.
  */
-export function DownloadZipButtons({ manifestEndpoint, availableFormats, className }: DownloadZipButtonsProps) {
+export function DownloadZipButtons({
+  manifestEndpoint,
+  availableFormats,
+  className,
+}: DownloadZipButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [swState, setSwState] = useState<SwState>("registering");
   const swRef = useRef<ServiceWorker | null>(null);
@@ -59,17 +92,34 @@ export function DownloadZipButtons({ manifestEndpoint, availableFormats, classNa
       swRef.current = navigator.serviceWorker.controller;
       if (swRef.current) setSwState("ready");
     };
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      onControllerChange,
+    );
 
     return () => {
       cancelled = true;
-      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        onControllerChange,
+      );
     };
   }, []);
 
   async function handleClick(format: string) {
-    if (loading || swState !== "ready" || !swRef.current) return;
+    if (loading) return;
     setLoading(format);
+
+    // Re-resolve the SW now — the cached ref can be stale (see component doc).
+    // If it's gone, surface the same fallback message as a never-registered
+    // browser instead of letting the navigation download an HTML error page.
+    const sw = await getActiveServiceWorker();
+    if (!sw) {
+      setSwState("unavailable");
+      setLoading(null);
+      return;
+    }
+    swRef.current = sw;
 
     try {
       const manifestUrl = new URL(manifestEndpoint, window.location.origin);
@@ -79,12 +129,14 @@ export function DownloadZipButtons({ manifestEndpoint, availableFormats, classNa
       const manifest = (await res.json()) as Manifest;
 
       const id = crypto.randomUUID();
-      const sw = swRef.current;
       // Wait for the SW to ack before navigating — closes the iOS Safari
       // race where the navigation reaches the fetch handler before the
       // message has been processed.
       await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("SW ack timeout")), 5000);
+        const timeout = setTimeout(
+          () => reject(new Error("SW ack timeout")),
+          5000,
+        );
         const onMessage = (event: MessageEvent) => {
           if (event.data?.type === "ack" && event.data.id === id) {
             clearTimeout(timeout);
@@ -121,7 +173,8 @@ export function DownloadZipButtons({ manifestEndpoint, availableFormats, classNa
   if (swState === "unavailable") {
     return (
       <p className="text-xs text-muted-foreground">
-        Bulk download requires a modern browser. Use the per-track download buttons above.
+        Bulk download requires a modern browser. Use the per-track download
+        buttons above.
       </p>
     );
   }
@@ -137,7 +190,9 @@ export function DownloadZipButtons({ manifestEndpoint, availableFormats, classNa
           disabled={loading !== null || swState !== "ready"}
         >
           {loading === format ? (
-            <><Loader2Icon className="h-4 w-4 animate-spin" /> Zipping</>
+            <>
+              <Loader2Icon className="h-4 w-4 animate-spin" /> Zipping
+            </>
           ) : (
             `${format.toUpperCase()} ZIP`
           )}
