@@ -20,6 +20,36 @@ importers:
       '@base-ui/react':
         specifier: ^1.3.0
         version: 1.3.0(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/admin':
+        specifier: link:../gigamusic/packages/admin
+        version: link:../gigamusic/packages/admin
+      '@gigamusic/audio':
+        specifier: link:../gigamusic/packages/audio
+        version: link:../gigamusic/packages/audio
+      '@gigamusic/checkout':
+        specifier: link:../gigamusic/packages/checkout
+        version: link:../gigamusic/packages/checkout
+      '@gigamusic/config':
+        specifier: link:../gigamusic/packages/config
+        version: link:../gigamusic/packages/config
+      '@gigamusic/core':
+        specifier: link:../gigamusic/packages/core
+        version: link:../gigamusic/packages/core
+      '@gigamusic/db':
+        specifier: link:../gigamusic/packages/db
+        version: link:../gigamusic/packages/db
+      '@gigamusic/email':
+        specifier: link:../gigamusic/packages/email
+        version: link:../gigamusic/packages/email
+      '@gigamusic/links':
+        specifier: link:../gigamusic/packages/links
+        version: link:../gigamusic/packages/links
+      '@gigamusic/storage':
+        specifier: link:../gigamusic/packages/storage
+        version: link:../gigamusic/packages/storage
+      '@gigamusic/ui':
+        specifier: link:../gigamusic/packages/ui
+        version: link:../gigamusic/packages/ui
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0

@@ -112,7 +112,12 @@ export async function POST(req: NextRequest) {
         try {
           const verifyToken = await createOrderVerificationToken(email);
           const verifyUrl = `${env.NEXT_PUBLIC_BASE_URL()}/orders/verify?token=${verifyToken}`;
-          await sendPurchaseConfirmationEmail(email, verifyUrl, itemNames);
+          await sendPurchaseConfirmationEmail(
+            email,
+            verifyUrl,
+            itemNames,
+            session.amount_total ?? 0,
+          );
         } catch (err) {
           console.error(
             `[stripe-webhook] failed to send purchase confirmation to ${email} for session ${session.id}:`,
