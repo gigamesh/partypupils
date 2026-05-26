@@ -1,4 +1,7 @@
-import { SignJWT, jwtVerify } from "jose";
+import {
+  createAdminSessionToken,
+  verifyAdminSessionToken,
+} from "@gigamusic/core";
 import { cookies } from "next/headers";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { env } from "./env";
@@ -7,14 +10,11 @@ const COOKIE_NAME = "admin_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 24;
 const REFRESH_WHEN_REMAINING_SECONDS = 60 * 60 * 12;
 
-const secret = () => new TextEncoder().encode(env.ADMIN_SECRET());
-
-async function signSession() {
-  return new SignJWT({})
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
-    .sign(secret());
+function signSession() {
+  return createAdminSessionToken({
+    secret: env.ADMIN_SECRET(),
+    expiresIn: `${SESSION_DURATION_SECONDS}s`,
+  });
 }
 
 function writeSessionCookie(jar: ReadonlyRequestCookies, token: string) {
@@ -43,14 +43,26 @@ export async function verifyAdminSession(): Promise<boolean> {
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return false;
   try {
-    const { payload } = await jwtVerify(token, secret());
-    const exp = payload.exp ?? 0;
-    const remaining = exp - Math.floor(Date.now() / 1000);
-    if (remaining < REFRESH_WHEN_REMAINING_SECONDS) {
+    await verifyAdminSessionToken(token, env.ADMIN_SECRET());
+    // Decode unverified to read exp for sliding-window refresh; verify already
+    // confirmed the signature and expiry.
+    const [, payloadB64] = token.split(".");
+    if (payloadB64) {
       try {
-        writeSessionCookie(jar, await signSession());
+        const payload = JSON.parse(
+          Buffer.from(payloadB64, "base64url").toString("utf8"),
+        ) as { exp?: number };
+        const exp = payload.exp ?? 0;
+        const remaining = exp - Math.floor(Date.now() / 1000);
+        if (remaining < REFRESH_WHEN_REMAINING_SECONDS) {
+          try {
+            writeSessionCookie(jar, await signSession());
+          } catch {
+            // cookies() is readonly in Server Component renders — skip refresh.
+          }
+        }
       } catch {
-        // cookies() is readonly in Server Component renders — skip the refresh.
+        // unreadable payload — skip refresh, the verify above already passed.
       }
     }
     return true;
