@@ -32,6 +32,5 @@ const handler = createStripeWebhookHandler({
  * env-reading boundary.
  */
 export async function POST(req: NextRequest) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return handler(req as any);
+  return handler(req);
 }

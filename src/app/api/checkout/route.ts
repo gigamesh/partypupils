@@ -41,6 +41,5 @@ export async function POST(req: NextRequest) {
   if (!isAllowedRequestOrigin(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return handler(req as any);
+  return handler(req);
 }
