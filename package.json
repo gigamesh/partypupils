@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "dotenvx run -- concurrently -n db,stripe,next -c blue,magenta,green \"prisma dev\" \"./scripts/stripe-listen.sh\" \"sleep 3 && tsx scripts/guard-local-db.ts && prisma db push --accept-data-loss && next dev\"",
-    "dev:prod": "dotenvx run -f .env.prod -- next dev",
-    "build": "node scripts/strip-env-on-vercel.mjs && node scripts/prepare-ffmpeg.mjs && next build",
+    "dev": "dotenvx run -- concurrently -n db,stripe,next -c blue,magenta,green \"prisma dev\" \"./scripts/stripe-listen.sh\" \"sleep 3 && tsx scripts/guard-local-db.ts && prisma db push --accept-data-loss && next dev --webpack\"",
+    "dev:prod": "dotenvx run -f .env.prod -- next dev --webpack",
+    "build": "node scripts/strip-env-on-vercel.mjs && node scripts/prepare-ffmpeg.mjs && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
