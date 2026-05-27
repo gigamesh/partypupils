@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import archiver from "archiver";
 import { resolveCustomerZip } from "@/lib/release-zip";
@@ -67,15 +67,46 @@ export async function GET(req: NextRequest, context: RouteContext) {
         // DOM `ReadableStream` and Node's web `ReadableStream` are
         // runtime-compatible but typed separately — cast at the boundary.
         const body = Readable.fromWeb(res.body as unknown as NodeReadableStream<Uint8Array>);
-        // When the client disconnects mid-download, undici aborts the
-        // in-flight fetch and emits `TypeError: terminated` on the body
-        // stream. Swallow it — archiver is already being torn down by
-        // the abort listener above.
-        body.on("error", (err) => {
-          if (req.signal.aborted) return;
-          console.warn(`[zip-stream] body stream error for ${file.fileName}:`, err);
+        // Pass-through counter so we know how far the upstream R2 stream
+        // got before failing. Useful for distinguishing "R2 never started"
+        // from "R2 dropped us halfway through a large file."
+        let bytesReceived = 0;
+        const counter = new Transform({
+          transform(chunk: Buffer, _enc, cb) {
+            bytesReceived += chunk.length;
+            cb(null, chunk);
+          },
         });
-        archive.append(body, { name: file.fileName });
+        const baseName = file.fileName.split("/").pop() || file.fileName;
+        body.on("error", (err) => {
+          // Tear the counter down so archiver stops waiting on it.
+          counter.destroy(err);
+          if (req.signal.aborted) return;
+          // Client is still connected, so this is an upstream failure
+          // (R2 dropped the socket, network blip, etc.). Log full context
+          // and try to leave a _FAILED_ marker in the zip — archiver may
+          // refuse further appends if the entry is partially written, but
+          // best-effort is better than nothing.
+          const detail = err instanceof Error ? err.message : String(err);
+          console.error(
+            `[zip-stream] body stream error for ${file.fileName} ` +
+              `(storageKey=${file.storageKey}, bytesReceived=${bytesReceived}): ${detail}`,
+          );
+          try {
+            archive.append(
+              `Streaming "${file.fileName}" from R2 failed after ${bytesReceived} bytes: ${detail}.\n` +
+                `Try downloading the track individually from your order page.\n`,
+              { name: `_FAILED_${baseName}.txt` },
+            );
+          } catch (appendErr) {
+            console.warn(
+              `[zip-stream] could not append failure placeholder for ${file.fileName}:`,
+              appendErr,
+            );
+          }
+        });
+        body.pipe(counter);
+        archive.append(counter, { name: file.fileName });
       } catch (err) {
         if (req.signal.aborted) return;
         const detail = err instanceof Error ? err.message : String(err);
