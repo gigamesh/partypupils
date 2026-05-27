@@ -36,6 +36,14 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
   - **WAV retag in place.** After transcoding, the package tags the source WAV with the supplied metadata and re-uploads it under the same key. The bucket's `.wav` object now carries ID3 tags. TPE2/`album_artist` is stripped by `@gigamusic/audio`'s type-level guarantee — safe per AGENTS.md.
   - **Response shape gains `wavUrl` + `wavFileSize` + `mp3FileSize`.** The upload form only reads `mp3Url`, so existing consumers ignore the extras.
   - **Optional `trackId` in the body triggers `queries.upsertTrackFile`.** Party-pupils' form doesn't pass one today (the release POST/PUT persists track files), so this code path stays dark — wired for forward compat only.
+- **Auth is now consumer-owned (gigamusic 0.2.0).** `@gigamusic/admin` and `@gigamusic/links/server` no longer ship admin auth — the handler factories trust that the request reached them. Party-pupils now owns the whole login + session flow locally:
+  - `src/lib/admin-auth.ts` — full impl: bcrypt-verify, `signSessionToken({ payload: { admin: true } })`, `verifySessionToken`, cookie writer + clearer + stateless verifier (for `proxy.ts`). Uses the renamed `@gigamusic/core.{hashPassword,verifyPassword,signSessionToken,verifySessionToken}` helpers.
+  - `src/proxy.ts` — Next 16 middleware. Gates `/admin/**` and `/api/admin/**` with one auth check at the boundary. `/api/admin/auth` is the only exempt path (login on-ramp).
+  - `src/app/api/admin/auth/route.ts` — restored as a local 50-line POST handler. Rate-limit via `@/lib/rate-limit.consumeRateLimit` (10/15min per IP), bcrypt verify via `verifyPassword`, cookie write via `createAdminSession()`.
+  - Every `createAdmin*Handler({...})` call drops `adminSessionSecret`. The factories now take `Pick<AdminDeps, ...>` slices of only what they need.
+  - `tests/setup.ts` dropped the global `next/headers` cookies mock (handlers don't call `cookies()` anymore) and updated the `@/lib/admin-auth` mock to cover the broader surface.
+  - `tests/api/admin/link-pages.test.ts` dropped the `admin_session` cookie attachment + the "401 when not authenticated" test (auth is upstream; tested via the login route + the proxy).
+  - `tests/api/admin/auth.test.ts` opts out of the global `@/lib/admin-auth` mock with `vi.unmock` so it can exercise the real login path end-to-end.
 
 ### Infra
 
