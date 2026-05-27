@@ -62,11 +62,9 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 
 ## Open follow-ups
 
-1. **Vercel env**: run `vercel env add ADMIN_PASSWORD_HASH` for production + preview using the `.env.prod`-derived hash.
-2. **Drop plaintext `ADMIN_PASSWORD`** once the new auth path is confirmed live in production — `vercel env rm ADMIN_PASSWORD` + remove from `.env` / `.env.prod`.
-3. **`runRetag` MP3 retag** — add an opt-in `formats: ("wav" | "mp3")[]` parameter (default `["wav"]`) to `@gigamusic/audio.runRetag` so maintenance flows can re-tag already-uploaded MP3s without re-uploading the WAV.
-4. **Webhook published-only resolution (doc-only)** — `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — checkout-side filtering already prevents unpublished items from reaching this path, but a JSDoc note on the handler would prevent surprises if an unpublished item ever lands via a direct Stripe API call.
-5. **Turbopack `link:` resolution** — `npx next build` (Turbopack default in Next 16) still fails to resolve `@gigamusic/*` `link:` symlinks; `--webpack` is the workaround. Resolve by publishing `@gigamusic/*` and switching to a version range, or stay on `--webpack` indefinitely.
+1. **`runRetag` MP3 retag** — add an opt-in `formats: ("wav" | "mp3")[]` parameter (default `["wav"]`) to `@gigamusic/audio.runRetag` so maintenance flows can re-tag already-uploaded MP3s without re-uploading the WAV.
+2. **Webhook published-only resolution (doc-only)** — `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — checkout-side filtering already prevents unpublished items from reaching this path, but a JSDoc note on the handler would prevent surprises if an unpublished item ever lands via a direct Stripe API call.
+3. **Turbopack `link:` resolution** — `npx next build` (Turbopack default in Next 16) still fails to resolve `@gigamusic/*` `link:` symlinks; `--webpack` is the workaround. Resolve by publishing `@gigamusic/*` and switching to a version range, or stay on `--webpack` indefinitely.
 
 ## Build state
 
