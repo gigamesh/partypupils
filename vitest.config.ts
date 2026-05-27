@@ -26,6 +26,11 @@ export default defineConfig({
     // Force a single copy of next/react so vi.mock("next/server") and friends
     // apply across both this app and inlined @gigamusic/* packages.
     dedupe: ["next", "react", "react-dom", "stripe"],
+    // Pick the `source` export condition first so vitest resolves linked
+    // @gigamusic/* packages to their src/index.ts (and gets type-aligned
+    // navigation as a bonus). Falls through to `import`/`default` for any
+    // package without a `source` condition.
+    conditions: ["source", "import", "module", "browser", "default"],
   },
   oxc: {
     jsx: {
