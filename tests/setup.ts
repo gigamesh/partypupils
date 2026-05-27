@@ -86,6 +86,34 @@ vi.mock("next/server", async () => {
   };
 });
 
+// `next/headers.cookies()` also needs a Next request scope. The gigamusic
+// admin handlers (`createAdminUploadProcessHandler`, etc.) verify the
+// session by calling `cookies().get("admin_session")`, so without a stub
+// they throw "cookies was called outside a request scope" before any test
+// assertion runs. Stub it with a synthetic jar that returns a freshly
+// signed admin session token — `isAdminAuthenticated(secret)` then verifies
+// against the same ADMIN_SECRET the route reads.
+const { adminSessionToken } = vi.hoisted(() => ({
+  adminSessionToken: { current: "" as string },
+}));
+vi.mock("next/headers", async () => {
+  const { createAdminSessionToken } = await import("@gigamusic/core");
+  adminSessionToken.current = await createAdminSessionToken({
+    secret: process.env.ADMIN_SECRET ?? "",
+  });
+  return {
+    cookies: async () => ({
+      get(name: string) {
+        if (name === "admin_session") {
+          return { name, value: adminSessionToken.current };
+        }
+        return undefined;
+      },
+      set: () => {},
+    }),
+  };
+});
+
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
 // `storageProvider` returns a `StorageProvider`-shaped object so the gigamusic
 // route factories that take the provider directly (download, zip, zip-stream)

@@ -18,11 +18,16 @@ import { readFile, writeFile, unlink } from "node:fs/promises";
 import ffmpegStatic from "ffmpeg-static";
 import { POST as processUpload } from "@/app/api/admin/upload/process/route";
 import { convertWavStreamToMp3 } from "@/lib/preview";
-import { getFileStream, uploadStream } from "@/lib/storage";
+import { getFileBuffer, uploadBuffer, uploadStream } from "@/lib/storage";
 
 beforeEach(() => {
-  vi.mocked(getFileStream).mockReset();
+  vi.mocked(getFileBuffer).mockReset();
+  vi.mocked(uploadBuffer).mockReset();
   vi.mocked(uploadStream).mockReset();
+  vi.mocked(uploadBuffer).mockResolvedValue({
+    url: "https://r2/stub",
+    storageKey: "https://r2/stub",
+  });
 });
 
 function jsonRequest(body: unknown): NextRequest {
@@ -175,11 +180,10 @@ describe("POST /api/admin/upload/process", () => {
     expect(res2.status).toBe(400);
   });
 
-  it("streams source → transcode → upload and returns the mp3 URL", async () => {
+  it("fetches the WAV, transcodes, and uploads the MP3 — returns its URL", async () => {
     const wav = generateSilentWav();
-    vi.mocked(getFileStream).mockImplementation(async () => Readable.from(wav));
+    vi.mocked(getFileBuffer).mockResolvedValue(wav);
     vi.mocked(uploadStream).mockImplementation(async (stream, pathname) => {
-      // Drain the stream to mimic a real upload finishing.
       await streamToBuffer(stream);
       return { url: `https://r2/${pathname}`, storageKey: `https://r2/${pathname}` };
     });
@@ -194,12 +198,15 @@ describe("POST /api/admin/upload/process", () => {
     const data = await res.json();
     expect(data.mp3Url).toBe("https://r2/audio/album/1/track.mp3");
 
-    expect(vi.mocked(getFileStream)).toHaveBeenCalledTimes(1);
+    // The factory pulls the WAV down once (via getFileBuffer), re-uploads
+    // the tagged WAV in place (uploadBuffer), then streams the MP3 up.
+    expect(vi.mocked(getFileBuffer)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(uploadBuffer)).toHaveBeenCalled();
     expect(vi.mocked(uploadStream)).toHaveBeenCalledTimes(1);
   });
 
-  it("500s when the transcode fails and surfaces the error", async () => {
-    vi.mocked(getFileStream).mockRejectedValue(new Error("R2 unreachable"));
+  it("500s when storage is unreachable and surfaces the error", async () => {
+    vi.mocked(getFileBuffer).mockRejectedValue(new Error("R2 unreachable"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const res = await processUpload(jsonRequest({ key: "audio/x/1/t.wav" }));
