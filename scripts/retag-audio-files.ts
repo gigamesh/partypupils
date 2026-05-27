@@ -92,8 +92,8 @@ async function main() {
       const wavFile = track.files.find((f) => f.format === "wav");
       const mp3File = track.files.find((f) => f.format === "mp3");
       allTracks.push({
-        id: String(track.id),
-        releaseId: String(release.id),
+        id: track.id,
+        releaseId: release.id,
         // `runRetag` derives display artist/title internally via
         // `deriveTrackArtistTitle(name, artist)` — same helper this repo used.
         name: track.name,
