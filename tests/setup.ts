@@ -25,19 +25,40 @@ vi.mock("@/lib/admin-auth", () => ({
 
 // Stub external services. Stripe stub is a singleton so vi.mocked(stripe().X) and the
 // route handler's stripe().X reference the same fn — otherwise the handler sees a fresh
-// vi.fn() while tests configure a different one.
-const stripeStub = {
-  checkout: { sessions: { create: vi.fn() } },
-  webhooks: { constructEvent: vi.fn() },
-};
+// vi.fn() while tests configure a different one. The same stub also backs
+// `new Stripe()` calls made by the gigamusic checkout handler.
+const { stripeStub, emailSendStub } = vi.hoisted(() => ({
+  stripeStub: {
+    checkout: { sessions: { create: vi.fn() } },
+    webhooks: { constructEvent: vi.fn() },
+  },
+  // Shared `send` mock backing `emailProvider().send(...)`. Tests can grab it
+  // via the exported `emailProvider` mock to assert call counts / mockRejected.
+  emailSendStub: vi.fn(async () => {}),
+}));
+export { emailSendStub };
 vi.mock("@/lib/stripe", () => ({
   stripe: () => stripeStub,
+}));
+vi.mock("stripe", () => ({
+  default: class StripeMock {
+    checkout = stripeStub.checkout;
+    webhooks = stripeStub.webhooks;
+  },
 }));
 
 vi.mock("@/lib/email", () => ({
   sendPurchaseConfirmationEmail: vi.fn(async () => {}),
+  sendOrderLookupEmail: vi.fn(async () => {}),
   sendOrderLinkEmail: vi.fn(async () => {}),
   sendContactEmail: vi.fn(async () => {}),
+  emailProvider: vi.fn(() => ({
+    send: emailSendStub,
+  })),
+  EMAIL_BRANDING: { siteName: "Test", themeColor: "#000000" },
+  orderLookupEmailHtml: vi.fn(() => "<html></html>"),
+  purchaseConfirmationEmailHtml: vi.fn(() => "<html></html>"),
+  contactEmailHtml: vi.fn(() => "<html></html>"),
 }));
 
 // next/cache primitives need a Next.js render store at runtime; in vitest there isn't one.
@@ -89,6 +110,8 @@ beforeEach(async () => {
   // Reset all stripeStub mocks between tests so prior calls don't leak.
   stripeStub.checkout.sessions.create.mockReset();
   stripeStub.webhooks.constructEvent.mockReset();
+  emailSendStub.mockReset();
+  emailSendStub.mockResolvedValue(undefined);
 
   // Wipe between tests. deleteMany via the Prisma client (rather than raw TRUNCATE) avoids
   // an issue where Prisma misparses parameter placeholders in raw SQL with quoted identifiers.
