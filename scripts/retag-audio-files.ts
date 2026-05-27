@@ -1,10 +1,11 @@
 /**
- * One-off maintenance: rewrite every production track's stored WAV so its
- * embedded metadata + cover art match the database. Delegates to
- * `@gigamusic/audio.runRetag`, which copies the PCM audio bit-for-bit, applies
- * RIFF INFO + ID3v2 tags (no `album_artist`), and re-uploads via the storage
- * provider. MP3 retag is intentionally out of scope at the package level —
- * gigamusic re-encodes from the freshly tagged WAV on the admin upload path.
+ * One-off maintenance: rewrite every production track's stored WAV (and the
+ * sibling MP3 in place, if one is on record) so the embedded metadata +
+ * cover art match the database. Delegates to `@gigamusic/audio.runRetag`,
+ * which copies the WAV's PCM audio bit-for-bit, applies RIFF INFO + ID3v2
+ * tags (no `album_artist`), and re-uploads via the storage provider. MP3s
+ * are retagged by rewriting the existing bytes' ID3 frames + APIC — no
+ * re-encode, so the audio data stays unchanged.
  *
  * Dry-run (default) — lists the metadata that would be written, touches nothing:
  *   npx dotenvx run -f .env.prod -- npx tsx scripts/retag-audio-files.ts

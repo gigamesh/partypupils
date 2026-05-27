@@ -19,7 +19,7 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 - `33ef5e3` `src/lib/link-pages.ts` → `@gigamusic/links.createLinkPageQueries`. `LinkPageWithItems` shape (`release.{coverImageUrl,isPublished}`, `items`) matches party-pupils' consumer at `src/app/links/[slug]/page.tsx` 1:1.
 - `13df7ce` `src/lib/catalog.ts` → `@gigamusic/core.applyCatalogDiscount` + `sumLineItems` and `queries.getSetting` for the discount percent. `prisma.release.findMany({ select: { id, price } })` stays direct — routing through `listPublishedReleases` would fetch tracks + files on every homepage render.
 - `d159283` `src/lib/preview.ts` → `@gigamusic/audio.transcodeWavToMp3`. (Later deleted entirely once the route swap left no production consumers.)
-- `701950c` `scripts/retag-audio-files.ts` → `@gigamusic/audio.runRetag`. Flattens the Prisma graph into `RetagTrack[]`, preserves the existing CLI surface (`--apply / --release / --track / --skip`). `src/lib/wav-tags.ts` deleted (no callers); the legacy `ffmpegBinary` / `metadataArgs` exports were removed from `preview.ts` in the same commit.
+- `701950c` `scripts/retag-audio-files.ts` → `@gigamusic/audio.runRetag`. Flattens the Prisma graph into `RetagTrack[]`, preserves the existing CLI surface (`--apply / --release / --track / --skip`). `src/lib/wav-tags.ts` deleted (no callers); the legacy `ffmpegBinary` / `metadataArgs` exports were removed from `preview.ts` in the same commit. `runRetag` rewrites WAV + (in-place) MP3 ID3 frames per track — no re-encode on the MP3 side.
 
 ### Route swaps
 
@@ -58,13 +58,11 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 - **Admin settings** — party-pupils' settings route carries a FAQ-JSON validator. FAQ is deliberately out of scope for `@gigamusic/admin`, so the settings route stays local.
 - **Admin releases (POST + PUT/PATCH/DELETE)** — `@gigamusic/admin/server.createAdminReleaseByIdHandlers` exposes a scalar-only PUT and no PATCH. Party-pupils' PUT uses `syncReleaseAndTracks` (incremental track diff) and PATCH gates `isPublished` flips with `validatePublishedRelease`. The track-sync code is mature; lifting it into the package would change a lot of edges without clear upside.
 - **Admin orders** — party-pupils' admin orders page is a server component that reads directly with date + pagination filters, not a REST handler. `createAdminOrdersHandler`'s `?email=…` shape doesn't match.
-- **`runRetag` MP3 retag dropped** — `@gigamusic/audio.runRetag` only handles WAV. Party-pupils' previous script also re-tagged MP3s in place. (See Open follow-up #3 below.)
 
 ## Open follow-ups
 
-1. **`runRetag` MP3 retag** — add an opt-in `formats: ("wav" | "mp3")[]` parameter (default `["wav"]`) to `@gigamusic/audio.runRetag` so maintenance flows can re-tag already-uploaded MP3s without re-uploading the WAV.
-2. **Webhook published-only resolution (doc-only)** — `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — checkout-side filtering already prevents unpublished items from reaching this path, but a JSDoc note on the handler would prevent surprises if an unpublished item ever lands via a direct Stripe API call.
-3. **Turbopack `link:` resolution** — `npx next build` (Turbopack default in Next 16) still fails to resolve `@gigamusic/*` `link:` symlinks; `--webpack` is the workaround. Resolve by publishing `@gigamusic/*` and switching to a version range, or stay on `--webpack` indefinitely.
+1. **Webhook published-only resolution (doc-only)** — `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — checkout-side filtering already prevents unpublished items from reaching this path, but a JSDoc note on the handler would prevent surprises if an unpublished item ever lands via a direct Stripe API call.
+2. **Turbopack `link:` resolution** — `npx next build` (Turbopack default in Next 16) still fails to resolve `@gigamusic/*` `link:` symlinks; `--webpack` is the workaround. Resolve by publishing `@gigamusic/*` and switching to a version range, or stay on `--webpack` indefinitely.
 
 ## Build state
 
