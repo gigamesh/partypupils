@@ -1,54 +1,11 @@
 import { Readable } from "stream";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { existsSync, createWriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
-import ffmpegStatic from "ffmpeg-static";
 import { transcodeWavToMp3, type AudioTags } from "@gigamusic/audio";
-
-/**
- * Legacy ffmpeg-binary resolver — used by `src/lib/wav-tags.ts`, which is
- * being deleted in a follow-up commit. Kept here only to avoid breaking the
- * intermediate build state.
- */
-export function ffmpegBinary(): string {
-  if (process.env.NODE_ENV === "production") {
-    const bundled = resolve(process.cwd(), "bin", "ffmpeg");
-    if (existsSync(bundled)) return bundled;
-  }
-  if (!ffmpegStatic) {
-    throw new Error(
-      `ffmpeg-static has no prebuilt binary for ${process.platform}/${process.arch}`,
-    );
-  }
-  return ffmpegStatic;
-}
-
-/**
- * Legacy ffmpeg `-metadata k=v` flag builder — used by `src/lib/wav-tags.ts`,
- * which is being deleted in a follow-up commit. Project invariant (no
- * `album_artist` / TPE2) is preserved by virtue of the type's absence of the
- * field.
- */
-export function metadataArgs(meta?: Mp3Metadata): string[] {
-  if (!meta) return [];
-  const pairs: Array<[string, string]> = [];
-  if (meta.title) pairs.push(["title", meta.title]);
-  if (meta.artist) pairs.push(["artist", meta.artist]);
-  if (meta.album) pairs.push(["album", meta.album]);
-  if (meta.genre) pairs.push(["genre", meta.genre]);
-  if (meta.trackNumber != null) {
-    const value =
-      meta.trackTotal != null
-        ? `${meta.trackNumber}/${meta.trackTotal}`
-        : String(meta.trackNumber);
-    pairs.push(["track", value]);
-  }
-  if (meta.year != null) pairs.push(["date", String(meta.year)]);
-  return pairs.flatMap(([k, v]) => ["-metadata", `${k}=${v}`]);
-}
 
 /**
  * Party-pupils-shaped MP3 metadata. Kept as a separate alias rather than
