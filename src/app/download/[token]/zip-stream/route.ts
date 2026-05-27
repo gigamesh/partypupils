@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Readable, Transform } from "node:stream";
+import { finished } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import archiver from "archiver";
 import { resolveCustomerZip } from "@/lib/release-zip";
@@ -50,16 +51,21 @@ export async function GET(req: NextRequest, context: RouteContext) {
   // Abort the pipeline if the client disconnects mid-download.
   req.signal.addEventListener("abort", () => archive.abort());
 
-  // Pump R2 fetches into the archive. Each fetch starts as soon as the
-  // previous one's response headers arrive — bodies stream concurrently
-  // and archiver consumes them in append order. Good throughput without
-  // holding the entire archive in memory.
+  // Serialise R2 fetches: only open file N's R2 socket after archiver has
+  // fully consumed file N-1. The naive parallel approach (open every
+  // socket up front, let archiver drain them in order) leaves the later
+  // sockets idle behind backpressure long enough for R2 to time them out,
+  // surfacing as `TypeError: terminated` mid-stream. A serial pipeline
+  // costs one R2 TTFB per file transition — small compared to the
+  // per-file streaming time — and the archiver was the serial bottleneck
+  // anyway, so end-to-end throughput is unchanged.
   (async () => {
     for (const file of result.files) {
       if (req.signal.aborted) return;
+      const baseName = file.fileName.split("/").pop() || file.fileName;
       try {
         const url = await getPresignedDownloadUrl(file.storageKey, {
-          filename: file.fileName.split("/").pop() ?? file.fileName,
+          filename: baseName,
           contentType: file.contentType,
         });
         const res = await fetch(url, { signal: req.signal });
@@ -77,16 +83,18 @@ export async function GET(req: NextRequest, context: RouteContext) {
             cb(null, chunk);
           },
         });
-        const baseName = file.fileName.split("/").pop() || file.fileName;
-        body.on("error", (err) => {
-          // Tear the counter down so archiver stops waiting on it.
-          counter.destroy(err);
+        // Forward upstream errors onto the counter so the `finished` await
+        // below rejects, and the loop can append a _FAILED_ placeholder.
+        body.on("error", (err) => counter.destroy(err));
+        body.pipe(counter);
+        archive.append(counter, { name: file.fileName });
+        try {
+          // Resolves once both sides of counter are done: body has ended
+          // (R2 finished) AND archiver has drained the readable side
+          // (entry fully written to the zip queue).
+          await finished(counter);
+        } catch (err) {
           if (req.signal.aborted) return;
-          // Client is still connected, so this is an upstream failure
-          // (R2 dropped the socket, network blip, etc.). Log full context
-          // and try to leave a _FAILED_ marker in the zip — archiver may
-          // refuse further appends if the entry is partially written, but
-          // best-effort is better than nothing.
           const detail = err instanceof Error ? err.message : String(err);
           console.error(
             `[zip-stream] body stream error for ${file.fileName} ` +
@@ -104,13 +112,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
               appendErr,
             );
           }
-        });
-        body.pipe(counter);
-        archive.append(counter, { name: file.fileName });
+        }
       } catch (err) {
         if (req.signal.aborted) return;
         const detail = err instanceof Error ? err.message : String(err);
-        const baseName = file.fileName.split("/").pop() || file.fileName;
         console.warn(`[zip-stream] fetch failed for ${file.fileName}:`, detail);
         archive.append(
           `Failed to download "${file.fileName}" from R2: ${detail}.\n` +
