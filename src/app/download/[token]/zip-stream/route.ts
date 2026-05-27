@@ -66,10 +66,16 @@ export async function GET(req: NextRequest, context: RouteContext) {
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
         // DOM `ReadableStream` and Node's web `ReadableStream` are
         // runtime-compatible but typed separately — cast at the boundary.
-        archive.append(
-          Readable.fromWeb(res.body as unknown as NodeReadableStream<Uint8Array>),
-          { name: file.fileName },
-        );
+        const body = Readable.fromWeb(res.body as unknown as NodeReadableStream<Uint8Array>);
+        // When the client disconnects mid-download, undici aborts the
+        // in-flight fetch and emits `TypeError: terminated` on the body
+        // stream. Swallow it — archiver is already being torn down by
+        // the abort listener above.
+        body.on("error", (err) => {
+          if (req.signal.aborted) return;
+          console.warn(`[zip-stream] body stream error for ${file.fileName}:`, err);
+        });
+        archive.append(body, { name: file.fileName });
       } catch (err) {
         if (req.signal.aborted) return;
         const detail = err instanceof Error ? err.message : String(err);
