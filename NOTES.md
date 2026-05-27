@@ -17,12 +17,16 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 - `13df7ce` `src/lib/catalog.ts` → `@gigamusic/core.applyCatalogDiscount` + `sumLineItems` and `queries.getSetting` for the discount percent. `prisma.release.findMany({ select: { id, price } })` stays direct — routing through `listPublishedReleases` would fetch tracks + files on every homepage render.
 - `4c44102` `src/app/api/checkout/route.ts` → wraps `@gigamusic/checkout.createCheckoutHandler`. Route-level wrapper still does the `isAllowedRequestOrigin` CSRF check and translates the legacy cart shape (`{ releaseId, trackId, catalogPurchase }`) to the package's canonical `{ kind, id }`. Handler is recreated per request so admin-changed discounts pick up on the next call.
 - `d61a6eb` `src/app/api/webhooks/stripe/route.ts` → wraps `@gigamusic/checkout.createStripeWebhookHandler`. Built once at module load (no env reads at request time). `orderTokenSecret: env.ADMIN_SECRET()` so existing tokens stay valid.
+- `a00dc12` `package.json` next + eslint-config-next bumped to `16.2.6` (exact pin, matching the gigamusic tree). Unblocks dropping `as any` casts at the route boundary.
+- `d159283` `src/lib/preview.ts` → `@gigamusic/audio.transcodeWavToMp3`. `convertWavStreamToMp3` keeps its stream-in / file-out signature: the stream is buffered to a temp WAV and the cover image is read into a Buffer before the package handoff. `Mp3Metadata` (party-pupils' historical `year: number` shape) stays as a local alias that `toAudioTags` translates to `AudioTags`.
+- `701950c` `scripts/retag-audio-files.ts` → `@gigamusic/audio.runRetag`. Flattens the Prisma graph into `RetagTrack[]`, preserves the existing CLI surface (`--apply / --release / --track / --skip`). `src/lib/wav-tags.ts` deleted (no callers); the legacy `ffmpegBinary` / `metadataArgs` exports were removed from `preview.ts` in the same commit. Note: MP3 retag is no longer done by the script — the package contract treats MP3 retagging as a consumer concern (gigamusic re-encodes from the freshly tagged WAV on admin upload).
+- `74e881a` `src/app/cart/page.tsx` now POSTs `{ items: [{ kind, id? }] }` — the canonical `CheckoutCartItem` shape — directly. The route's `translateCart` block + re-encoded `Request` bridge are removed; the body passes through to `createCheckoutHandler` unchanged. localStorage cart state shape is untouched, so prior cart contents still round-trip.
+- `083a0c6` `src/app/api/checkout/route.ts` now constructs `createCheckoutHandler` once at module load and resolves the discount via the new `catalogDiscount: () => Promise<...>` callback at request time. Same admin-changeable behaviour, no per-request handler reconstruction.
+- `8e4425d` Dropped `as any` / `as unknown as NextRequest` casts in `checkout` + `stripe` route wrappers — both trees are now on `next@16.2.6` and the two `NextRequest` types unify.
 
 ## Notes on the route swaps
 
-- **Cart shape translation**: `src/app/cart/page.tsx` still emits `{ releaseId, trackId, catalogPurchase }`. The translation lives at the route boundary; the package consumes its canonical `{ kind, id }` input. UI was off-limits per orchestrator scope.
 - **Webhook published-only resolution**: `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — but checkout-side filtering already prevents unpublished items from reaching this path, so behaviour is consistent.
-- **Cross-tree NextRequest types**: `@gigamusic/checkout` is bundled against Next 16.2.6 in the gigamusic repo's `node_modules`; party-pupils is at 16.2.2. The two `NextRequest` types are structurally identical but nominally distinct, so the route handlers cast through `any` at the call boundary. Tag: candidate for a single-source `peerDependencies` declaration once packages are published.
 
 ## What was reverted earlier
 
@@ -30,19 +34,19 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 
 ## What is still NOT swapped (with reasons)
 
-- `src/lib/preview.ts` — `convertWavStreamToMp3` has no `@gigamusic/audio` equivalent (different feature than `generatePreview` / `tagWav` / `tagMp3`).
-- `src/lib/wav-tags.ts` — `extractId3v2Tag` + `retagWav({ srcWavPath, outWavPath, id3v2Tag })` shape doesn't match `@gigamusic/audio.tagWav({ inputPath, outputPath, tags, coverArt })`. Only used by `retag-audio-files.ts` maintenance script.
 - `src/lib/release-reads.ts` — `getTrackByReleaseAndSlug` (no package equivalent) and `getHeroLinks` (`showOnHero` filter is party-pupils-specific) stay on raw Prisma. **Suggested**: add a `listVisibleLinks({ showOnHero?: boolean })` overload, and a `getTrack({ releaseSlug, trackSlug })` query.
-- API routes other than checkout + stripe webhook: `src/app/api/checkout/route.ts` and `src/app/api/webhooks/stripe/route.ts` are done. The downloads route, admin routes, contact route, and link-pages routes are follow-ups.
+- API routes other than checkout + stripe webhook: the downloads route, admin routes, contact route, and link-pages routes are follow-ups.
+- `src/lib/preview.ts` is now a thin shim around `@gigamusic/audio.transcodeWavToMp3` but is intentionally retained because the admin upload route and the cart-side metadata shape (`Mp3Metadata` with `year: number`) keep the historical surface stable. Could be inlined if `@gigamusic/audio.AudioTags` ever gains a `year`/`date` convenience overload.
+- `runRetag` does not retag MP3 files — gigamusic intentionally moves MP3 retag to the upload pipeline (re-encode from the freshly tagged WAV). The previous party-pupils script re-tagged MP3s in place; this is a deliberate feature trade-off.
 
 ## Outstanding gigamusic-package observations (for orchestrator)
 
-1. **Two Next versions in the tree.** `@gigamusic/checkout` is built against `next@16.2.6`; party-pupils is on `next@16.2.2`. Their `NextRequest` types diverge by nominal identity even though the runtime shape matches — every route wrapping a gigamusic handler ends up casting through `any`. Aligning Next versions (or expressing it as a `peerDependency`) would let route handlers stay strongly typed.
-2. **`createCheckoutHandler` bakes catalog discount at factory call.** The handler closes over `catalogDiscount.percent`; party-pupils reads the percent from a SiteSetting that admins can change without redeploying. The route works around this by reconstructing the handler per request. An alternative would be to accept `catalogDiscount` as `() => Promise<{percent, productName}>`.
-3. **`@gigamusic/checkout` webhook handler resolves items via `listPublishedReleases`.** Behaviourally fine today (the checkout handler is the only on-ramp and it filters the same way), but documenting it would prevent surprises if an unpublished item ever reached the webhook via a direct Stripe API call.
+1. **`@gigamusic/checkout` webhook handler resolves items via `listPublishedReleases`.** Behaviourally fine today (the checkout handler is the only on-ramp and it filters the same way), but documenting it would prevent surprises if an unpublished item ever reached the webhook via a direct Stripe API call.
+2. **`runRetag` does not retag MP3 files.** Party-pupils' previous script did. If a future site needs in-place MP3 retag during maintenance (without re-uploading a WAV), the package needs to expose that path.
 
 ## Build state
 
-- `npx tsc --noEmit` — passes cleanly on `gigamusic-integration` (verified after the swaps above).
-- `npx next build --webpack` — compiles cleanly. The only failure is the pre-existing `src/app/api/all-tracks/route.ts` route-export typecheck on `RADIO_TRACKS_TAG`, which existed before the integration commits (verified at `4046552`).
+- `npx tsc --noEmit` — passes cleanly on `gigamusic-integration` apart from the pre-existing `RADIO_TRACKS_TAG` route-export error in `src/app/api/all-tracks/route.ts` (predates the integration; verified at `4046552`).
+- `npx next build --webpack` — compiles successfully (`Compiled successfully in ~9s`); only failure is the same pre-existing `RADIO_TRACKS_TAG` route-export typecheck.
 - `npx next build` (Turbopack default in Next 16) — still fails to resolve `@gigamusic/*` `link:` symlinks; Webpack remains the workaround. **Flagged for orchestrator**: publish + switch to a version range, or keep `--webpack` until Turbopack's `link:` resolution is fixed.
+- `pnpm dev:prod` smoke (port 3001, fallback from 3000): `/`, `/music`, `/cart`, `/admin`, `/faq` all return 200.
