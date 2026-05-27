@@ -61,8 +61,7 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 
 ## Open follow-ups
 
-1. **Webhook published-only resolution (doc-only)** — `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — checkout-side filtering already prevents unpublished items from reaching this path, but a JSDoc note on the handler would prevent surprises if an unpublished item ever lands via a direct Stripe API call.
-2. **Turbopack `link:` resolution** — `npx next build` (Turbopack default in Next 16) still fails to resolve `@gigamusic/*` `link:` symlinks; `--webpack` is the workaround. Resolve by publishing `@gigamusic/*` and switching to a version range, or stay on `--webpack` indefinitely.
+1. **Turbopack `link:` resolution** — `npx next build` (Turbopack default in Next 16) still fails to resolve `@gigamusic/*` `link:` symlinks; `--webpack` is the workaround. Resolve by publishing `@gigamusic/*` and switching to a version range, or stay on `--webpack` indefinitely.
 
 ## Build state
 
