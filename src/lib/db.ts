@@ -1,21 +1,35 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaNeon } from "@prisma/adapter-neon";
 import { env } from "./env";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 /**
- * PrismaPg's generated SQL hard-codes a schema (defaulting to `public`) and
- * does NOT honor the `?schema=` URL param that Prisma's legacy CLI engine did.
- * Pull the schema out of the URL and pass it as the adapter's `schema` option
- * so non-`public` schemas (notably the test runner's `schema=test`) actually
- * take effect at runtime.
+ * Neon (prod): use the WebSocket-based serverless driver to avoid the
+ * cold-start auth timeouts and dropped sockets that plague direct pg
+ * connections from short-lived Vercel functions.
+ *
+ * Everything else (local `prisma dev`, CI test schema): use the direct pg
+ * adapter. PrismaPg's generated SQL hard-codes a schema (defaulting to
+ * `public`) and does NOT honor the `?schema=` URL param that Prisma's legacy
+ * CLI engine did. Pull the schema out of the URL and pass it as the
+ * adapter's `schema` option so non-`public` schemas (notably the test
+ * runner's `schema=test`) actually take effect at runtime.
  */
 function createPrismaClient() {
-  const raw = env.DATABASE_URL().replace("sslmode=require", "sslmode=verify-full");
-  const match = raw.match(/[?&]schema=([^&]+)/);
+  const raw = env.DATABASE_URL();
+
+  if (raw.includes("neon.tech")) {
+    return new PrismaClient({ adapter: new PrismaNeon({ connectionString: raw }) });
+  }
+
+  const sslAdjusted = raw.replace("sslmode=require", "sslmode=verify-full");
+  const match = sslAdjusted.match(/[?&]schema=([^&]+)/);
   const schema = match ? decodeURIComponent(match[1]) : undefined;
-  const connectionString = match ? raw.replace(/([?&])schema=[^&]+&?/, (_, sep) => (sep === "?" ? "?" : "&")).replace(/[?&]$/, "") : raw;
+  const connectionString = match
+    ? sslAdjusted.replace(/([?&])schema=[^&]+&?/, (_, sep) => (sep === "?" ? "?" : "&")).replace(/[?&]$/, "")
+    : sslAdjusted;
   const adapter = new PrismaPg(
     {
       connectionString,
@@ -51,12 +65,15 @@ const TRANSIENT_CONNECTION_ERROR_CODES = new Set([
 ]);
 
 // Substrings of pg connection-failure messages (no stable error code): a lost
-// socket, or a connection-acquisition timeout while the database wakes up.
+// socket, a connection-acquisition timeout while the database wakes up, or
+// Neon's `08P01 "Authentication timed out"` emitted while its compute is
+// still warming up.
 const TRANSIENT_CONNECTION_ERROR_MESSAGES = [
   "socket disconnected",
   "Connection terminated",
   "timeout exceeded when trying to connect",
   "timeout expired",
+  "Authentication timed out",
 ];
 
 /** True for connection-level failures that are safe to retry (vs. query bugs). */
@@ -73,11 +90,15 @@ function isTransientConnectionError(error: unknown): boolean {
 /**
  * Runs a database operation, retrying with exponential backoff when it fails
  * with a transient connection error (e.g. ECONNRESET during a connection
- * burst). Non-connection errors propagate immediately.
+ * burst, or a cold Neon compute that's still warming). Non-connection errors
+ * propagate immediately.
+ *
+ * Backoff is sized to outlast Neon's scale-to-zero wake (typically 3–8s):
+ * 200ms, 400ms, 800ms, 1600ms — total ~3s of sleeps across 5 attempts.
  */
 export async function withDbRetry<T>(
   operation: () => Promise<T>,
-  attempts = 3,
+  attempts = 5,
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -87,10 +108,11 @@ export async function withDbRetry<T>(
       if (!isTransientConnectionError(error)) throw error;
       lastError = error;
       if (attempt < attempts - 1) {
+        const delay = 200 * 2 ** attempt;
         console.warn(
-          `Transient database error, retrying (attempt ${attempt + 1}/${attempts})`,
+          `Transient database error, retrying in ${delay}ms (attempt ${attempt + 1}/${attempts})`,
         );
-        await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }

@@ -23,6 +23,8 @@
     "@aws-sdk/lib-storage": "^3.1041.0",
     "@aws-sdk/s3-request-presigner": "^3.1042.0",
     "@base-ui/react": "^1.3.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^7.6.0",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "@tiptap/extension-link": "^3.23.4",
