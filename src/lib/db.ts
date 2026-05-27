@@ -61,7 +61,9 @@ const TRANSIENT_CONNECTION_ERROR_CODES = new Set([
   "ETIMEDOUT",
   "EPIPE",
   "P1001", // can't reach database server
+  "P1008", // operations timed out
   "P1017", // server closed the connection
+  "P2024", // timed out fetching a new connection from the pool
 ]);
 
 // Substrings of pg connection-failure messages (no stable error code): a lost
@@ -76,15 +78,27 @@ const TRANSIENT_CONNECTION_ERROR_MESSAGES = [
   "Authentication timed out",
 ];
 
-/** True for connection-level failures that are safe to retry (vs. query bugs). */
-function isTransientConnectionError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+/**
+ * True for connection-level failures that are safe to retry (vs. query bugs).
+ * Walks the `cause` chain because Prisma wraps the driver's underlying socket
+ * error in its own exception — the outer message often doesn't match our
+ * substrings but the nested cause does (e.g. outer "Connection terminated due
+ * to connection timeout" with a cause of "Connection terminated unexpectedly"
+ * from the pg socket). Depth-capped to avoid pathological self-referential
+ * cause chains.
+ */
+function isTransientConnectionError(error: unknown, depth = 0): boolean {
+  if (!error || typeof error !== "object" || depth > 5) return false;
   const code = (error as { code?: unknown }).code;
   if (typeof code === "string" && TRANSIENT_CONNECTION_ERROR_CODES.has(code)) {
     return true;
   }
   const message = error instanceof Error ? error.message : "";
-  return TRANSIENT_CONNECTION_ERROR_MESSAGES.some((m) => message.includes(m));
+  if (TRANSIENT_CONNECTION_ERROR_MESSAGES.some((m) => message.includes(m))) {
+    return true;
+  }
+  const cause = (error as { cause?: unknown }).cause;
+  return cause !== undefined && isTransientConnectionError(cause, depth + 1);
 }
 
 /**
