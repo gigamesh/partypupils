@@ -59,14 +59,30 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 - **Admin releases (POST + PUT/PATCH/DELETE)** — `@gigamusic/admin/server.createAdminReleaseByIdHandlers` exposes a scalar-only PUT and no PATCH. Party-pupils' PUT uses `syncReleaseAndTracks` (incremental track diff) and PATCH gates `isPublished` flips with `validatePublishedRelease`. The track-sync code is mature; lifting it into the package would change a lot of edges without clear upside.
 - **Admin orders** — party-pupils' admin orders page is a server component that reads directly with date + pagination filters, not a REST handler. `createAdminOrdersHandler`'s `?email=…` shape doesn't match.
 
-## Open follow-ups
+## Inner-loop iteration model
 
-1. **Turbopack `link:` resolution** — `npx next build` (Turbopack default in Next 16) still fails to resolve `@gigamusic/*` `link:` symlinks; `--webpack` is the workaround. Resolve by publishing `@gigamusic/*` and switching to a version range, or stay on `--webpack` indefinitely.
+`@gigamusic/*` are now published versioned packages. Day-to-day:
+
+- party-pupils consumes them at `^0.1.1` from the registry.
+- For local iteration against an unreleased gigamusic change, use
+  `pnpm link --global` per-package in the gigamusic side, then
+  `pnpm link --global @gigamusic/<pkg>` in this repo. Unlink when done
+  (`pnpm unlink --global @gigamusic/<pkg>`).
+- When the change is ready, bump via Changesets in the gigamusic repo
+  (`pnpm changeset` → `pnpm changeset version` → `pnpm changeset publish`),
+  then `pnpm update '@gigamusic/*'` here.
 
 ## Build state
 
 - `npx tsc --noEmit` — passes cleanly on `gigamusic-integration`.
-- `npx next build --webpack` — compiles + typechecks successfully.
-- `npx next build` (Turbopack default in Next 16) — still fails to resolve `@gigamusic/*` `link:` symlinks; see Open follow-up #6.
-- `pnpm test` — 141/141 tests pass against a vanilla Postgres on `localhost:5436`.
+- `npx next build` (Turbopack default in Next 16) — compiles + typechecks +
+  collects page data successfully against `^0.1.1` registry-installed
+  packages. Static-gen needs the dev DB up (`pnpm dev` starts `prisma dev`
+  on port 51214); a fully static build requires no `--webpack` flag now.
+- `pnpm test` — 138/138 tests pass against a vanilla Postgres on
+  `localhost:5436`. Vitest config gained `ssr.resolve.conditions: ["source"]`
+  so the published packages' `source` export condition is honored at SSR
+  load time — vitest picks the shipped `src/index.ts` rather than falling
+  through to `dist/index.js` (which would re-import `next/server` and
+  break inside pnpm's isolated peer-dep `node_modules`).
 - `pnpm dev:prod` smoke (port 3001, fallback from 3000): `/`, `/music`, `/cart`, `/admin`, `/faq` all return 200.

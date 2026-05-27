@@ -26,11 +26,19 @@ export default defineConfig({
     // Force a single copy of next/react so vi.mock("next/server") and friends
     // apply across both this app and inlined @gigamusic/* packages.
     dedupe: ["next", "react", "react-dom", "stripe"],
-    // Pick the `source` export condition first so vitest resolves linked
-    // @gigamusic/* packages to their src/index.ts (and gets type-aligned
-    // navigation as a bonus). Falls through to `import`/`default` for any
-    // package without a `source` condition.
     conditions: ["source", "import", "module", "browser", "default"],
+  },
+  // SSR-side conditions for vitest 4: the test runner loads modules in SSR
+  // mode, and conditions for that path live under `ssr.resolve.conditions`
+  // separately from `resolve.conditions`. Prepend `source` to the Node defaults
+  // (`node, import, require, default`) so registry-installed @gigamusic/*
+  // packages resolve to their shipped `src/index.ts` rather than
+  // `dist/index.js` (dist's transpiled `import "next/server"` can't be
+  // resolved by Node through pnpm's isolated peer-dep node_modules).
+  ssr: {
+    resolve: {
+      conditions: ["source"],
+    },
   },
   oxc: {
     jsx: {
