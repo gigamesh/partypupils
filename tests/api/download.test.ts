@@ -184,7 +184,9 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    expect(body.zipName).toBe(`Party Pupils - Order ${order.id} (MP3).zip`);
+    // @gigamusic/checkout's zip handler is brand-agnostic — the consumer
+    // is responsible for any artist-name prefix it wants on the file.
+    expect(body.zipName).toBe(`Order ${order.id} (MP3).zip`);
     // Each track sits under a "Release Name/" folder and keeps its original
     // uploaded filename verbatim — no track-number prefix is added.
     expect(body.files.map((f: { fileName: string }) => f.fileName)).toEqual([
@@ -343,7 +345,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    expect(body.zipName).toBe("Party Pupils - Tracks (MP3).zip");
+    expect(body.zipName).toBe("Tracks (MP3).zip");
     expect(body.files.map((f: { fileName: string }) => f.fileName)).toEqual([
       "Mix Album/beta_v2.mp3",
       "Mix Album/alpha_v2.mp3",

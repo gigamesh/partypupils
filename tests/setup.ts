@@ -86,18 +86,43 @@ vi.mock("next/server", async () => {
 });
 
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
+// `storageProvider` returns a `StorageProvider`-shaped object so the gigamusic
+// route factories that take the provider directly (download, zip, zip-stream)
+// see the same stubbed methods the legacy free-function imports do.
 vi.mock("@/lib/storage", async () => {
   const { Readable } = await import("stream");
+  const deleteFile = vi.fn(async () => {});
+  const uploadFile = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
+  const uploadBuffer = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
+  const uploadStream = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
+  const getPresignedUploadUrl = vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" }));
+  const getPresignedDownloadUrl = vi.fn(async () => "https://r2/signed?response-content-disposition=stub");
+  const getFileBuffer = vi.fn(async () => Buffer.from(""));
+  const getFileStream = vi.fn(async () => Readable.from(Buffer.from("")));
+  const keyFromPublicUrl = vi.fn((url: string) => url);
+  const publicUrlFromKey = vi.fn((key: string) => key);
+  const providerStub = {
+    uploadBuffer,
+    uploadStream,
+    getPresignedUploadUrl,
+    getPresignedDownloadUrl,
+    getFileBuffer,
+    getFileStream,
+    deleteFile,
+    keyFromPublicUrl,
+    publicUrlFromKey,
+  };
   return {
-    deleteFile: vi.fn(async () => {}),
-    uploadFile: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-    uploadBuffer: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-    uploadStream: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-    getPresignedUploadUrl: vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" })),
-    getPresignedDownloadUrl: vi.fn(async () => "https://r2/signed?response-content-disposition=stub"),
-    getFileBuffer: vi.fn(async () => Buffer.from("")),
-    getFileStream: vi.fn(async () => Readable.from(Buffer.from(""))),
-    keyFromPublicUrl: vi.fn((url: string) => url),
+    deleteFile,
+    uploadFile,
+    uploadBuffer,
+    uploadStream,
+    getPresignedUploadUrl,
+    getPresignedDownloadUrl,
+    getFileBuffer,
+    getFileStream,
+    keyFromPublicUrl,
+    storageProvider: () => providerStub,
   };
 });
 

@@ -1,140 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Readable, Transform } from "node:stream";
-import { finished } from "node:stream/promises";
-import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import archiver from "archiver";
-import { resolveCustomerZip } from "@/lib/release-zip";
-import { getPresignedDownloadUrl } from "@/lib/storage";
+import type { NextRequest } from "next/server";
+import { createDownloadZipStreamHandler } from "@gigamusic/checkout";
+import { createQueries } from "@gigamusic/db";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
+import { prisma } from "@/lib/db";
+import { storageProvider } from "@/lib/storage";
+
+const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
+
+// Server-side bulk-download fallback for browsers (Safari + every iOS browser,
+// plus private/incognito) that can't run the service worker reliably. Audio
+// bytes proxy through Vercel here — slower and costs egress, which is why the
+// SW path stays the default for the engines that handle it.
+const handler = createDownloadZipStreamHandler({ queries, storage: storageProvider() });
+
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 interface RouteContext {
   params: Promise<{ token: string }>;
 }
 
-export const runtime = "nodejs";
-export const maxDuration = 300;
-
-/**
- * Server-side bulk-download fallback. Mirrors `/download/[token]/zip`'s
- * file-list logic via `resolveCustomerZip()`, but streams a real zip back
- * to the browser through `archiver` instead of returning a manifest for
- * the client to assemble.
- *
- * Slower than the SW path (audio bytes proxy through Vercel and cost
- * egress), but works everywhere. Used when the customer's browser can't
- * run the service worker reliably — Safari, private/incognito mode,
- * older browsers.
- *
- * Per-file failure policy matches the SW: any failed R2 fetch becomes a
- * `_FAILED_<name>.txt` placeholder so one bad object doesn't taint the
- * whole archive.
- */
-export async function GET(req: NextRequest, context: RouteContext) {
-  const { token } = await context.params;
-  const releaseId = parseInt(req.nextUrl.searchParams.get("releaseId") || "0");
-  const trackIdsParam = req.nextUrl.searchParams.get("trackIds");
-  const format = req.nextUrl.searchParams.get("format") || "mp3";
-
-  const result = await resolveCustomerZip({ token, releaseId, trackIdsParam, format });
-  if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
-  }
-
-  // `store: true` = no DEFLATE compression. MP3/WAV barely compress, and the
-  // SW path already serves uncompressed entries — staying consistent means
-  // identical byte counts.
-  const archive = archiver("zip", { store: true });
-
-  archive.on("error", (err) => {
-    console.error("[zip-stream] archiver error:", err);
-  });
-
-  // Abort the pipeline if the client disconnects mid-download.
-  req.signal.addEventListener("abort", () => archive.abort());
-
-  // Serialise R2 fetches: only open file N's R2 socket after archiver has
-  // fully consumed file N-1. The naive parallel approach (open every
-  // socket up front, let archiver drain them in order) leaves the later
-  // sockets idle behind backpressure long enough for R2 to time them out,
-  // surfacing as `TypeError: terminated` mid-stream. A serial pipeline
-  // costs one R2 TTFB per file transition — small compared to the
-  // per-file streaming time — and the archiver was the serial bottleneck
-  // anyway, so end-to-end throughput is unchanged.
-  (async () => {
-    for (const file of result.files) {
-      if (req.signal.aborted) return;
-      const baseName = file.fileName.split("/").pop() || file.fileName;
-      try {
-        const url = await getPresignedDownloadUrl(file.storageKey, {
-          filename: baseName,
-          contentType: file.contentType,
-        });
-        const res = await fetch(url, { signal: req.signal });
-        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-        // DOM `ReadableStream` and Node's web `ReadableStream` are
-        // runtime-compatible but typed separately — cast at the boundary.
-        const body = Readable.fromWeb(res.body as unknown as NodeReadableStream<Uint8Array>);
-        // Pass-through counter so we know how far the upstream R2 stream
-        // got before failing. Useful for distinguishing "R2 never started"
-        // from "R2 dropped us halfway through a large file."
-        let bytesReceived = 0;
-        const counter = new Transform({
-          transform(chunk: Buffer, _enc, cb) {
-            bytesReceived += chunk.length;
-            cb(null, chunk);
-          },
-        });
-        // Forward upstream errors onto the counter so the `finished` await
-        // below rejects, and the loop can append a _FAILED_ placeholder.
-        body.on("error", (err) => counter.destroy(err));
-        body.pipe(counter);
-        archive.append(counter, { name: file.fileName });
-        try {
-          // Resolves once both sides of counter are done: body has ended
-          // (R2 finished) AND archiver has drained the readable side
-          // (entry fully written to the zip queue).
-          await finished(counter);
-        } catch (err) {
-          if (req.signal.aborted) return;
-          const detail = err instanceof Error ? err.message : String(err);
-          console.error(
-            `[zip-stream] body stream error for ${file.fileName} ` +
-              `(storageKey=${file.storageKey}, bytesReceived=${bytesReceived}): ${detail}`,
-          );
-          try {
-            archive.append(
-              `Streaming "${file.fileName}" from R2 failed after ${bytesReceived} bytes: ${detail}.\n` +
-                `Try downloading the track individually from your order page.\n`,
-              { name: `_FAILED_${baseName}.txt` },
-            );
-          } catch (appendErr) {
-            console.warn(
-              `[zip-stream] could not append failure placeholder for ${file.fileName}:`,
-              appendErr,
-            );
-          }
-        }
-      } catch (err) {
-        if (req.signal.aborted) return;
-        const detail = err instanceof Error ? err.message : String(err);
-        console.warn(`[zip-stream] fetch failed for ${file.fileName}:`, detail);
-        archive.append(
-          `Failed to download "${file.fileName}" from R2: ${detail}.\n` +
-            `Try downloading the track individually from your order page.\n`,
-          { name: `_FAILED_${baseName}.txt` },
-        );
-      }
-    }
-    await archive.finalize();
-  })().catch((err) => {
-    console.error("[zip-stream] pipeline error:", err);
-    archive.abort();
-  });
-
-  return new Response(Readable.toWeb(archive) as ReadableStream<Uint8Array>, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${result.zipName.replace(/"/g, "")}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+export function GET(req: NextRequest, ctx: RouteContext) {
+  return handler(req, ctx);
 }

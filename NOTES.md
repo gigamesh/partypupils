@@ -23,10 +23,13 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 - `74e881a` `src/app/cart/page.tsx` now POSTs `{ items: [{ kind, id? }] }` — the canonical `CheckoutCartItem` shape — directly. The route's `translateCart` block + re-encoded `Request` bridge are removed; the body passes through to `createCheckoutHandler` unchanged. localStorage cart state shape is untouched, so prior cart contents still round-trip.
 - `083a0c6` `src/app/api/checkout/route.ts` now constructs `createCheckoutHandler` once at module load and resolves the discount via the new `catalogDiscount: () => Promise<...>` callback at request time. Same admin-changeable behaviour, no per-request handler reconstruction.
 - `8e4425d` Dropped `as any` / `as unknown as NextRequest` casts in `checkout` + `stripe` route wrappers — both trees are now on `next@16.2.6` and the two `NextRequest` types unify.
+- **download routes → `@gigamusic/checkout` factories.** `src/app/download/[token]/{route,zip/route,zip-stream/route}.ts` and `src/app/sw-zip/[...path]/route.ts` are now thin wrappers around `createDownloadHandler` / `createDownloadZipHandler` / `createDownloadZipStreamHandler` / `createSwZipFallbackHandler`. `src/lib/release-zip.ts` is trimmed to the admin-only `buildReleaseZipBundle` + `presignZipFiles`; the customer-side `resolveCustomerZip` and ~265 lines of supporting helpers are gone. `src/lib/storage.ts` gains a `storageProvider()` accessor mirroring `emailProvider()` so the factories can be handed the shared R2 singleton. Bonus pickups: the new `zip-stream` route inherits gigamusic's serialised-fetch + byte-counter + `_FAILED_*.txt` improvements that party-pupils' local copy was missing.
+- **Stripe + @types/node bump.** Stripe pinned to `^22.1.0` (was `^22.0.0`) and `@types/node` bumped to `^22` (was `^20`) so pnpm dedupes Stripe across this repo and the gigamusic tree — fixes the TS2739 / nominal-type identity errors at the `WebhookDeps.stripe` boundary now that gigamusic's checkout pulls `stripe@22.1.1`.
 
 ## Notes on the route swaps
 
 - **Webhook published-only resolution**: `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — but checkout-side filtering already prevents unpublished items from reaching this path, so behaviour is consistent.
+- **Customer zip filenames lost the "Party Pupils - " prefix.** `@gigamusic/checkout.createDownloadZipHandler` produces `Order N (MP3).zip` / `Tracks (MP3).zip` / `${releaseName} (MP3).zip` — brand-agnostic by design. Two `tests/api/download.test.ts` assertions were updated to match. If we want the artist-name back in the filename, the cleanest path is to add a `zipNamePrefix` option to the gigamusic factory; for now the names are still clearly tied to the order/release.
 
 ## What was reverted earlier
 
@@ -35,7 +38,7 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 ## What is still NOT swapped (with reasons)
 
 - `src/lib/release-reads.ts` — `getTrackByReleaseAndSlug` (no package equivalent) and `getHeroLinks` (`showOnHero` filter is party-pupils-specific) stay on raw Prisma. **Suggested**: add a `listVisibleLinks({ showOnHero?: boolean })` overload, and a `getTrack({ releaseSlug, trackSlug })` query.
-- API routes other than checkout + stripe webhook: the downloads route, admin routes, contact route, and link-pages routes are follow-ups.
+- API routes other than checkout + stripe webhook + downloads: admin routes, contact route, and link-pages routes are follow-ups.
 - `src/lib/preview.ts` is now a thin shim around `@gigamusic/audio.transcodeWavToMp3` but is intentionally retained because the admin upload route and the cart-side metadata shape (`Mp3Metadata` with `year: number`) keep the historical surface stable. Could be inlined if `@gigamusic/audio.AudioTags` ever gains a `year`/`date` convenience overload.
 - `runRetag` does not retag MP3 files — gigamusic intentionally moves MP3 retag to the upload pipeline (re-encode from the freshly tagged WAV). The previous party-pupils script re-tagged MP3s in place; this is a deliberate feature trade-off.
 
