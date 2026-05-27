@@ -38,7 +38,11 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 
 ## What is still NOT swapped (with reasons)
 
-- API routes other than checkout + stripe webhook + downloads: admin routes, contact route, and link-pages routes are follow-ups.
+- **Admin routes** — every admin handler factory in `@gigamusic/admin/server` takes a full `AdminDeps` bag that includes `adminPasswordHash` (bcrypt). Party-pupils currently authenticates with plaintext `ADMIN_PASSWORD` + `timingSafeEqual`, so swapping the admin routes requires either an env-var migration (generate a bcrypt hash, drop the plaintext var, update the login route, re-test) or letting handlers that don't need it accept a narrower deps slice. Both feel like operational/API decisions that deserve a separate pass.
+- **Admin settings** also carries a per-key validator map (FAQ JSON schema today). The gigamusic factory doesn't expose a validator hook, so this swap is gated on either a package addition (`validators?: Record<string, (raw: string) => Result>` on `createAdminSettingsHandlers`) or moving the FAQ validator behind a different surface.
+- **Admin links + releases + orders** are otherwise drop-in candidates once the auth-hash question is settled — they only need a thin `revalidateTag(...)` wrapper around the factory return value because the package leaves cache invalidation to the consumer.
+- **Contact route** — gigamusic has no contact handler factory (and shouldn't; contact destinations + branding are artist-specific). Stays local.
+- **all-tracks route** — pre-existing `RADIO_TRACKS_TAG` route-export error, unrelated to the integration.
 - `src/lib/preview.ts` is now a thin shim around `@gigamusic/audio.transcodeWavToMp3` but is intentionally retained because the admin upload route and the cart-side metadata shape (`Mp3Metadata` with `year: number`) keep the historical surface stable. Could be inlined if `@gigamusic/audio.AudioTags` ever gains a `year`/`date` convenience overload.
 - `runRetag` does not retag MP3 files — gigamusic intentionally moves MP3 retag to the upload pipeline (re-encode from the freshly tagged WAV). The previous party-pupils script re-tagged MP3s in place; this is a deliberate feature trade-off.
 
