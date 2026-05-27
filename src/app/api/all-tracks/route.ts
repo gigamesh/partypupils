@@ -5,8 +5,6 @@ import type { PlayerTrack } from "@/lib/player-types";
 import { NextResponse } from "next/server";
 import { RADIO_TRACKS_TAG } from "@/lib/cache-tags";
 
-export { RADIO_TRACKS_TAG };
-
 /**
  * Build the un-shuffled radio queue. Cached and tagged so admin writes
  * (`/api/admin/releases/*`) can invalidate via revalidateTag(RADIO_TRACKS_TAG).
