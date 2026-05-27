@@ -30,7 +30,6 @@ Lib + route swaps to `@gigamusic/*` packages on `gigamusic-integration`. Each is
 ## Notes on the route swaps
 
 - **Webhook published-only resolution**: `@gigamusic/checkout.createStripeWebhookHandler` resolves item names/prices from `listPublishedReleases()`. Party-pupils' original `findMany` had no `isPublished` filter — but checkout-side filtering already prevents unpublished items from reaching this path, so behaviour is consistent.
-- **Customer zip filenames lost the "Party Pupils - " prefix.** `@gigamusic/checkout.createDownloadZipHandler` produces `Order N (MP3).zip` / `Tracks (MP3).zip` / `${releaseName} (MP3).zip` — brand-agnostic by design. Two `tests/api/download.test.ts` assertions were updated to match. If we want the artist-name back in the filename, the cleanest path is to add a `zipNamePrefix` option to the gigamusic factory; for now the names are still clearly tied to the order/release.
 
 ## What was reverted earlier
 
