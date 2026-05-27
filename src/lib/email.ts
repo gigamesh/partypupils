@@ -8,18 +8,23 @@ import {
 import { SITE_NAME } from "./constants";
 import { env } from "./env";
 
-const BRANDING: EmailBranding = {
+export const EMAIL_BRANDING: EmailBranding = {
   siteName: SITE_NAME,
   themeColor: "#adfd02",
 };
 
+const BRANDING = EMAIL_BRANDING;
+
 let _provider: ReturnType<typeof createResendProvider> | undefined;
-function provider() {
+export function emailProvider() {
   if (!_provider) {
     _provider = createResendProvider({ apiKey: env.RESEND_API_KEY() });
   }
   return _provider;
 }
+
+// Internal alias preserved so the existing send helpers below don't churn.
+const provider = emailProvider;
 
 /** HTML body for the magic-link email that lets a customer re-access orders. */
 export function orderLookupEmailHtml(verifyUrl: string): string {
