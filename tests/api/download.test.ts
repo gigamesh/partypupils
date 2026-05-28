@@ -184,6 +184,8 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
 
+    // `zipNamePrefix: SITE_NAME` ("Party Pupils") is wired into the route
+    // factory, so the zip filename keeps its historical artist-name prefix.
     expect(body.zipName).toBe(`Party Pupils - Order ${order.id} (MP3).zip`);
     // Each track sits under a "Release Name/" folder and keeps its original
     // uploaded filename verbatim — no track-number prefix is added.
@@ -315,7 +317,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
     const body = await res.json();
 
-    expect(body.zipName).toBe("Album One (MP3).zip");
+    expect(body.zipName).toBe("Party Pupils - Album One (MP3).zip");
     expect(body.files).toHaveLength(2);
     // Single-release zip stays flat — the zip itself is named after the release.
     expect(body.files[0].fileName).toBe("trackA_final.mp3");

@@ -1,43 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createDownloadHandler } from "@gigamusic/checkout";
+import { createQueries } from "@gigamusic/db";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
 import { prisma } from "@/lib/db";
-import { getPresignedDownloadUrl } from "@/lib/storage";
-import { tokenGrantsTrack } from "@/lib/download-auth";
-import { cleanDownloadFilename } from "@/lib/utils";
+import { storageProvider } from "@/lib/storage";
+
+const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
+
+// Built once at module load. Per-track presigned-URL redirect is stateless;
+// the handler captures `queries` + `storage` closures and reads no env at
+// request time.
+const handler = createDownloadHandler({ queries, storage: storageProvider() });
 
 interface RouteContext {
   params: Promise<{ token: string }>;
 }
 
-export async function GET(req: NextRequest, context: RouteContext) {
-  const { token } = await context.params;
-  const trackId = parseInt(req.nextUrl.searchParams.get("trackId") || "0");
-  const format = req.nextUrl.searchParams.get("format") || "mp3";
-
-  if (!trackId) {
-    return NextResponse.json({ error: "Missing trackId" }, { status: 400 });
-  }
-
-  const file = await prisma.trackFile.findFirst({
-    where: { trackId, format },
-    include: { track: { select: { releaseId: true } } },
-  });
-
-  if (!file) {
-    return NextResponse.json({ error: "File not found" }, { status: 404 });
-  }
-
-  const ok = await tokenGrantsTrack(token, trackId, file.track.releaseId);
-  if (!ok) {
-    return NextResponse.json({ error: "Track not in order" }, { status: 403 });
-  }
-
-  // 302 to a presigned R2 GET URL with response-header overrides baked into
-  // the signature. Bytes flow R2 → user directly; the function never sees the
-  // audio body. The browser still triggers a same-tab download because R2's
-  // response carries `Content-Disposition: attachment`.
-  const url = await getPresignedDownloadUrl(file.storageKey, {
-    filename: cleanDownloadFilename(file.fileName),
-    contentType: format === "wav" ? "audio/wav" : "audio/mpeg",
-  });
-  return NextResponse.redirect(url, 302);
+export function GET(req: NextRequest, ctx: RouteContext) {
+  return handler(req, ctx);
 }

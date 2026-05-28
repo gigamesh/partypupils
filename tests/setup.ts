@@ -18,9 +18,10 @@ if (process.env.DATABASE_URL?.includes("neon.tech")) {
 }
 
 // Admin-auth: every protected route sees an authed admin by default. Re-mock per test for 401 paths.
+// `createAdminSession` is no longer part of the surface — the gigamusic
+// `createAdminLoginHandler` mints the cookie inside the package now.
 vi.mock("@/lib/admin-auth", () => ({
   verifyAdminSession: vi.fn(async () => true),
-  createAdminSession: vi.fn(async () => {}),
 }));
 
 // Stub external services. Stripe stub is a singleton so vi.mocked(stripe().X) and the
@@ -85,19 +86,72 @@ vi.mock("next/server", async () => {
   };
 });
 
+// `next/headers.cookies()` also needs a Next request scope. The gigamusic
+// admin handlers (`createAdminUploadProcessHandler`, etc.) verify the
+// session by calling `cookies().get("admin_session")`, so without a stub
+// they throw "cookies was called outside a request scope" before any test
+// assertion runs. Stub it with a synthetic jar that returns a freshly
+// signed admin session token — `isAdminAuthenticated(secret)` then verifies
+// against the same ADMIN_SECRET the route reads.
+const { adminSessionToken } = vi.hoisted(() => ({
+  adminSessionToken: { current: "" as string },
+}));
+vi.mock("next/headers", async () => {
+  const { createAdminSessionToken } = await import("@gigamusic/core");
+  adminSessionToken.current = await createAdminSessionToken({
+    secret: process.env.ADMIN_SECRET ?? "",
+  });
+  return {
+    cookies: async () => ({
+      get(name: string) {
+        if (name === "admin_session") {
+          return { name, value: adminSessionToken.current };
+        }
+        return undefined;
+      },
+      set: () => {},
+    }),
+  };
+});
+
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
+// `storageProvider` returns a `StorageProvider`-shaped object so the gigamusic
+// route factories that take the provider directly (download, zip, zip-stream)
+// see the same stubbed methods the legacy free-function imports do.
 vi.mock("@/lib/storage", async () => {
   const { Readable } = await import("stream");
+  const deleteFile = vi.fn(async () => {});
+  const uploadFile = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
+  const uploadBuffer = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
+  const uploadStream = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
+  const getPresignedUploadUrl = vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" }));
+  const getPresignedDownloadUrl = vi.fn(async () => "https://r2/signed?response-content-disposition=stub");
+  const getFileBuffer = vi.fn(async () => Buffer.from(""));
+  const getFileStream = vi.fn(async () => Readable.from(Buffer.from("")));
+  const keyFromPublicUrl = vi.fn((url: string) => url);
+  const publicUrlFromKey = vi.fn((key: string) => key);
+  const providerStub = {
+    uploadBuffer,
+    uploadStream,
+    getPresignedUploadUrl,
+    getPresignedDownloadUrl,
+    getFileBuffer,
+    getFileStream,
+    deleteFile,
+    keyFromPublicUrl,
+    publicUrlFromKey,
+  };
   return {
-    deleteFile: vi.fn(async () => {}),
-    uploadFile: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-    uploadBuffer: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-    uploadStream: vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" })),
-    getPresignedUploadUrl: vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" })),
-    getPresignedDownloadUrl: vi.fn(async () => "https://r2/signed?response-content-disposition=stub"),
-    getFileBuffer: vi.fn(async () => Buffer.from("")),
-    getFileStream: vi.fn(async () => Readable.from(Buffer.from(""))),
-    keyFromPublicUrl: vi.fn((url: string) => url),
+    deleteFile,
+    uploadFile,
+    uploadBuffer,
+    uploadStream,
+    getPresignedUploadUrl,
+    getPresignedDownloadUrl,
+    getFileBuffer,
+    getFileStream,
+    keyFromPublicUrl,
+    storageProvider: () => providerStub,
   };
 });
 

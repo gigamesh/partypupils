@@ -1,80 +1,44 @@
+import type { NextRequest } from "next/server";
 import { revalidateTag } from "next/cache";
-import { NextRequest, NextResponse } from "next/server";
+import {
+  createAdminLinksHandlers,
+  type AdminDeps,
+} from "@gigamusic/admin/server";
+import { createQueries } from "@gigamusic/db";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
 import { prisma } from "@/lib/db";
-import { verifyAdminSession } from "@/lib/admin-auth";
+import { env } from "@/lib/env";
 import { LINKS_TAG } from "@/lib/cache-tags";
 
-export async function GET() {
-  if (!(await verifyAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
-  const links = await prisma.link.findMany({
-    orderBy: { position: "asc" },
-  });
+// The `AdminDeps` type wants the full bag (storage, audio, branding,
+// adminPasswordHash) but `createAdminLinksHandlers` only reads `queries` +
+// `adminSessionSecret`. Pass the live slice and cast the rest — keeps the
+// per-route bundle from pulling in storage/audio/email transitively.
+const handlers = createAdminLinksHandlers({
+  queries,
+  adminSessionSecret: env.ADMIN_SECRET(),
+} as unknown as AdminDeps);
 
-  return NextResponse.json(links);
+/** Re-validate the hero/links cache after every write so changes show up immediately. */
+async function withCacheBust(res: Response): Promise<Response> {
+  if (res.ok) revalidateTag(LINKS_TAG, "max");
+  return res;
+}
+
+export function GET(req: NextRequest) {
+  return handlers.GET(req);
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await verifyAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { title, url } = (await req.json()) as { title: string; url: string };
-
-  const maxPosition = await prisma.link.aggregate({ _max: { position: true } });
-  const link = await prisma.link.create({
-    data: { title, url, position: (maxPosition._max.position ?? -1) + 1 },
-  });
-
-  revalidateTag(LINKS_TAG, "max");
-
-  return NextResponse.json(link);
+  return withCacheBust(await handlers.POST(req));
 }
 
 export async function PUT(req: NextRequest) {
-  if (!(await verifyAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id, title, url, position, isVisible, showOnHero } =
-    (await req.json()) as {
-      id: number;
-      title?: string;
-      url?: string;
-      position?: number;
-      isVisible?: boolean;
-      showOnHero?: boolean;
-    };
-
-  const link = await prisma.link.update({
-    where: { id },
-    data: {
-      ...(title !== undefined && { title }),
-      ...(url !== undefined && { url }),
-      ...(position !== undefined && { position }),
-      ...(isVisible !== undefined && { isVisible }),
-      ...(showOnHero !== undefined && { showOnHero }),
-    },
-  });
-
-  revalidateTag(LINKS_TAG, "max");
-
-  return NextResponse.json(link);
+  return withCacheBust(await handlers.PUT(req));
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!(await verifyAdminSession())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const id = Number(searchParams.get("id"));
-
-  await prisma.link.delete({ where: { id } });
-
-  revalidateTag(LINKS_TAG, "max");
-
-  return NextResponse.json({ ok: true });
+  return withCacheBust(await handlers.DELETE(req));
 }

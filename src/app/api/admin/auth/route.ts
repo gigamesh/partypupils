@@ -1,39 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
-import { createAdminSession } from "@/lib/admin-auth";
+import type { NextRequest } from "next/server";
+import { createAdminLoginHandler } from "@gigamusic/admin/server";
+import { createQueries } from "@gigamusic/db";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
+import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
-import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
 
-const LOGIN_MAX_ATTEMPTS = 10;
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
-function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a, "utf8");
-  const bb = Buffer.from(b, "utf8");
-  if (ab.length !== bb.length) return false;
-  return timingSafeEqual(ab, bb);
-}
+// `queries` opts the package into its built-in per-IP brute-force rate limit
+// (10 attempts / 15 min, same shape as the old hand-rolled limiter on this
+// route). Without `queries` the handler skips the rate-limit check entirely.
+const handler = createAdminLoginHandler({
+  adminPasswordHash: env.ADMIN_PASSWORD_HASH(),
+  adminSessionSecret: env.ADMIN_SECRET(),
+  queries,
+});
 
-export async function POST(req: NextRequest) {
-  const ip = clientIp(req);
-  const allowed = await consumeRateLimit(
-    `admin-login:${ip}`,
-    LOGIN_MAX_ATTEMPTS,
-    LOGIN_WINDOW_MS,
-  );
-  if (!allowed) {
-    return NextResponse.json(
-      { error: "Too many attempts. Please try again later." },
-      { status: 429 },
-    );
-  }
-
-  const { password } = (await req.json()) as { password: string };
-
-  if (!password || !safeEqual(password, env.ADMIN_PASSWORD())) {
-    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
-  }
-
-  await createAdminSession();
-  return NextResponse.json({ ok: true });
+export function POST(req: NextRequest) {
+  return handler(req);
 }
