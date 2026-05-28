@@ -1,15 +1,9 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { createQueries } from "@gigamusic/db";
-import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
-import { prisma, withDbRetry } from "./db";
+import { prisma, queries, withDbRetry } from "./db";
 import { LINKS_TAG, RELEASES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;
-
-// Party-pupils' Prisma client is generated to src/generated/prisma but is
-// structurally compatible with the one @gigamusic/db expects.
-const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 /**
  * Wraps a cached database read so the unwrapped error makes it into the

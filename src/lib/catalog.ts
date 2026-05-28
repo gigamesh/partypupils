@@ -1,14 +1,10 @@
 import { unstable_cache } from "next/cache";
 import { applyCatalogDiscount, sumLineItems } from "@gigamusic/core";
-import { createQueries } from "@gigamusic/db";
-import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
-import { prisma } from "./db";
+import { prisma, queries } from "./db";
 import { RELEASES_TAG } from "./cache-tags";
 
 const DEFAULT_DISCOUNT_PERCENT = 15;
 const CATALOG_DISCOUNT_KEY = "catalog_discount_percent";
-
-const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 /**
  * Resolves the configurable "buy whole catalog" discount percentage.

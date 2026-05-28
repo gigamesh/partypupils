@@ -1,10 +1,4 @@
-import { createQueries } from "@gigamusic/db";
-import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
-import { prisma } from "./db";
-
-// Party-pupils' Prisma client is generated to src/generated/prisma but is
-// structurally compatible with the one @gigamusic/db expects.
-const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
+import { queries } from "./db";
 
 /**
  * Returns true if the given download token belongs to a completed order that

@@ -1,6 +1,8 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { createQueries } from "@gigamusic/db";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
 import { env } from "./env";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -55,6 +57,11 @@ export const prisma = new Proxy({} as PrismaClient, {
     return Reflect.get(globalForPrisma.prisma, prop);
   },
 });
+
+// Shared `@gigamusic/db` queries singleton. Built once at module load against
+// the lazy prisma proxy above — actual DB connections still defer until the
+// first query.
+export const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 const TRANSIENT_CONNECTION_ERROR_CODES = new Set([
   "ECONNRESET",
