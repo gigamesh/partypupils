@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { prisma, queries, withDbRetry } from "./db";
+import { queries, withDbRetry } from "./db";
 import { LINKS_TAG, RELEASES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;

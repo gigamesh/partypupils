@@ -1,33 +1,16 @@
 /**
- * Admin auth route — verifies bcrypt password compare and per-IP rate limiting
- * (the gigamusic package owns both; this exercises the wired handler end to
- * end against the real test database).
+ * Admin auth route — verifies timing-safe password compare and per-IP
+ * rate limiting backed by the shared Postgres counter.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
-import { hashAdminPassword } from "@gigamusic/core";
+import { POST as adminAuth } from "@/app/api/admin/auth/route";
+import * as adminAuthLib from "@/lib/admin-auth";
 
-// The route module reads `env.ADMIN_PASSWORD_HASH()` at import time, so the
-// hash and env mutation have to happen before the dynamic route import below.
-const passwordHash = await hashAdminPassword("test-correct-password");
-process.env.ADMIN_PASSWORD_HASH = passwordHash;
-
-// Mock `next/headers` cookies with a Map so we can observe what the package
-// writes after a successful login. Mirrors @gigamusic/admin's own test pattern.
-const cookieJar = vi.hoisted(() => new Map<string, { value: string }>());
-vi.mock("next/headers", () => ({
-  cookies: async () => ({
-    get(name: string) {
-      const entry = cookieJar.get(name);
-      return entry ? { name, value: entry.value } : undefined;
-    },
-    set(name: string, value: string) {
-      cookieJar.set(name, { value });
-    },
-  }),
-}));
-
-const { POST: adminAuth } = await import("@/app/api/admin/auth/route");
+beforeEach(() => {
+  vi.mocked(adminAuthLib.createAdminSession).mockClear();
+  process.env.ADMIN_PASSWORD = "test-correct-password";
+});
 
 function loginReq(password: string, ip = "1.1.1.1"): NextRequest {
   return new Request("http://test/api/admin/auth", {
@@ -41,19 +24,19 @@ function loginReq(password: string, ip = "1.1.1.1"): NextRequest {
 }
 
 describe("POST /api/admin/auth", () => {
-  it("loaded a deterministic hash fixture", () => {
-    expect(passwordHash.startsWith("$2")).toBe(true);
-  });
-
-  it("200s and writes a session cookie on the correct password", async () => {
-    cookieJar.clear();
+  it("200s and creates a session on the correct password", async () => {
     const res = await adminAuth(loginReq("test-correct-password"));
     expect(res.status).toBe(200);
-    expect(cookieJar.get("admin_session")?.value).toBeTruthy();
+    expect(vi.mocked(adminAuthLib.createAdminSession)).toHaveBeenCalledTimes(1);
   });
 
   it("401s on the wrong password", async () => {
     const res = await adminAuth(loginReq("nope"));
+    expect(res.status).toBe(401);
+  });
+
+  it("401s on a wrong-but-same-length password (timing-safe compare doesn't shortcut)", async () => {
+    const res = await adminAuth(loginReq("test-correct-passwore"));
     expect(res.status).toBe(401);
   });
 

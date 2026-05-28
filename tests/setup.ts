@@ -18,10 +18,9 @@ if (process.env.DATABASE_URL?.includes("neon.tech")) {
 }
 
 // Admin-auth: every protected route sees an authed admin by default. Re-mock per test for 401 paths.
-// `createAdminSession` is no longer part of the surface — the gigamusic
-// `createAdminLoginHandler` mints the cookie inside the package now.
 vi.mock("@/lib/admin-auth", () => ({
   verifyAdminSession: vi.fn(async () => true),
+  createAdminSession: vi.fn(async () => {}),
 }));
 
 // Stub external services. Stripe stub is a singleton so vi.mocked(stripe().X) and the

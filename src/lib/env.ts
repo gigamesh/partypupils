@@ -39,12 +39,7 @@ export const env = {
   STRIPE_SECRET_KEY: lazy("STRIPE_SECRET_KEY"),
   STRIPE_WEBHOOK_SECRET: lazy("STRIPE_WEBHOOK_SECRET"),
   ADMIN_SECRET: lazy("ADMIN_SECRET"),
-  /**
-   * Bcrypt hash of the admin password — what the login route compares against.
-   * Generate once with `pnpm tsx scripts/hash-admin-password.ts` and paste the
-   * result into `.env` (and `vercel env add ADMIN_PASSWORD_HASH` for prod).
-   */
-  ADMIN_PASSWORD_HASH: lazy("ADMIN_PASSWORD_HASH"),
+  ADMIN_PASSWORD: lazy("ADMIN_PASSWORD"),
   RESEND_API_KEY: lazy("RESEND_API_KEY"),
   EMAIL_FROM: lazy("EMAIL_FROM"),
   CONTACT_EMAIL: lazy("CONTACT_EMAIL"),
