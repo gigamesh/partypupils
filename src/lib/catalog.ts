@@ -2,9 +2,7 @@ import { unstable_cache } from "next/cache";
 import { applyCatalogDiscount, sumLineItems } from "@gigamusic/core";
 import { prisma, queries } from "./db";
 import { RELEASES_TAG } from "./cache-tags";
-
-const DEFAULT_DISCOUNT_PERCENT = 15;
-const CATALOG_DISCOUNT_KEY = "catalog_discount_percent";
+import { CATALOG_DISCOUNT_KEY, DEFAULT_DISCOUNT_PERCENT } from "./constants";
 
 /**
  * Resolves the configurable "buy whole catalog" discount percentage.
