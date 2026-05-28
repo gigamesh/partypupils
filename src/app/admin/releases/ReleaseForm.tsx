@@ -19,6 +19,10 @@ import {
 } from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
 import { combinedName, deriveTrackArtistTitle } from "@/lib/track-name";
+import {
+  validateReleaseFormState,
+  type ReleaseFormState,
+} from "@/lib/release-validation";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { DownloadButtons } from "@/components/DownloadButtons";
@@ -86,6 +90,79 @@ interface ExistingTrack {
   files: { format: string; fileName: string; storageKey: string; fileSize: number | null }[];
 }
 
+/** Reduce a `{ key: string[] }` server error map to `{ key: string }` for inline display. */
+function flattenFieldErrors(
+  fieldErrors: Record<string, unknown>,
+): Record<string, string> {
+  const flat: Record<string, string> = {};
+  for (const [key, msgs] of Object.entries(fieldErrors)) {
+    if (Array.isArray(msgs) && msgs.length > 0 && typeof msgs[0] === "string") {
+      flat[key] = msgs[0];
+    }
+  }
+  return flat;
+}
+
+/** Map a zod dotted-path key (`tracks[0].artist`) to a friendly form-summary label. */
+function friendlyFieldLabel(key: string): string {
+  const trackMatch = /^tracks\[(\d+)\]\.(.+)$/.exec(key);
+  if (trackMatch) {
+    const trackLabel = `Track ${Number(trackMatch[1]) + 1}`;
+    const fieldLabel = TRACK_FIELD_LABELS[trackMatch[2]] ?? trackMatch[2];
+    return `${trackLabel} — ${fieldLabel}`;
+  }
+  return RELEASE_FIELD_LABELS[key] ?? key;
+}
+
+/** Map a zod dotted-path key to the DOM id of the matching form field. */
+function fieldDomId(key: string): string {
+  const trackMatch = /^tracks\[(\d+)\]\.(.+)$/.exec(key);
+  if (trackMatch) {
+    const sub = trackMatch[2];
+    const subId = TRACK_FIELD_DOM_SUFFIX[sub] ?? sub;
+    return `track-${trackMatch[1]}-${subId}`;
+  }
+  return RELEASE_FIELD_DOM_ID[key] ?? key;
+}
+
+const RELEASE_FIELD_LABELS: Record<string, string> = {
+  name: "Release Name",
+  slug: "Slug",
+  price: "Release Price",
+  type: "Release Type",
+  tracks: "Tracks",
+  coverImageUrl: "Cover Image",
+  releasedAt: "Release Date",
+};
+
+const RELEASE_FIELD_DOM_ID: Record<string, string> = {
+  name: "name",
+  slug: "slug",
+  price: "price",
+  type: "type",
+  tracks: "tracks-section",
+  coverImageUrl: "cover-image",
+};
+
+const TRACK_FIELD_LABELS: Record<string, string> = {
+  name: "Title (Artist + Title combined cannot be empty)",
+  artist: "Artist",
+  slug: "Slug",
+  price: "Price",
+  files: "WAV file",
+};
+
+// Suffix mapping for the per-track DOM ids the form renders below
+// (`track-<index>-<suffix>`). `name` is a derived field — there's no single
+// input, but the artist field is the first thing the admin needs to fix.
+const TRACK_FIELD_DOM_SUFFIX: Record<string, string> = {
+  name: "artist",
+  artist: "artist",
+  slug: "slug",
+  price: "price",
+  files: "wav",
+};
+
 /** Read a Blob into a base64 `data:` URL — used for inline artwork preview and transport. */
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -134,7 +211,9 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   const [priceStr, setPriceStr] = useState(
     release ? (release.price / 100).toFixed(2) : ""
   );
-  const [type, setType] = useState(release?.type || "single");
+  const [type, setType] = useState<"album" | "single">(
+    (release?.type as "album" | "single") || "single",
+  );
   const [releasedAt, setReleasedAt] = useState(() => {
     if (!release?.releasedAt) return "";
     const d = new Date(release.releasedAt);
@@ -357,6 +436,43 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     await executeSubmit();
   }
 
+  function buildFormState(): ReleaseFormState {
+    const parsedPrice = parseFloat(priceStr);
+    const price = isNaN(parsedPrice) ? 0 : Math.round(parsedPrice * 100);
+    return {
+      name,
+      slug,
+      description,
+      priceCents: price,
+      type,
+      coverImageUrl: release?.coverImageUrl ?? null,
+      releasedAt: releasedAt
+        ? new Date(releasedAt + "T00:00:00Z").toISOString()
+        : null,
+      isPublished,
+      inRadio,
+      tracks: tracks.map((t) => {
+        const parsedTrackPrice = parseFloat(t.priceStr);
+        const trackPrice = isNaN(parsedTrackPrice)
+          ? 0
+          : Math.round(parsedTrackPrice * 100);
+        const trackName = combinedName(t.artist, t.title);
+        return {
+          existingId: t.existingId,
+          name: trackName,
+          artist: t.artist,
+          genre: t.genre,
+          slug: t.slug || slugify(trackName) || `track-${t.trackNumber}`,
+          priceCents: trackPrice,
+          trackNumber: t.trackNumber,
+          inRadio: t.inRadio,
+          hasNewWav: t.wavFile != null,
+          hasExistingWav: t.existingWavStorageKey != null,
+        };
+      }),
+    };
+  }
+
   async function executeSubmit() {
     setLoading(true);
     setError("");
@@ -364,10 +480,15 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     setStatus("");
 
     try {
-      const parsedPrice = parseFloat(priceStr);
-      const price = isNaN(parsedPrice) ? 0 : Math.round(parsedPrice * 100);
-      if (isPublished && price <= 0) {
-        setError("Please enter a valid release price.");
+      // Pre-flight: validate against the same server schema BEFORE any
+      // uploads start. Otherwise the admin can wait minutes for transcoding
+      // only to learn they forgot an artist name. Same fieldErrors shape the
+      // server would have returned, so the banner + inline error rendering
+      // below handles both paths identically.
+      const preflight = validateReleaseFormState(buildFormState());
+      if (!preflight.ok) {
+        setError("Please fix the issues below before saving.");
+        setFieldErrors(flattenFieldErrors(preflight.errors.fieldErrors));
         setLoading(false);
         return;
       }
@@ -462,11 +583,16 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       setProgress({ current: currentStep, total: totalSteps });
       setStatus("Saving release...");
 
+      const parsedReleasePrice = parseFloat(priceStr);
+      const releasePriceCents = isNaN(parsedReleasePrice)
+        ? 0
+        : Math.round(parsedReleasePrice * 100);
+
       const body = {
         name,
         slug,
         description: description || null,
-        price,
+        price: releasePriceCents,
         type,
         coverImageUrl,
         releasedAt: releasedAt ? new Date(releasedAt + "T00:00:00Z").toISOString() : null,
@@ -488,16 +614,12 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Something went wrong");
-        // Server returns { fieldErrors: { "tracks[0].artist": [msg], ... } }
-        // Flatten to first-message-per-field for inline display.
         if (data.fieldErrors && typeof data.fieldErrors === "object") {
-          const flat: Record<string, string> = {};
-          for (const [key, msgs] of Object.entries(data.fieldErrors)) {
-            if (Array.isArray(msgs) && msgs.length > 0 && typeof msgs[0] === "string") {
-              flat[key] = msgs[0];
-            }
-          }
-          setFieldErrors(flat);
+          setFieldErrors(
+            flattenFieldErrors(
+              data.fieldErrors as Record<string, unknown>,
+            ),
+          );
         }
         setLoading(false);
         setStatus("");
@@ -549,6 +671,37 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="glass-panel p-6 space-y-6">
+      {Object.keys(fieldErrors).length > 0 && (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 space-y-2"
+        >
+          <p className="text-sm font-medium text-destructive">
+            Please fix these issues before saving:
+          </p>
+          <ul className="space-y-1 text-sm">
+            {Object.keys(fieldErrors).map((key) => (
+              <li key={key}>
+                <button
+                  type="button"
+                  className="text-left underline hover:no-underline"
+                  onClick={() => {
+                    const el = document.getElementById(fieldDomId(key));
+                    if (el) {
+                      el.scrollIntoView({ behavior: "smooth", block: "center" });
+                      el.focus({ preventScroll: true });
+                    }
+                  }}
+                >
+                  <span className="font-medium">{friendlyFieldLabel(key)}:</span>{" "}
+                  <span className="text-muted-foreground">{fieldErrors[key]}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="name">Release Name</Label>
         <Input
@@ -588,7 +741,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           <select
             id="type"
             value={type}
-            onChange={(e) => setType(e.target.value)}
+            onChange={(e) => setType(e.target.value as "album" | "single")}
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
           >
             <option value="single">Single</option>
@@ -635,7 +788,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         />
       </div>
 
-      <div className="space-y-4">
+      <div id="tracks-section" className="space-y-4">
         <Label>Tracks</Label>
 
         {tracks.map((track, index) => (
@@ -730,8 +883,9 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Artist</Label>
+                <Label htmlFor={`track-${index}-artist`}>Artist</Label>
                 <Input
+                  id={`track-${index}-artist`}
                   value={track.artist}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -792,15 +946,23 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Price (USD)</Label>
-                <Input type="number" step="0.01" min="0" value={track.priceStr} onChange={(e) => updateTrack(index, "priceStr", e.target.value)} />
+                <Label htmlFor={`track-${index}-price`}>Price (USD)</Label>
+                <Input
+                  id={`track-${index}-price`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={track.priceStr}
+                  onChange={(e) => updateTrack(index, "priceStr", e.target.value)}
+                />
                 {fieldErrors[`tracks[${index}].price`] && (
                   <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].price`]}</p>
                 )}
               </div>
               <div className="space-y-1">
-                <Label>Slug</Label>
+                <Label htmlFor={`track-${index}-slug`}>Slug</Label>
                 <Input
+                  id={`track-${index}-slug`}
                   value={track.slug}
                   onChange={(e) => updateTrack(index, "slug", e.target.value)}
                 />
@@ -866,11 +1028,12 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               );
             })()}
             <div className="space-y-1">
-              <Label>
+              <Label htmlFor={`track-${index}-wav`}>
                 WAV File
                 {isPublished && !track.existingWavName && " (required to publish)"}
               </Label>
               <Input
+                id={`track-${index}-wav`}
                 type="file"
                 accept=".wav"
                 onChange={(e) => void handleWavSelect(index, e.target.files?.[0] || null)}
