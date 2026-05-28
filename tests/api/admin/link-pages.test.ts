@@ -128,19 +128,9 @@ describe("POST /api/admin/link-pages", () => {
     expect(body.error).toMatch(/already exists/i);
   });
 
-  it("returns 401 when not authenticated", async () => {
-    // The gigamusic link-pages factory verifies the session statelessly
-    // from req.headers.cookie, so an unauth request is one without the
-    // admin_session cookie attached. The shared `jsonRequest` helper
-    // always attaches it; here we build a request manually that doesn't.
-    const unauthRequest = new Request("http://test/api/admin/link-pages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "X", slug: "unauth" }),
-    }) as unknown as NextRequest;
-    const res = await createPage(unauthRequest);
-    expect(res.status).toBe(401);
-  });
+  // Auth is no longer checked inside the @gigamusic/admin handler factories
+  // (0.3.0). `src/proxy.ts` gates `/api/admin/*` upstream — see
+  // `tests/proxy.test.ts` for that coverage.
 });
 
 describe("GET /api/admin/link-pages", () => {
