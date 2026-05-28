@@ -50,9 +50,7 @@ vi.mock("stripe", () => ({
 }));
 
 vi.mock("@/lib/email", () => ({
-  sendPurchaseConfirmationEmail: vi.fn(async () => {}),
   sendOrderLookupEmail: vi.fn(async () => {}),
-  sendOrderLinkEmail: vi.fn(async () => {}),
   sendContactEmail: vi.fn(async () => {}),
   emailProvider: vi.fn(() => ({
     send: emailSendStub,
@@ -116,14 +114,12 @@ vi.mock("next/headers", async () => {
   };
 });
 
-// Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
-// `storageProvider` returns a `StorageProvider`-shaped object so the gigamusic
-// route factories that take the provider directly (download, zip, zip-stream)
-// see the same stubbed methods the legacy free-function imports do.
+// Storage stub — never hit R2 in tests. `storageProvider()` returns a
+// `StorageProvider`-shaped object whose methods are vi.fns, so tests can grab
+// the gigamusic factories' transitive calls via `vi.mocked(storageProvider()).<fn>`.
 vi.mock("@/lib/storage", async () => {
   const { Readable } = await import("stream");
   const deleteFile = vi.fn(async () => {});
-  const uploadFile = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
   const uploadBuffer = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
   const uploadStream = vi.fn(async () => ({ url: "https://r2/stub", storageKey: "https://r2/stub" }));
   const getPresignedUploadUrl = vi.fn(async () => ({ url: "https://r2/presign", publicUrl: "https://r2/stub" }));
@@ -145,14 +141,7 @@ vi.mock("@/lib/storage", async () => {
   };
   return {
     deleteFile,
-    uploadFile,
-    uploadBuffer,
-    uploadStream,
-    getPresignedUploadUrl,
     getPresignedDownloadUrl,
-    getFileBuffer,
-    getFileStream,
-    keyFromPublicUrl,
     storageProvider: () => providerStub,
   };
 });

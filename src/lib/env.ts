@@ -1,11 +1,5 @@
 /** Validated environment variables. Throws at first access if any are missing. */
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
-  return value;
-}
-
 function lazy(name: string, fallback?: () => string | undefined): () => string {
   let cached: string | undefined;
   return () => {

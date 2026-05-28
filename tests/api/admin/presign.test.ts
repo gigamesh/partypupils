@@ -5,10 +5,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import { POST as presign } from "@/app/api/admin/upload/presign/route";
-import { getPresignedUploadUrl } from "@/lib/storage";
+import { storageProvider } from "@/lib/storage";
+
+const getPresignedUploadUrl = vi.mocked(storageProvider().getPresignedUploadUrl);
 
 beforeEach(() => {
-  vi.mocked(getPresignedUploadUrl).mockClear();
+  getPresignedUploadUrl.mockClear();
 });
 
 function jsonReq(body: unknown): NextRequest {
@@ -31,7 +33,7 @@ describe("POST /api/admin/upload/presign", () => {
       jsonReq({ key: "audio/x/../../../etc/passwd.wav", contentType: "audio/wav" }),
     );
     expect(res.status).toBe(400);
-    expect(vi.mocked(getPresignedUploadUrl)).not.toHaveBeenCalled();
+    expect(getPresignedUploadUrl).not.toHaveBeenCalled();
   });
 
   it("400s when key uses an unknown top-level prefix", async () => {
@@ -62,7 +64,7 @@ describe("POST /api/admin/upload/presign", () => {
     expect(res.status).toBe(200);
     // `@gigamusic/admin`'s presign factory uses the `StorageProvider`
     // method signature: `(key, { contentType, expiresInSeconds? })`.
-    expect(vi.mocked(getPresignedUploadUrl)).toHaveBeenCalledWith(
+    expect(getPresignedUploadUrl).toHaveBeenCalledWith(
       "audio/album-slug/1/Track.wav",
       expect.objectContaining({ contentType: "audio/wav" }),
     );

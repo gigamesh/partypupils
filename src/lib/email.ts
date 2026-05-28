@@ -13,8 +13,6 @@ export const EMAIL_BRANDING: EmailBranding = {
   themeColor: "#adfd02",
 };
 
-const BRANDING = EMAIL_BRANDING;
-
 let _provider: ReturnType<typeof createResendProvider> | undefined;
 export function emailProvider() {
   if (!_provider) {
@@ -23,12 +21,9 @@ export function emailProvider() {
   return _provider;
 }
 
-// Internal alias preserved so the existing send helpers below don't churn.
-const provider = emailProvider;
-
 /** HTML body for the magic-link email that lets a customer re-access orders. */
 export function orderLookupEmailHtml(verifyUrl: string): string {
-  return renderOrderLookup({ branding: BRANDING, verifyUrl }).html;
+  return renderOrderLookup({ branding: EMAIL_BRANDING, verifyUrl }).html;
 }
 
 /** HTML body for the post-purchase confirmation email with a download link. */
@@ -38,7 +33,7 @@ export function purchaseConfirmationEmailHtml(
   totalCents = 0,
 ): string {
   return renderPurchaseConfirmation({
-    branding: BRANDING,
+    branding: EMAIL_BRANDING,
     verifyUrl,
     itemNames,
     totalCents,
@@ -56,7 +51,7 @@ export function contactEmailHtml({
   message: string;
 }): string {
   return renderContactForm({
-    branding: BRANDING,
+    branding: EMAIL_BRANDING,
     fromName: name,
     fromEmail: email,
     message,
@@ -64,29 +59,8 @@ export function contactEmailHtml({
 }
 
 export async function sendOrderLookupEmail(email: string, verifyUrl: string) {
-  const { subject, html } = renderOrderLookup({ branding: BRANDING, verifyUrl });
-  await provider().send({
-    from: env.EMAIL_FROM(),
-    to: email,
-    subject,
-    html,
-  });
-}
-
-/** Send a purchase confirmation email with a link to download music. */
-export async function sendPurchaseConfirmationEmail(
-  email: string,
-  verifyUrl: string,
-  itemNames: string[],
-  totalCents = 0,
-) {
-  const { subject, html } = renderPurchaseConfirmation({
-    branding: BRANDING,
-    verifyUrl,
-    itemNames,
-    totalCents,
-  });
-  await provider().send({
+  const { subject, html } = renderOrderLookup({ branding: EMAIL_BRANDING, verifyUrl });
+  await emailProvider().send({
     from: env.EMAIL_FROM(),
     to: email,
     subject,
@@ -105,12 +79,12 @@ export async function sendContactEmail({
   message: string;
 }) {
   const { subject, html } = renderContactForm({
-    branding: BRANDING,
+    branding: EMAIL_BRANDING,
     fromName: name,
     fromEmail: email,
     message,
   });
-  await provider().send({
+  await emailProvider().send({
     from: env.EMAIL_FROM(),
     to: env.CONTACT_EMAIL(),
     replyTo: email,
