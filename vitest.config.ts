@@ -32,6 +32,17 @@ export default defineConfig({
     // package without a `source` condition.
     conditions: ["source", "import", "module", "browser", "default"],
   },
+  // SSR-side conditions for vitest 4: the test runner loads modules in SSR
+  // mode, and conditions for that path live under `ssr.resolve.conditions`
+  // separately from `resolve.conditions`. Without `source` here, registry-
+  // installed @gigamusic/* packages fall through to `dist/index.js`, whose
+  // transpiled `import "next/server"` can't be resolved by Node through
+  // pnpm's isolated peer-dep node_modules tree.
+  ssr: {
+    resolve: {
+      conditions: ["source"],
+    },
+  },
   oxc: {
     jsx: {
       runtime: "automatic",
