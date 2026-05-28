@@ -21,8 +21,17 @@ function lazy(name: string, fallback?: () => string | undefined): () => string {
 
 export const env = {
   NEXT_PUBLIC_BASE_URL: lazy("NEXT_PUBLIC_BASE_URL", () => {
-    if (process.env.VERCEL_PROJECT_PRODUCTION_URL)
+    // `VERCEL_PROJECT_PRODUCTION_URL` is set on *every* deployment (it's the
+    // project's public production URL, exposed for cross-env links), so it
+    // can only be the right fallback when we're actually running in prod.
+    // Otherwise prefer the per-deployment `VERCEL_URL` so preview builds
+    // self-reference instead of redirecting users to production.
+    if (
+      process.env.VERCEL_ENV === "production" &&
+      process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ) {
       return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    }
     if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
     return undefined;
   }),
