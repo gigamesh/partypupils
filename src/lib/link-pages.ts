@@ -9,7 +9,9 @@ const REVALIDATE_SECONDS = 3600;
 
 // Party-pupils' Prisma client is generated to src/generated/prisma but is
 // structurally compatible with the one @gigamusic/links expects.
-const linkPageQueries = createLinkPageQueries(
+// Exported so the admin route wrappers can hand the same singleton to
+// `@gigamusic/links/server`'s admin handler factories.
+export const linkPageQueries = createLinkPageQueries(
   prisma as unknown as GigamusicPrismaClient,
 );
 
