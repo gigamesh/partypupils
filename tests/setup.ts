@@ -17,11 +17,15 @@ if (process.env.DATABASE_URL?.includes("neon.tech")) {
   );
 }
 
-// Admin-auth: every protected route sees an authed admin by default. Re-mock per test for 401 paths.
-// `createAdminSession` is no longer part of the surface — the gigamusic
-// `createAdminLoginHandler` mints the cookie inside the package now.
+// Admin-auth: every protected route sees an authed admin by default.
+// Re-mock per test for 401 paths. `createAdminSession` is the local
+// cookie writer used by the login route. `verifyAdminSessionFromRequest`
+// is the stateless variant used by `src/proxy.ts`.
 vi.mock("@/lib/admin-auth", () => ({
   verifyAdminSession: vi.fn(async () => true),
+  verifyAdminSessionFromRequest: vi.fn(async () => true),
+  createAdminSession: vi.fn(async () => {}),
+  clearAdminSession: vi.fn(async () => {}),
 }));
 
 // Stub external services. Stripe stub is a singleton so vi.mocked(stripe().X) and the
@@ -86,33 +90,11 @@ vi.mock("next/server", async () => {
   };
 });
 
-// `next/headers.cookies()` also needs a Next request scope. The gigamusic
-// admin handlers (`createAdminUploadProcessHandler`, etc.) verify the
-// session by calling `cookies().get("admin_session")`, so without a stub
-// they throw "cookies was called outside a request scope" before any test
-// assertion runs. Stub it with a synthetic jar that returns a freshly
-// signed admin session token — `isAdminAuthenticated(secret)` then verifies
-// against the same ADMIN_SECRET the route reads.
-const { adminSessionToken } = vi.hoisted(() => ({
-  adminSessionToken: { current: "" as string },
-}));
-vi.mock("next/headers", async () => {
-  const { createAdminSessionToken } = await import("@gigamusic/core");
-  adminSessionToken.current = await createAdminSessionToken({
-    secret: process.env.ADMIN_SECRET ?? "",
-  });
-  return {
-    cookies: async () => ({
-      get(name: string) {
-        if (name === "admin_session") {
-          return { name, value: adminSessionToken.current };
-        }
-        return undefined;
-      },
-      set: () => {},
-    }),
-  };
-});
+// `next/headers.cookies()` is only used by `src/lib/admin-auth.ts` for the
+// login + session-verify path. The handler factories under test no longer
+// touch cookies (auth is enforced by `src/proxy.ts` upstream of route
+// handlers), so no global stub is required. The login route's own test
+// (`tests/api/admin/auth.test.ts`) sets up its own per-file cookie jar.
 
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
 // `storageProvider` returns a `StorageProvider`-shaped object so the gigamusic

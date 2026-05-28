@@ -1,6 +1,9 @@
 /**
  * CRUD + slug validation tests for the LinkPage admin API.
- * Auth defaults to authed via the global mock in tests/setup.ts.
+ *
+ * Auth is enforced by `src/proxy.ts` upstream of these handlers, so the
+ * handlers themselves don't gate requests — these tests skip the session
+ * cookie entirely.
  */
 import { describe, it, expect } from "vitest";
 import type { NextRequest } from "next/server";
@@ -19,25 +22,11 @@ import {
 } from "@/app/api/admin/link-pages/[id]/items/route";
 import { prisma } from "@/lib/db";
 import { makeRelease } from "../../factories";
-import { createAdminSessionToken } from "@gigamusic/core";
-import { env } from "@/lib/env";
-
-// The gigamusic link-pages handlers verify the session by reading
-// `req.headers.get("cookie")` (stateless), so the global vi.mock of
-// `@/lib/admin-auth` doesn't gate these routes. Mint a real token signed
-// with the same secret the route uses; every request below carries it.
-const ADMIN_COOKIE = await (async () => {
-  const token = await createAdminSessionToken({ secret: env.ADMIN_SECRET() });
-  return `admin_session=${token}`;
-})();
 
 function jsonRequest(method: string, body: unknown, search = ""): NextRequest {
   return new Request(`http://test/api${search}`, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      cookie: ADMIN_COOKIE,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   }) as unknown as NextRequest;
 }
@@ -45,7 +34,6 @@ function jsonRequest(method: string, body: unknown, search = ""): NextRequest {
 function deleteRequest(search = ""): NextRequest {
   return new Request(`http://test/api${search}`, {
     method: "DELETE",
-    headers: { cookie: ADMIN_COOKIE },
   }) as unknown as NextRequest;
 }
 
@@ -62,9 +50,7 @@ const rootCtx = { params: Promise.resolve({} as Record<string, never>) };
 const createPage = (req: NextRequest) => createPageRaw(req, rootCtx);
 const listPages = () =>
   listPagesRaw(
-    new Request("http://test/api/admin/link-pages", {
-      headers: { cookie: ADMIN_COOKIE },
-    }) as unknown as NextRequest,
+    new Request("http://test/api/admin/link-pages") as unknown as NextRequest,
     rootCtx,
   );
 
@@ -125,19 +111,10 @@ describe("POST /api/admin/link-pages", () => {
     expect(body.error).toMatch(/already exists/i);
   });
 
-  it("returns 401 when not authenticated", async () => {
-    // The gigamusic link-pages factory verifies the session statelessly
-    // from req.headers.cookie, so an unauth request is one without the
-    // admin_session cookie attached. The shared `jsonRequest` helper
-    // always attaches it; here we build a request manually that doesn't.
-    const unauthRequest = new Request("http://test/api/admin/link-pages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "X", slug: "unauth" }),
-    }) as unknown as NextRequest;
-    const res = await createPage(unauthRequest);
-    expect(res.status).toBe(401);
-  });
+  // No "401 when not authenticated" test — auth is enforced by
+  // `src/proxy.ts` upstream of these handlers, and is tested separately
+  // via the proxy itself. Tests/api/admin/auth.test.ts covers the
+  // login-route side of the same auth model.
 });
 
 describe("GET /api/admin/link-pages", () => {

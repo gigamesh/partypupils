@@ -1,12 +1,10 @@
 import type { NextRequest } from "next/server";
 import { createAdminLinkPagesHandlers } from "@gigamusic/links/server";
 import { linkPageQueries } from "@/lib/link-pages";
-import { env } from "@/lib/env";
 
-const handlers = createAdminLinkPagesHandlers({
-  queries: linkPageQueries,
-  adminSessionSecret: env.ADMIN_SECRET(),
-});
+// Auth is enforced upstream by `src/proxy.ts`; the package no longer
+// verifies sessions inside handlers.
+const handlers = createAdminLinkPagesHandlers({ queries: linkPageQueries });
 
 interface RouteContext {
   params: Promise<Record<string, never>>;

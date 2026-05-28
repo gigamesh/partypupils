@@ -5,11 +5,16 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type { NextRequest } from "next/server";
-import { hashAdminPassword } from "@gigamusic/core";
+import { hashPassword } from "@gigamusic/core";
+
+// Opt out of the global `vi.mock("@/lib/admin-auth")` from tests/setup.ts —
+// this test exercises the real login route, including the real cookie write
+// from `createAdminSession`.
+vi.unmock("@/lib/admin-auth");
 
 // The route module reads `env.ADMIN_PASSWORD_HASH()` at import time, so the
 // hash and env mutation have to happen before the dynamic route import below.
-const passwordHash = await hashAdminPassword("test-correct-password");
+const passwordHash = await hashPassword("test-correct-password");
 process.env.ADMIN_PASSWORD_HASH = passwordHash;
 
 // Mock `next/headers` cookies with a Map so we can observe what the package

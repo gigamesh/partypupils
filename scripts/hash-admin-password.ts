@@ -12,8 +12,8 @@
 import "@dotenvx/dotenvx/config";
 import bcrypt from "bcryptjs";
 
-// 12 matches @gigamusic/core's hashAdminPassword. Kept inline so the
-// script can be invoked via tsx (CJS) without dragging in the ESM-only
+// 12 matches `@gigamusic/core.hashPassword`. Kept inline so the script can
+// be invoked via tsx (CJS) without dragging in the ESM-only
 // @gigamusic/core entry.
 const SALT_ROUNDS = 12;
 
