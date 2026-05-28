@@ -96,8 +96,9 @@ const { adminSessionToken } = vi.hoisted(() => ({
   adminSessionToken: { current: "" as string },
 }));
 vi.mock("next/headers", async () => {
-  const { createAdminSessionToken } = await import("@gigamusic/core");
-  adminSessionToken.current = await createAdminSessionToken({
+  const { signSessionToken } = await import("@gigamusic/core");
+  adminSessionToken.current = await signSessionToken({
+    payload: { admin: true },
     secret: process.env.ADMIN_SECRET ?? "",
   });
   return {

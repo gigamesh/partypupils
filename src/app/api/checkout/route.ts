@@ -7,25 +7,25 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/utils";
 import { DEFAULT_CURRENCY, SITE_NAME } from "@/lib/constants";
-import { getCatalogDiscount } from "@/lib/catalog";
+import { getCatalogPrice } from "@/lib/catalog";
 import { isAllowedRequestOrigin } from "@/lib/urls";
 
 const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
-// Built once at module load. The `catalogDiscount` callback is resolved at
-// request time so an admin-changed catalog-discount SiteSetting picks up on
-// the next call without a deployment cycle — no per-request handler
-// reconstruction needed.
+// `catalogPurchase` is resolved at request time so admin-changed catalog
+// pricing picks up on the next call without redeploying. 0.3.0 made the
+// consumer own pricing math (the package no longer applies a discount
+// percent itself), so we pass the already-computed `totalCents` here.
 const handler = createCheckoutHandler({
   stripeSecret: env.STRIPE_SECRET_KEY(),
   queries,
   baseUrl: getBaseUrl(),
   currency: DEFAULT_CURRENCY,
-  catalogDiscount: async () => {
-    const percent = await getCatalogDiscount();
+  catalogPurchase: async () => {
+    const { discountedPrice, discountPercent } = await getCatalogPrice();
     return {
-      percent,
-      productName: `${SITE_NAME} — Complete Catalog (${percent}% off)`,
+      totalCents: discountedPrice,
+      productName: `${SITE_NAME} — Complete Catalog (${discountPercent}% off)`,
     };
   },
 });

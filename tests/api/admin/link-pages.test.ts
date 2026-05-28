@@ -19,15 +19,18 @@ import {
 } from "@/app/api/admin/link-pages/[id]/items/route";
 import { prisma } from "@/lib/db";
 import { makeRelease } from "../../factories";
-import { createAdminSessionToken } from "@gigamusic/core";
+import { signSessionToken } from "@gigamusic/core";
 import { env } from "@/lib/env";
 
-// The gigamusic link-pages handlers verify the session by reading
-// `req.headers.get("cookie")` (stateless), so the global vi.mock of
-// `@/lib/admin-auth` doesn't gate these routes. Mint a real token signed
-// with the same secret the route uses; every request below carries it.
+// @gigamusic/links 0.3.0's link-page handlers no longer verify the session
+// themselves (auth moved to `src/proxy.ts`), so this cookie isn't strictly
+// required for these tests anymore. Kept attached to match how a real
+// browser request looks, in case the package re-adds a stateless check.
 const ADMIN_COOKIE = await (async () => {
-  const token = await createAdminSessionToken({ secret: env.ADMIN_SECRET() });
+  const token = await signSessionToken({
+    payload: { admin: true },
+    secret: env.ADMIN_SECRET(),
+  });
   return `admin_session=${token}`;
 })();
 
