@@ -1,5 +1,4 @@
 import { unstable_cache } from "next/cache";
-import { applyCatalogDiscount, sumLineItems } from "@gigamusic/core";
 import { prisma, queries } from "./db";
 import { RELEASES_TAG } from "./cache-tags";
 import { CATALOG_DISCOUNT_KEY, DEFAULT_DISCOUNT_PERCENT } from "./constants";
@@ -25,7 +24,6 @@ export async function getCatalogDiscount(): Promise<number> {
  * The release fetch stays as a lean `findMany` (id + price only); routing it
  * through `queries.listPublishedReleases` would pull tracks + files on every
  * homepage render, which this projection is specifically designed to avoid.
- * The discount math is owned by `@gigamusic/core.applyCatalogDiscount`.
  */
 export const getCatalogPrice = unstable_cache(
   async () => {
@@ -37,13 +35,10 @@ export const getCatalogPrice = unstable_cache(
       getCatalogDiscount(),
     ]);
 
-    const originalPrice = sumLineItems(
-      releases.map((r) => ({ id: r.id, priceCents: r.price })),
-    );
-    const { totalCents: discountedPrice } = applyCatalogDiscount(
-      originalPrice,
-      discountPercent,
-    );
+    const originalPrice = releases.reduce((sum, r) => sum + r.price, 0);
+    // Round to whole dollars so the displayed price stays tidy.
+    const discountedPrice =
+      Math.round((originalPrice * (1 - discountPercent / 100)) / 100) * 100;
 
     return {
       originalPrice,
