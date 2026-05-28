@@ -24,11 +24,14 @@ export default function CartPage() {
     setLoading(true);
     setError("");
     try {
-      const cartItems = items.map((i) => ({
-        releaseId: i.releaseId,
-        trackId: i.trackId,
-        catalogPurchase: i.catalogPurchase,
-      }));
+      // Emit @gigamusic/checkout's canonical { kind, id } shape directly —
+      // the route used to translate this from {releaseId,trackId,catalogPurchase},
+      // but now passes it through to createCheckoutHandler unchanged.
+      const cartItems = items.map((i) => {
+        if (i.catalogPurchase) return { kind: "catalog" as const };
+        if (i.trackId != null) return { kind: "track" as const, id: i.trackId };
+        return { kind: "release" as const, id: i.releaseId };
+      });
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

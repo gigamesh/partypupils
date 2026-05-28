@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CATALOG_DISCOUNT_KEY } from "@/lib/constants";
 
 interface SettingsFormProps {
   catalogDiscount: string;
@@ -20,7 +21,7 @@ export function SettingsForm({ catalogDiscount }: SettingsFormProps) {
     await fetch("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "catalog_discount_percent", value: discount }),
+      body: JSON.stringify({ key: CATALOG_DISCOUNT_KEY, value: discount }),
     });
     setLoading(false);
     setSaved(true);

@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { CATALOG_DISCOUNT_KEY, DEFAULT_DISCOUNT_PERCENT } from "../src/lib/constants";
 import { slugify } from "../src/lib/utils";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -111,9 +112,9 @@ async function main() {
 
   // Site settings
   await prisma.siteSetting.upsert({
-    where: { key: "catalog_discount_percent" },
+    where: { key: CATALOG_DISCOUNT_KEY },
     update: {},
-    create: { key: "catalog_discount_percent", value: "15" },
+    create: { key: CATALOG_DISCOUNT_KEY, value: String(DEFAULT_DISCOUNT_PERCENT) },
   });
 
   // Links

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendContactEmail } from "@/lib/email";
 import { isAllowedRequestOrigin } from "@/lib/urls";
-import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
+import { queries } from "@/lib/db";
+import { clientIp } from "@/lib/rate-limit";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX = 3;
@@ -19,10 +20,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const allowed = await consumeRateLimit(
+  const { ok: allowed } = await queries.consumeRateLimit(
     `contact:${clientIp(req)}`,
-    RATE_LIMIT_MAX,
-    RATE_LIMIT_WINDOW_MS,
+    { max: RATE_LIMIT_MAX, windowMs: RATE_LIMIT_WINDOW_MS },
   );
   if (!allowed) {
     return NextResponse.json(

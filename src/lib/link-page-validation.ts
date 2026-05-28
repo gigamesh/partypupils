@@ -1,5 +1,7 @@
+import { RESERVED_SLUGS as GIGAMUSIC_RESERVED_SLUGS } from "@gigamusic/core";
+
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const RESERVED_SLUGS = new Set(["new", "edit", "admin", "api"]);
+export const RESERVED_SLUGS = new Set<string>(GIGAMUSIC_RESERVED_SLUGS);
 
 export const INVALID_SLUG_MESSAGE =
   "Slug must be lowercase letters, numbers, and dashes";

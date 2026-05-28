@@ -5,6 +5,15 @@ const r2Hostname = process.env.R2_PUBLIC_URL
   : "localhost";
 
 const nextConfig: NextConfig = {
+  // @gigamusic/{config,ui,admin,links} ship as raw TS source (Type B in
+  // gigamusic's packaging convention) and rely on the consumer's Next compiler
+  // to handle their `"use client"` directives and JSX.
+  transpilePackages: [
+    "@gigamusic/config",
+    "@gigamusic/ui",
+    "@gigamusic/admin",
+    "@gigamusic/links",
+  ],
   images: {
     remotePatterns: [
       {

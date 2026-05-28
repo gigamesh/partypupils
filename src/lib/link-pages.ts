@@ -1,9 +1,17 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
+import { createLinkPageQueries } from "@gigamusic/links";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
 import { prisma } from "./db";
 import { LINK_PAGES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;
+
+// Party-pupils' Prisma client is generated to src/generated/prisma but is
+// structurally compatible with the one @gigamusic/links expects.
+const linkPageQueries = createLinkPageQueries(
+  prisma as unknown as GigamusicPrismaClient,
+);
 
 /**
  * Public link page by slug. Includes visible items (ordered) and the
@@ -12,19 +20,7 @@ const REVALIDATE_SECONDS = 3600;
  */
 export const getPublicLinkPageBySlug = cache(
   unstable_cache(
-    (slug: string) =>
-      prisma.linkPage.findFirst({
-        where: { slug, isPublished: true },
-        include: {
-          // Only fields the public surface actually uses, plus isPublished so
-          // callers can refuse to fall back through a draft release.
-          release: { select: { coverImageUrl: true, isPublished: true } },
-          items: {
-            where: { isVisible: true },
-            orderBy: { position: "asc" },
-          },
-        },
-      }),
+    (slug: string) => linkPageQueries.getPublicLinkPageBySlug(slug),
     ["public-link-page-by-slug-v2"],
     { tags: [LINK_PAGES_TAG], revalidate: REVALIDATE_SECONDS },
   ),

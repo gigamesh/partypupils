@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  const ok = await tokenGrantsTrack(token, trackId, file.track.releaseId);
+  const ok = await tokenGrantsTrack({ token, trackId });
   if (!ok) {
     return NextResponse.json({ error: "Track not in order" }, { status: 403 });
   }

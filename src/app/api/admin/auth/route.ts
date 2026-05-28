@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { createAdminSession } from "@/lib/admin-auth";
+import { queries } from "@/lib/db";
 import { env } from "@/lib/env";
-import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
+import { clientIp } from "@/lib/rate-limit";
 
 const LOGIN_MAX_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -16,10 +17,9 @@ function safeEqual(a: string, b: string): boolean {
 
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);
-  const allowed = await consumeRateLimit(
+  const { ok: allowed } = await queries.consumeRateLimit(
     `admin-login:${ip}`,
-    LOGIN_MAX_ATTEMPTS,
-    LOGIN_WINDOW_MS,
+    { max: LOGIN_MAX_ATTEMPTS, windowMs: LOGIN_WINDOW_MS },
   );
   if (!allowed) {
     return NextResponse.json(

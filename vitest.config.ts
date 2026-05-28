@@ -10,10 +10,43 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 20000,
     hookTimeout: 20000,
+    server: {
+      deps: {
+        // Inline gigamusic packages and stripe so module mocks (vi.mock) apply to
+        // their transitive imports. Without this, vite externalizes deps and the
+        // route handler's `new Stripe()` bypasses the test's mock.
+        inline: [/^@gigamusic\//, "stripe"],
+      },
+    },
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+    },
+    // Force a single copy of next/react so vi.mock("next/server") and friends
+    // apply across both this app and inlined @gigamusic/* packages.
+    dedupe: ["next", "react", "react-dom", "stripe"],
+    // Pick the `source` export condition first so vitest resolves linked
+    // @gigamusic/* packages to their src/index.ts (and gets type-aligned
+    // navigation as a bonus). Falls through to `import`/`default` for any
+    // package without a `source` condition.
+    conditions: ["source", "import", "module", "browser", "default"],
+  },
+  // SSR-side conditions for vitest 4: the test runner loads modules in SSR
+  // mode, and conditions for that path live under `ssr.resolve.conditions`
+  // separately from `resolve.conditions`. Without `source` here, registry-
+  // installed @gigamusic/* packages fall through to `dist/index.js`, whose
+  // transpiled `import "next/server"` can't be resolved by Node through
+  // pnpm's isolated peer-dep node_modules tree.
+  ssr: {
+    resolve: {
+      conditions: ["source"],
+    },
+  },
+  oxc: {
+    jsx: {
+      runtime: "automatic",
+      importSource: "react",
     },
   },
 });

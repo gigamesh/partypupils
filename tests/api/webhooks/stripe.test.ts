@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST as stripeWebhook } from "@/app/api/webhooks/stripe/route";
 import { stripe } from "@/lib/stripe";
-import { sendPurchaseConfirmationEmail } from "@/lib/email";
 import { prisma } from "@/lib/db";
+import { emailSendStub } from "../../setup";
 import { makeRelease, makeTrackWithFile } from "../../factories";
 
 function webhookReq(rawBody: string) {
@@ -19,8 +19,8 @@ function webhookReq(rawBody: string) {
 
 beforeEach(() => {
   vi.mocked(stripe().webhooks.constructEvent).mockReset();
-  vi.mocked(sendPurchaseConfirmationEmail).mockReset();
-  vi.mocked(sendPurchaseConfirmationEmail).mockResolvedValue(undefined);
+  // emailSendStub is reset by tests/setup.ts. Re-installing a default resolution
+  // here is redundant; tests that need a rejection override per-call.
 });
 
 describe("POST /api/webhooks/stripe", () => {
@@ -114,7 +114,7 @@ describe("POST /api/webhooks/stripe", () => {
     const res = await stripeWebhook(webhookReq("{}") as never);
     // 200 (not 500): we don't want Stripe retrying just because a sibling delivery won the race.
     expect(res.status).toBe(200);
-    expect(vi.mocked(sendPurchaseConfirmationEmail)).not.toHaveBeenCalled();
+    expect(emailSendStub).not.toHaveBeenCalled();
 
     // adapter-pg leaves the pooled connection in an aborted-transaction state
     // after a P2002 inside an implicit transaction; same workaround as the
@@ -155,7 +155,7 @@ describe("POST /api/webhooks/stripe", () => {
     const orders = await prisma.order.findMany({ where: { stripeSessionId: "cs_test_dup" } });
     expect(orders).toHaveLength(1);
     // The retry must short-circuit before scheduling another email send.
-    expect(vi.mocked(sendPurchaseConfirmationEmail)).toHaveBeenCalledTimes(1);
+    expect(emailSendStub).toHaveBeenCalledTimes(1);
   });
 
   it("still creates an Order when customer_details.email is empty (logs a warning)", async () => {
@@ -182,7 +182,7 @@ describe("POST /api/webhooks/stripe", () => {
     expect(order).not.toBeNull();
     expect(order?.email).toBe("");
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no customer_details.email"));
-    expect(vi.mocked(sendPurchaseConfirmationEmail)).not.toHaveBeenCalled();
+    expect(emailSendStub).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });
@@ -190,7 +190,7 @@ describe("POST /api/webhooks/stripe", () => {
   it("does not retry the whole webhook when the confirmation email fails", async () => {
     const release = await makeRelease();
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.mocked(sendPurchaseConfirmationEmail).mockRejectedValueOnce(new Error("Resend is down"));
+    emailSendStub.mockRejectedValueOnce(new Error("Resend is down"));
 
     vi.mocked(stripe().webhooks.constructEvent).mockReturnValueOnce({
       type: "checkout.session.completed",

@@ -17,7 +17,9 @@ export async function GET() {
   }
 
   const pages = await prisma.linkPage.findMany({
-    orderBy: { updatedAt: "desc" },
+    // `id` tiebreaker keeps ordering deterministic when two rows land in the
+    // same millisecond (Prisma's DateTime is `timestamp(3)`).
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     include: {
       release: { select: { id: true, name: true, slug: true, coverImageUrl: true } },
       _count: { select: { items: true } },
