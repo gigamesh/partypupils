@@ -22,7 +22,7 @@ export function ReleaseCard({ id, name, slug, price, type, coverImageUrl, showPr
       href={`/music/${slug}`}
       className="group block overflow-hidden rounded-lg border border-white/10 bg-card transition-all hover:border-white/25 hover:shadow-[0_0_20px_rgba(173,253,2,0.15)]"
     >
-      <div className="relative aspect-square bg-muted">
+      <div className="relative aspect-square overflow-hidden bg-muted">
         {coverImageUrl ? (
           <Image
             src={coverImageUrl}
