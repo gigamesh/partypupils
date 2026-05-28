@@ -24,9 +24,6 @@ export default function CartPage() {
     setLoading(true);
     setError("");
     try {
-      // Emit @gigamusic/checkout's canonical { kind, id } shape directly —
-      // the route used to translate this from {releaseId,trackId,catalogPurchase},
-      // but now passes it through to createCheckoutHandler unchanged.
       const cartItems = items.map((i) => {
         if (i.catalogPurchase) return { kind: "catalog" as const };
         if (i.trackId != null) return { kind: "track" as const, id: i.trackId };
