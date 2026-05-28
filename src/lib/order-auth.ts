@@ -1,19 +1,23 @@
-import { SignJWT, jwtVerify } from "jose";
+import { signOrderToken, verifyOrderToken } from "@gigamusic/core";
 import { env } from "./env";
 
-const secret = () => new TextEncoder().encode(env.ADMIN_SECRET());
-
+/**
+ * Magic-link order-verification token. Party-pupils' order lookup is keyed by
+ * email only (no order id), so we sign with an empty `orderId` placeholder.
+ */
 export async function createOrderVerificationToken(email: string): Promise<string> {
-  return new SignJWT({ email })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("1h")
-    .sign(secret());
+  return signOrderToken({
+    orderId: "",
+    email,
+    secret: env.ADMIN_SECRET(),
+    expiresIn: "1h",
+  });
 }
 
 export async function verifyOrderVerificationToken(token: string): Promise<string | null> {
   try {
-    const { payload } = await jwtVerify(token, secret());
-    return (payload.email as string) || null;
+    const { email } = await verifyOrderToken(token, env.ADMIN_SECRET());
+    return email || null;
   } catch {
     return null;
   }

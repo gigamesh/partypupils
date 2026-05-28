@@ -1,4 +1,10 @@
+import { createQueries } from "@gigamusic/db";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
 import { prisma } from "./db";
+
+// The party-pupils Prisma client is generated to src/generated/prisma but is
+// structurally compatible with the one @gigamusic/db expects.
+const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 /**
  * Fixed-window rate limiter backed by Postgres so the limit is shared across
@@ -6,43 +12,16 @@ import { prisma } from "./db";
  * counter has been bumped, `false` when the caller is over the cap for the
  * current window. Older windows reset on the next call (no background sweeper).
  *
- * The counter update is a single `INSERT ... ON CONFLICT DO UPDATE` so two
- * concurrent calls serialize on the row lock — read-then-update at Postgres'
- * default Read Committed isolation would let parallel attackers both observe
- * the same `count` and both write `count + 1`, silently bypassing the cap.
- *
- * For most pages a 15-minute window with single-digit `max` is plenty; this is
- * not a precise sliding window — bursts at the boundary can roughly double the
- * effective rate, which is fine for abuse control rather than fairness.
+ * Wraps `@gigamusic/db`'s `consumeRateLimit` (which returns an object) with the
+ * legacy boolean signature party-pupils call sites expect.
  */
 export async function consumeRateLimit(
   key: string,
   max: number,
   windowMs: number,
 ): Promise<boolean> {
-  const now = new Date();
-  const windowCutoff = new Date(now.getTime() - windowMs);
-
-  // The CASE branches handle two paths atomically:
-  //   - existing window has expired → reset count=1, windowStart=now
-  //   - existing window is current → increment count, keep windowStart
-  // RETURNING gives us the post-update count to compare against `max`.
-  const rows = await prisma.$queryRaw<{ count: number }[]>`
-    INSERT INTO "rate_limits" ("key", "count", "windowStart", "updatedAt")
-    VALUES (${key}, 1, ${now}, ${now})
-    ON CONFLICT ("key") DO UPDATE SET
-      "count" = CASE
-        WHEN "rate_limits"."windowStart" < ${windowCutoff} THEN 1
-        ELSE "rate_limits"."count" + 1
-      END,
-      "windowStart" = CASE
-        WHEN "rate_limits"."windowStart" < ${windowCutoff} THEN ${now}
-        ELSE "rate_limits"."windowStart"
-      END,
-      "updatedAt" = ${now}
-    RETURNING "count";
-  `;
-  return rows[0].count <= max;
+  const { ok } = await queries.consumeRateLimit(key, { max, windowMs });
+  return ok;
 }
 
 /** Pull the originating IP from request headers; falls back to a stable string. */

@@ -1,128 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { createCheckoutHandler } from "@gigamusic/checkout";
+import { createQueries } from "@gigamusic/db";
+import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
 import { prisma } from "@/lib/db";
-import { stripe } from "@/lib/stripe";
+import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/utils";
-import { DEFAULT_CURRENCY } from "@/lib/constants";
-import { getCatalogPrice } from "@/lib/catalog";
+import { DEFAULT_CURRENCY, SITE_NAME } from "@/lib/constants";
+import { getCatalogDiscount } from "@/lib/catalog";
 import { isAllowedRequestOrigin } from "@/lib/urls";
 
-interface CartItem {
-  releaseId?: number;
-  trackId?: number;
-  catalogPurchase?: boolean;
-}
+const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
+// Built once at module load. The `catalogDiscount` callback is resolved at
+// request time so an admin-changed catalog-discount SiteSetting picks up on
+// the next call without a deployment cycle — no per-request handler
+// reconstruction needed.
+const handler = createCheckoutHandler({
+  stripeSecret: env.STRIPE_SECRET_KEY(),
+  queries,
+  baseUrl: getBaseUrl(),
+  currency: DEFAULT_CURRENCY,
+  catalogDiscount: async () => {
+    const percent = await getCatalogDiscount();
+    return {
+      percent,
+      productName: `${SITE_NAME} — Complete Catalog (${percent}% off)`,
+    };
+  },
+});
+
+/**
+ * Stripe Checkout entry point. Body lives in
+ * `@gigamusic/checkout.createCheckoutHandler`; this file is just the
+ * env-reading boundary plus a CSRF origin check (the package is intentionally
+ * CSRF-agnostic). Cart UI emits the canonical `{ kind, id }` shape directly,
+ * so the body passes through untouched.
+ */
 export async function POST(req: NextRequest) {
   if (!isAllowedRequestOrigin(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-
-  const { items } = (await req.json()) as { items: CartItem[] };
-
-  if (!items || items.length === 0) {
-    return NextResponse.json({ error: "No items provided" }, { status: 400 });
-  }
-
-  const isCatalogPurchase = items.some((i) => i.catalogPurchase);
-  const baseUrl = getBaseUrl();
-  console.log("[checkout] baseUrl:", JSON.stringify(baseUrl));
-
-  try {
-    if (isCatalogPurchase) {
-      const catalog = await getCatalogPrice();
-
-      const session = await stripe().checkout.sessions.create({
-        mode: "payment",
-        line_items: [
-          {
-            price_data: {
-              currency: DEFAULT_CURRENCY,
-              product_data: {
-                name: `Party Pupils — Complete Catalog (${catalog.discountPercent}% off)`,
-              },
-              unit_amount: catalog.discountedPrice,
-            },
-            quantity: 1,
-          },
-        ],
-        metadata: {
-          catalog_purchase: "true",
-          release_ids: JSON.stringify(catalog.releaseIds),
-          track_ids: "[]",
-        },
-        success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/cart`,
-      });
-
-      return NextResponse.json({ url: session.url });
-    }
-
-    const releaseIds = items.filter((i) => i.releaseId).map((i) => i.releaseId!);
-    const trackIds = items.filter((i) => i.trackId).map((i) => i.trackId!);
-
-    const [releases, tracks] = await Promise.all([
-      releaseIds.length > 0
-        ? prisma.release.findMany({ where: { id: { in: releaseIds }, isPublished: true } })
-        : [],
-      trackIds.length > 0
-        ? prisma.track.findMany({ where: { id: { in: trackIds } }, include: { release: true } })
-        : [],
-    ]);
-
-    const toAbsoluteUrl = (url: string) => {
-      const raw = url.startsWith("http") ? url : `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
-      try {
-        const parsed = new URL(raw);
-        parsed.pathname = encodeURI(decodeURI(parsed.pathname));
-        return parsed.toString();
-      } catch {
-        return raw;
-      }
-    };
-
-    const lineItems = [
-      ...releases.map((r) => ({
-        price_data: {
-          currency: DEFAULT_CURRENCY,
-          product_data: {
-            name: r.name,
-            ...(r.coverImageUrl ? { images: [toAbsoluteUrl(r.coverImageUrl)] } : {}),
-          },
-          unit_amount: r.price,
-        },
-        quantity: 1 as const,
-      })),
-      ...tracks.map((t) => ({
-        price_data: {
-          currency: DEFAULT_CURRENCY,
-          product_data: {
-            name: `${t.release.name} — ${t.name}`,
-            ...(t.release.coverImageUrl ? { images: [toAbsoluteUrl(t.release.coverImageUrl)] } : {}),
-          },
-          unit_amount: t.price,
-        },
-        quantity: 1 as const,
-      })),
-    ];
-
-    if (lineItems.length === 0) {
-      return NextResponse.json({ error: "No valid items found" }, { status: 400 });
-    }
-
-    const session = await stripe().checkout.sessions.create({
-      mode: "payment",
-      line_items: lineItems,
-      metadata: {
-        release_ids: JSON.stringify(releases.map((r) => r.id)),
-        track_ids: JSON.stringify(tracks.map((t) => t.id)),
-      },
-      success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/cart`,
-    });
-
-    return NextResponse.json({ url: session.url });
-  } catch (err) {
-    console.error("Stripe checkout error:", err);
-    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
-  }
+  return handler(req);
 }
