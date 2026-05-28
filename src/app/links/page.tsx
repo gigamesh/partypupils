@@ -2,6 +2,7 @@ import Image from "@/components/Image";
 import { LinkPageLayout } from "@/components/LinkPageLayout";
 import { prisma } from "@/lib/db";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function LinksPage() {
       cover={{ src: "/images/promo-palm-trees.jpg", alt: "Party Pupils" }}
       header={
         <>
-          <a href="/" className="inline-block">
+          <Link href="/" className="inline-block">
             <Image
               src="/images/pp-logo.svg"
               alt="Party Pupils"
@@ -29,7 +30,7 @@ export default async function LinksPage() {
               height={50}
               className="h-8 w-auto"
             />
-          </a>
+          </Link>
           <p className="text-white/60 text-sm mt-1">
             Yacht House, Funky House & Disco
             <br />
