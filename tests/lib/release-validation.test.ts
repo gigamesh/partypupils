@@ -4,7 +4,9 @@ import {
   draftReleaseSchema,
   generateDraftSlug,
   publishedReleaseSchema,
+  validateReleaseFormState,
   validateReleasePayload,
+  type ReleaseFormState,
 } from "@/lib/release-validation";
 
 describe("draftReleaseSchema", () => {
@@ -169,5 +171,126 @@ describe("generateDraftSlug", () => {
     const b = generateDraftSlug();
     expect(a).toMatch(/^draft-[a-f0-9]+$/);
     expect(a).not.toBe(b);
+  });
+});
+
+describe("validateReleaseFormState (client-side pre-flight)", () => {
+  const validPublishedState: ReleaseFormState = {
+    name: "Release",
+    slug: "release",
+    description: "",
+    priceCents: 1000,
+    type: "single",
+    coverImageUrl: null,
+    releasedAt: null,
+    isPublished: true,
+    inRadio: true,
+    tracks: [
+      {
+        name: "Artist - Title",
+        artist: "Artist",
+        genre: "",
+        slug: "artist-title",
+        priceCents: 200,
+        trackNumber: 1,
+        inRadio: true,
+        hasNewWav: true,
+        hasExistingWav: false,
+      },
+    ],
+  };
+
+  it("accepts a complete published-release state with a freshly-picked WAV", () => {
+    const result = validateReleaseFormState(validPublishedState);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts a track that has no new WAV but does have an existing one", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      tracks: [
+        {
+          ...validPublishedState.tracks[0],
+          hasNewWav: false,
+          hasExistingWav: true,
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a track that has neither a new nor existing WAV (the screenshot bug)", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      tracks: [
+        {
+          ...validPublishedState.tracks[0],
+          hasNewWav: false,
+          hasExistingWav: false,
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.fieldErrors["tracks[0].files"]).toBeDefined();
+    }
+  });
+
+  it("rejects a track with an empty artist when publishing", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      tracks: [{ ...validPublishedState.tracks[0], artist: "" }],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.fieldErrors["tracks[0].artist"]).toBeDefined();
+    }
+  });
+
+  it("rejects a release with priceCents <= 0 when publishing", () => {
+    const result = validateReleaseFormState({ ...validPublishedState, priceCents: 0 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.fieldErrors.price).toBeDefined();
+    }
+  });
+
+  it("accepts a draft state with sparse fields", () => {
+    const result = validateReleaseFormState({
+      name: "Untitled",
+      slug: "",
+      description: "",
+      priceCents: 0,
+      type: "single",
+      coverImageUrl: null,
+      releasedAt: null,
+      isPublished: false,
+      inRadio: true,
+      tracks: [],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("returns multiple structured errors at once for a multi-issue published state", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      priceCents: 0,
+      tracks: [
+        {
+          ...validPublishedState.tracks[0],
+          artist: "",
+          priceCents: 0,
+          hasNewWav: false,
+          hasExistingWav: false,
+        },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.fieldErrors.price).toBeDefined();
+      expect(result.errors.fieldErrors["tracks[0].artist"]).toBeDefined();
+      expect(result.errors.fieldErrors["tracks[0].price"]).toBeDefined();
+      expect(result.errors.fieldErrors["tracks[0].files"]).toBeDefined();
+    }
   });
 });

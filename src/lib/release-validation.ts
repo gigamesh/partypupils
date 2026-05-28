@@ -147,6 +147,89 @@ export function generateDraftSlug(): string {
 }
 
 /**
+ * Form-state projection used by `validateReleaseFormState`. Mirrors the
+ * subset of `ReleaseForm.tsx` state the validator needs: the user-typed
+ * scalars plus, per track, whether a WAV will be present after upload
+ * (`hasNewWav` for a freshly-picked File, `hasExistingWav` for a key
+ * already persisted on the existing release).
+ */
+export interface ReleaseFormState {
+  name: string;
+  slug: string;
+  description: string;
+  priceCents: number;
+  type: "album" | "single";
+  coverImageUrl: string | null;
+  releasedAt: string | null;
+  isPublished: boolean;
+  inRadio: boolean;
+  tracks: Array<{
+    existingId?: number;
+    /** Combined "Artist - Title" form, e.g. what gets stored as `track.name`. */
+    name: string;
+    artist: string;
+    genre: string;
+    /** Slug as already saved, or empty if the form will auto-derive one. */
+    slug: string;
+    priceCents: number;
+    trackNumber: number;
+    inRadio: boolean;
+    /** True when the user has selected a fresh WAV File for this track. */
+    hasNewWav: boolean;
+    /** True when the track already has a WAV persisted (existing release). */
+    hasExistingWav: boolean;
+  }>;
+}
+
+/**
+ * Client-side pre-flight: validate the form's current state against the same
+ * server schema *before* any uploads begin. Lets the form fail fast on
+ * missing scalars (artist, title, slug, price) and on tracks that lack any
+ * WAV — historically the form only learned about these failures after
+ * minutes of waiting for transcoding to finish on the server round-trip.
+ *
+ * Projects the form state into the API body shape, substituting a placeholder
+ * `pending://upload` storage key for tracks where a WAV will be uploaded but
+ * doesn't exist yet. The published-schema only checks for presence of an
+ * entry with `format: "wav"` (not whether the URL is reachable), so this
+ * placeholder is enough to short-circuit the "missing WAV" error.
+ */
+export function validateReleaseFormState(state: ReleaseFormState): ValidationResult {
+  const body = projectFormStateToApiBody(state);
+  return validateReleasePayload(body);
+}
+
+function projectFormStateToApiBody(state: ReleaseFormState): unknown {
+  return {
+    name: state.name,
+    slug: state.slug,
+    description: state.description || null,
+    price: state.priceCents,
+    type: state.type,
+    coverImageUrl: state.coverImageUrl,
+    releasedAt: state.releasedAt,
+    isPublished: state.isPublished,
+    inRadio: state.inRadio,
+    tracks: state.tracks.map((t) => ({
+      id: t.existingId,
+      name: t.name,
+      artist: t.artist || null,
+      genre: t.genre || null,
+      slug: t.slug,
+      price: t.priceCents,
+      trackNumber: t.trackNumber,
+      inRadio: t.inRadio,
+      files: filesForTrack(t.hasNewWav, t.hasExistingWav),
+    })),
+  };
+}
+
+function filesForTrack(hasNewWav: boolean, hasExistingWav: boolean) {
+  if (!hasNewWav && !hasExistingWav) return [];
+  return [{ format: "wav", fileName: "pending.wav", storageKey: "pending://upload" }];
+}
+
+/**
  * Fill in the columns the schema requires NOT NULL when the admin saved a
  * sparse draft. Idempotent: never overwrites an explicit value.
  */

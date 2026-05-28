@@ -6,6 +6,8 @@ import { slugify } from "../src/lib/utils";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
+const ARTIST = "Party Pupils";
+
 function trackSlug(name: string): string {
   return slugify(name);
 }
@@ -23,17 +25,17 @@ async function main() {
       price: 999,
       type: "album",
       releasedAt: new Date("2025-01-17"),
-      isPublished: true,
+      isPublished: false,
       tracks: {
         create: [
-          { name: "Believe In Love", slug: trackSlug("Believe In Love"), price: 199, trackNumber: 1 },
-          { name: "Tokyo Blur", slug: trackSlug("Tokyo Blur"), price: 199, trackNumber: 2 },
-          { name: "Hiya", slug: trackSlug("Hiya"), price: 199, trackNumber: 3 },
-          { name: "White Light", slug: trackSlug("White Light"), price: 199, trackNumber: 4 },
-          { name: "E.P.C.O.T.", slug: trackSlug("E.P.C.O.T."), price: 199, trackNumber: 5 },
-          { name: "Are We Dreaming?", slug: trackSlug("Are We Dreaming?"), price: 199, trackNumber: 6 },
-          { name: "Circuit", slug: trackSlug("Circuit"), price: 199, trackNumber: 7 },
-          { name: "Get Down", slug: trackSlug("Get Down"), price: 199, trackNumber: 8 },
+          { name: "Believe In Love", artist: ARTIST, slug: trackSlug("Believe In Love"), price: 199, trackNumber: 1 },
+          { name: "Tokyo Blur", artist: ARTIST, slug: trackSlug("Tokyo Blur"), price: 199, trackNumber: 2 },
+          { name: "Hiya", artist: ARTIST, slug: trackSlug("Hiya"), price: 199, trackNumber: 3 },
+          { name: "White Light", artist: ARTIST, slug: trackSlug("White Light"), price: 199, trackNumber: 4 },
+          { name: "E.P.C.O.T.", artist: ARTIST, slug: trackSlug("E.P.C.O.T."), price: 199, trackNumber: 5 },
+          { name: "Are We Dreaming?", artist: ARTIST, slug: trackSlug("Are We Dreaming?"), price: 199, trackNumber: 6 },
+          { name: "Circuit", artist: ARTIST, slug: trackSlug("Circuit"), price: 199, trackNumber: 7 },
+          { name: "Get Down", artist: ARTIST, slug: trackSlug("Get Down"), price: 199, trackNumber: 8 },
         ],
       },
     },
@@ -51,27 +53,29 @@ async function main() {
       price: 799,
       type: "album",
       releasedAt: new Date("2020-05-15"),
-      isPublished: true,
+      isPublished: false,
       tracks: {
         create: [
-          { name: "Lonelier (feat. Alna)", slug: trackSlug("Lonelier (feat. Alna)"), price: 199, trackNumber: 1 },
+          { name: "Lonelier (feat. Alna)", artist: ARTIST, slug: trackSlug("Lonelier (feat. Alna)"), price: 199, trackNumber: 1 },
           {
             name: "West Coast Tears (feat. Gary Go)",
+            artist: ARTIST,
             slug: trackSlug("West Coast Tears (feat. Gary Go)"),
             price: 199,
             trackNumber: 2,
           },
-          { name: "Rock The Party", slug: trackSlug("Rock The Party"), price: 199, trackNumber: 3 },
-          { name: "The Plug (feat. Drelli)", slug: trackSlug("The Plug (feat. Drelli)"), price: 199, trackNumber: 4 },
+          { name: "Rock The Party", artist: ARTIST, slug: trackSlug("Rock The Party"), price: 199, trackNumber: 3 },
+          { name: "The Plug (feat. Drelli)", artist: ARTIST, slug: trackSlug("The Plug (feat. Drelli)"), price: 199, trackNumber: 4 },
           {
             name: "Love Me For The Weekend (feat. Ashe)",
+            artist: ARTIST,
             slug: trackSlug("Love Me For The Weekend (feat. Ashe)"),
             price: 199,
             trackNumber: 5,
           },
-          { name: "One Two Things (feat. TOBi)", slug: trackSlug("One Two Things (feat. TOBi)"), price: 199, trackNumber: 6 },
-          { name: "Bite My Tongue", slug: trackSlug("Bite My Tongue"), price: 199, trackNumber: 7 },
-          { name: "Sax On The Beach", slug: trackSlug("Sax On The Beach"), price: 199, trackNumber: 8 },
+          { name: "One Two Things (feat. TOBi)", artist: ARTIST, slug: trackSlug("One Two Things (feat. TOBi)"), price: 199, trackNumber: 6 },
+          { name: "Bite My Tongue", artist: ARTIST, slug: trackSlug("Bite My Tongue"), price: 199, trackNumber: 7 },
+          { name: "Sax On The Beach", artist: ARTIST, slug: trackSlug("Sax On The Beach"), price: 199, trackNumber: 8 },
         ],
       },
     },
@@ -102,9 +106,9 @@ async function main() {
         price: 199,
         type: "single",
         releasedAt: new Date(single.date),
-        isPublished: true,
+        isPublished: false,
         tracks: {
-          create: [{ name: single.name, slug: trackSlug(single.name), price: 199, trackNumber: 1 }],
+          create: [{ name: single.name, artist: ARTIST, slug: trackSlug(single.name), price: 199, trackNumber: 1 }],
         },
       },
     });
