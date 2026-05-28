@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { desc, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { linkPages, releases } from "@/db/schema";
 import { getBaseUrl } from "@/lib/utils";
 import { LinkPageForm } from "../../LinkPageForm";
 import { DeleteLinkPageButton } from "../../DeleteLinkPageButton";
@@ -10,17 +12,17 @@ interface Props {
 
 export default async function EditLinkPagePage({ params }: Props) {
   const { id } = await params;
-  const [page, releases] = await Promise.all([
-    prisma.linkPage.findUnique({
-      where: { id: Number(id) },
-      include: {
-        items: { orderBy: { position: "asc" } },
-        release: { select: { id: true, name: true, slug: true, coverImageUrl: true, isPublished: true } },
+  const [page, releaseRows] = await Promise.all([
+    db.query.linkPages.findFirst({
+      where: eq(linkPages.id, Number(id)),
+      with: {
+        items: { orderBy: (i, { asc }) => asc(i.position) },
+        release: { columns: { id: true, name: true, slug: true, coverImageUrl: true, isPublished: true } },
       },
     }),
-    prisma.release.findMany({
-      orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, slug: true, coverImageUrl: true, isPublished: true },
+    db.query.releases.findMany({
+      orderBy: desc(releases.createdAt),
+      columns: { id: true, name: true, slug: true, coverImageUrl: true, isPublished: true },
     }),
   ]);
 
@@ -46,7 +48,7 @@ export default async function EditLinkPagePage({ params }: Props) {
           />
         </div>
       </div>
-      <LinkPageForm page={page} releases={releases} baseUrl={getBaseUrl()} />
+      <LinkPageForm page={page} releases={releaseRows} baseUrl={getBaseUrl()} />
     </div>
   );
 }

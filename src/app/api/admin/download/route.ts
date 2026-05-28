@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { trackFiles } from "@/db/schema";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { getPresignedDownloadUrl } from "@/lib/storage";
 import { cleanDownloadFilename } from "@/lib/utils";
@@ -22,8 +24,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing trackId" }, { status: 400 });
   }
 
-  const file = await prisma.trackFile.findFirst({
-    where: { trackId, format },
+  const file = await db.query.trackFiles.findFirst({
+    where: and(eq(trackFiles.trackId, trackId), eq(trackFiles.format, format)),
   });
 
   if (!file) {

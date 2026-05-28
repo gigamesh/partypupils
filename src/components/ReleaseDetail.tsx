@@ -1,4 +1,4 @@
-import type { Prisma } from "@/generated/prisma/client";
+import type { ReleaseWithTracks } from "@gigamusic/db";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import Image from "@/components/Image";
 import { PlayButton } from "@/components/PlayButton";
@@ -7,9 +7,7 @@ import { TracklistRowLink } from "@/components/TracklistRowLink";
 import { buildPlayerTracksForRelease, toPlayerTrack } from "@/lib/player-data";
 import { formatCurrency } from "@/lib/utils";
 
-export type ReleaseForDetail = Prisma.ReleaseGetPayload<{
-  include: { tracks: { include: { files: true } } };
-}>;
+export type ReleaseForDetail = ReleaseWithTracks;
 
 interface Props {
   release: ReleaseForDetail;

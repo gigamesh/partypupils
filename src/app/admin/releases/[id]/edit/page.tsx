@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { desc, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { linkPages, releases } from "@/db/schema";
 import { ReleaseForm } from "../../ReleaseForm";
 import { DeleteReleaseButton } from "../../DeleteReleaseButton";
 import { DownloadZipButtons } from "@/components/DownloadZipButtons";
@@ -10,22 +12,22 @@ interface Props {
 
 export default async function EditReleasePage({ params }: Props) {
   const { id } = await params;
-  const release = await prisma.release.findUnique({
-    where: { id: parseInt(id) },
-    include: {
+  const release = await db.query.releases.findFirst({
+    where: eq(releases.id, parseInt(id)),
+    with: {
       tracks: {
-        orderBy: { trackNumber: "asc" },
-        include: { files: true },
+        orderBy: (t, { asc }) => asc(t.trackNumber),
+        with: { files: true },
       },
     },
   });
 
   if (!release) notFound();
 
-  const linkPages = await prisma.linkPage.findMany({
-    where: { releaseId: release.id },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, slug: true, title: true, isPublished: true },
+  const linkPagesRows = await db.query.linkPages.findMany({
+    where: eq(linkPages.releaseId, release.id),
+    orderBy: desc(linkPages.updatedAt),
+    columns: { id: true, slug: true, title: true, isPublished: true },
   });
 
   const availableFormats = [
@@ -55,7 +57,7 @@ export default async function EditReleasePage({ params }: Props) {
           />
         </div>
       )}
-      <ReleaseForm release={release} linkPages={linkPages} />
+      <ReleaseForm release={release} linkPages={linkPagesRows} />
     </div>
   );
 }

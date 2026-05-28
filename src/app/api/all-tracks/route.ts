@@ -1,5 +1,7 @@
 import { unstable_cache } from "next/cache";
-import { prisma } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { releases } from "@/db/schema";
 import { toPlayerTrack } from "@/lib/player-data";
 import type { PlayerTrack } from "@/lib/player-types";
 import { NextResponse } from "next/server";
@@ -12,18 +14,18 @@ import { RADIO_TRACKS_TAG } from "@/lib/cache-tags";
  */
 const getRadioTracks = unstable_cache(
   async (): Promise<PlayerTrack[]> => {
-    const releases = await prisma.release.findMany({
-      where: { isPublished: true, inRadio: true },
-      include: {
+    const releaseRows = await db.query.releases.findMany({
+      where: and(eq(releases.isPublished, true), eq(releases.inRadio, true)),
+      with: {
         tracks: {
-          where: { inRadio: true },
-          orderBy: { trackNumber: "asc" },
-          include: { files: true },
+          where: (t, { eq: eqFn }) => eqFn(t.inRadio, true),
+          orderBy: (t, { asc }) => asc(t.trackNumber),
+          with: { files: true },
         },
       },
     });
 
-    return releases.flatMap((r) => {
+    return releaseRows.flatMap((r) => {
       const releaseInfo = {
         id: r.id,
         name: r.name,

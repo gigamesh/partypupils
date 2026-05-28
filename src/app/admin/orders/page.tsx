@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/lib/db";
+import { and, count, desc, eq, gte, ilike, sql, type SQL } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { orders as ordersTable } from "@/db/schema";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,33 +46,53 @@ export default async function AdminOrdersPage({
 
   const dateFrom = getDateFilter(period);
 
-  const where = {
-    ...(dateFrom && { createdAt: { gte: dateFrom } }),
-    ...(query && { email: { contains: query, mode: "insensitive" as const } }),
-  };
+  // Build the SQL predicate piece-by-piece so absent filters don't show up as
+  // dangling `AND TRUE` clauses. Mirrors the Prisma `where` spread above.
+  const conditions: SQL[] = [];
+  if (dateFrom) conditions.push(gte(ordersTable.createdAt, dateFrom));
+  if (query) conditions.push(ilike(ordersTable.email, `%${query}%`));
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [orders, totalCount, totals] = await Promise.all([
-    prisma.order.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: {
+  const [orders, totalCountRows, totalsRows] = await Promise.all([
+    db.query.orders.findMany({
+      where: whereClause,
+      orderBy: desc(ordersTable.createdAt),
+      offset: (page - 1) * PAGE_SIZE,
+      limit: PAGE_SIZE,
+      with: {
         items: {
-          include: {
-            release: { select: { name: true } },
-            track: { select: { name: true } },
+          with: {
+            release: { columns: { name: true } },
+            track: { columns: { name: true } },
           },
         },
       },
     }),
-    prisma.order.count({ where }),
-    prisma.order.aggregate({
-      where: { ...where, status: "completed" },
-      _sum: { amountTotal: true },
-      _count: true,
-    }),
+    db
+      .select({ count: count() })
+      .from(ordersTable)
+      .where(whereClause),
+    db
+      .select({
+        sum: sql<string | null>`COALESCE(SUM(${ordersTable.amountTotal}), 0)`,
+        count: count(),
+      })
+      .from(ordersTable)
+      .where(
+        and(
+          ...conditions,
+          eq(ordersTable.status, "completed"),
+        ),
+      ),
   ]);
+
+  const totalCount = totalCountRows[0]?.count ?? 0;
+  // `totals` mirrors Prisma's `{ _sum: { amountTotal }, _count }` shape so the
+  // JSX below can read the same field names.
+  const totals = {
+    _sum: { amountTotal: Number(totalsRows[0]?.sum ?? 0) },
+    _count: totalsRows[0]?.count ?? 0,
+  };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 

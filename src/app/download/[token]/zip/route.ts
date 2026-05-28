@@ -1,12 +1,8 @@
 import type { NextRequest } from "next/server";
 import { createDownloadZipHandler } from "@gigamusic/checkout";
-import { createQueries } from "@gigamusic/db";
-import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
-import { prisma } from "@/lib/db";
+import { queries } from "@/lib/db";
 import { storageProvider } from "@/lib/storage";
 import { SITE_NAME } from "@/lib/constants";
-
-const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 // Returns the JSON manifest the service worker (`public/sw-zip.js`) consumes
 // — the SW pipes presigned R2 URLs through `client-zip` and streams the

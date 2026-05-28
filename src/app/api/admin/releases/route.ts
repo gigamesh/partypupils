@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { releases, trackFiles, tracks } from "@/db/schema";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import {
   DuplicateTrackSlugError,
@@ -13,11 +15,16 @@ import {
 } from "@/lib/release-validation";
 import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 
+/**
+ * Postgres signals unique-constraint violation with SQLSTATE `23505`; the
+ * pg driver exposes it on `err.code`. Replaces the Prisma `P2002` check used
+ * before the Drizzle migration.
+ */
 function isUniqueConstraintError(err: unknown): boolean {
   return (
     typeof err === "object" &&
     err !== null &&
-    (err as { code?: string }).code === "P2002"
+    (err as { code?: string }).code === "23505"
   );
 }
 
@@ -65,21 +72,31 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
-  let release;
+  let releaseId: number;
   try {
-    release = await prisma.release.create({
-      data: {
-        name: data.name,
-        slug: data.slug!,
-        description: data.description ?? null,
-        price: data.price!,
-        type: data.type!,
-        coverImageUrl: data.coverImageUrl ?? null,
-        releasedAt: data.releasedAt ? new Date(data.releasedAt) : null,
-        isPublished: data.isPublished,
-        inRadio: data.inRadio ?? true,
-        tracks: {
-          create: incomingTracks.map((t) => ({
+    releaseId = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(releases)
+        .values({
+          name: data.name,
+          slug: data.slug!,
+          description: data.description ?? null,
+          price: data.price!,
+          type: data.type!,
+          coverImageUrl: data.coverImageUrl ?? null,
+          releasedAt: data.releasedAt ? new Date(data.releasedAt) : null,
+          isPublished: data.isPublished,
+          inRadio: data.inRadio ?? true,
+        })
+        .returning({ id: releases.id });
+
+      const newReleaseId = created!.id;
+
+      for (const t of incomingTracks) {
+        const [track] = await tx
+          .insert(tracks)
+          .values({
+            releaseId: newReleaseId,
             name: t.name,
             artist: t.artist ?? null,
             genre: t.genre ?? null,
@@ -87,26 +104,35 @@ export async function POST(req: NextRequest) {
             price: t.price,
             trackNumber: t.trackNumber,
             inRadio: t.inRadio ?? true,
-            files: { create: t.files },
-          })),
-        },
-      },
-      include: {
-        tracks: {
-          orderBy: { trackNumber: "asc" },
-          include: { files: true },
-        },
-      },
+          })
+          .returning({ id: tracks.id });
+        if (t.files.length > 0) {
+          await tx
+            .insert(trackFiles)
+            .values(t.files.map((f) => ({ ...f, trackId: track!.id })));
+        }
+      }
+
+      return newReleaseId;
     });
   } catch (err) {
-    // Rely on the DB-level unique constraint instead of a separate findUnique
-    // pre-check (which had a tiny TOCTOU window between two concurrent admin
-    // submits).
+    // Rely on the DB-level unique constraint instead of a separate pre-check
+    // (which had a tiny TOCTOU window between two concurrent admin submits).
     if (isUniqueConstraintError(err)) {
       return NextResponse.json({ error: "Slug already exists" }, { status: 400 });
     }
     throw err;
   }
+
+  const release = await db.query.releases.findFirst({
+    where: eq(releases.id, releaseId),
+    with: {
+      tracks: {
+        orderBy: (t, { asc }) => asc(t.trackNumber),
+        with: { files: true },
+      },
+    },
+  });
 
   revalidateTag(RADIO_TRACKS_TAG, "max");
   revalidateTag(RELEASES_TAG, "max");

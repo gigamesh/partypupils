@@ -1,33 +1,10 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { queries, withDbRetry } from "./db";
+import { loggedCacheRead, withDbRetry } from "@gigamusic/db";
+import { queries } from "./db";
 import { LINKS_TAG, RELEASES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;
-
-/**
- * Wraps a cached database read so the unwrapped error makes it into the
- * runtime logs. When the inner operation throws (typically `withDbRetry`
- * exhausting its retries against a dropped Neon socket), Next.js's
- * `unstable_cache` revalidation path stringifies the failure as
- * `ErrorEvent {type:'error',...}` — stack and cause stripped. Catching
- * here and logging before re-throwing preserves the diagnostics without
- * changing behaviour: Next.js still sees the throw and still emits its
- * own log line, ours just has the actual stack and `err.cause`.
- */
-async function loggedCacheRead<T>(label: string, op: () => Promise<T>): Promise<T> {
-  try {
-    return await op();
-  } catch (err) {
-    const detail = err instanceof Error ? err.stack || err.message : String(err);
-    const causeRaw = err instanceof Error ? (err as { cause?: unknown }).cause : undefined;
-    const cause = causeRaw
-      ? `\n  cause: ${causeRaw instanceof Error ? causeRaw.stack || causeRaw.message : String(causeRaw)}`
-      : "";
-    console.error(`[cache:${label}] failed: ${detail}${cause}`);
-    throw err;
-  }
-}
 
 /**
  * Featured releases for the homepage (latest 4 published, with tracks + files).

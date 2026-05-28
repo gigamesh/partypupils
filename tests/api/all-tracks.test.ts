@@ -60,9 +60,12 @@ describe("GET /api/all-tracks", () => {
   it("excludes releases with inRadio=false", async () => {
     const r = await makeRelease({ slug: "off-air" });
     await makeTrackWithFile(r.id);
-    await import("@/lib/db").then(({ prisma }) =>
-      prisma.release.update({ where: { id: r.id }, data: { inRadio: false } }),
-    );
+    {
+      const { db } = await import("@/lib/db");
+      const { releases } = await import("@/db/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(releases).set({ inRadio: false }).where(eq(releases.id, r.id));
+    }
 
     const res = await getAllTracks();
     const data = await res.json();
@@ -73,9 +76,12 @@ describe("GET /api/all-tracks", () => {
     const r = await makeRelease({ slug: "mixed" });
     const tOn = await makeTrackWithFile(r.id, { name: "On", trackNumber: 1 });
     const tOff = await makeTrackWithFile(r.id, { name: "Off", trackNumber: 2 });
-    await import("@/lib/db").then(({ prisma }) =>
-      prisma.track.update({ where: { id: tOff.id }, data: { inRadio: false } }),
-    );
+    {
+      const { db } = await import("@/lib/db");
+      const { tracks } = await import("@/db/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(tracks).set({ inRadio: false }).where(eq(tracks.id, tOff.id));
+    }
 
     const res = await getAllTracks();
     const data = await res.json();
@@ -134,7 +140,7 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
             name: t.name,
             price: t.price,
             trackNumber: 1,
-            files: t.files.map((f) => ({
+            files: t.files.map((f: { format: string; fileName: string; storageKey: string; fileSize: number | null }) => ({
               format: f.format,
               fileName: f.fileName,
               storageKey: f.storageKey,

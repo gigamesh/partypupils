@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { desc } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { releases } from "@/db/schema";
 import { NewLinkPageForm } from "./NewLinkPageForm";
 
 interface Props {
@@ -7,19 +9,19 @@ interface Props {
 
 export default async function NewLinkPagePage({ searchParams }: Props) {
   const { releaseId } = await searchParams;
-  const releases = await prisma.release.findMany({
-    orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, slug: true, isPublished: true },
+  const releaseRows = await db.query.releases.findMany({
+    orderBy: desc(releases.createdAt),
+    columns: { id: true, name: true, slug: true, isPublished: true },
   });
 
   const initialRelease = releaseId
-    ? releases.find((r) => r.id === Number(releaseId))
+    ? releaseRows.find((r) => r.id === Number(releaseId))
     : undefined;
 
   return (
     <div className="max-w-2xl">
       <h1>New Link Page</h1>
-      <NewLinkPageForm releases={releases} initialRelease={initialRelease} />
+      <NewLinkPageForm releases={releaseRows} initialRelease={initialRelease} />
     </div>
   );
 }

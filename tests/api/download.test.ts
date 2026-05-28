@@ -9,7 +9,8 @@ import { NextRequest } from "next/server";
 import { GET as downloadTrack } from "@/app/download/[token]/route";
 import { GET as downloadZip } from "@/app/download/[token]/zip/route";
 import { getPresignedDownloadUrl } from "@/lib/storage";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { trackFiles } from "@/db/schema";
 import { makeRelease, makeTrackWithFile, makeCompletedOrder } from "../factories";
 
 const fetchMock = vi.fn();
@@ -83,7 +84,7 @@ describe("GET /download/[token]", () => {
     // Filename comes from the stored TrackFile.fileName (whitespace-trimmed),
     // not the track name.
     expect(vi.mocked(getPresignedDownloadUrl)).toHaveBeenCalledWith(
-      t.files[0].storageKey,
+      t.files[0]!.storageKey,
       { filename: "owned_master_v3.mp3", contentType: "audio/mpeg" },
     );
     // Critical: the function must NOT have fetched the audio body.
@@ -94,14 +95,12 @@ describe("GET /download/[token]", () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id, { name: "Wave" });
     // makeTrackWithFile only seeds an mp3; add a wav so format=wav resolves a row.
-    await prisma.trackFile.create({
-      data: {
-        trackId: t.id,
-        format: "wav",
-        fileName: "wave_master_24bit.wav",
-        storageKey: "https://r2/wave.wav",
-        fileSize: 100,
-      },
+    await db.insert(trackFiles).values({
+      trackId: t.id,
+      format: "wav",
+      fileName: "wave_master_24bit.wav",
+      storageKey: "https://r2/wave.wav",
+      fileSize: 100,
     });
     const order = await makeCompletedOrder({ email: "x@y", trackIds: [t.id] });
     const token = order.downloadTokens[0].token;

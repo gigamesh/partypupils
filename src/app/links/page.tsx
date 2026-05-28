@@ -1,6 +1,8 @@
 import Image from "@/components/Image";
 import { LinkPageLayout } from "@/components/LinkPageLayout";
-import { prisma } from "@/lib/db";
+import { asc, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { links as linksTable } from "@/db/schema";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -12,9 +14,9 @@ export const metadata: Metadata = {
 };
 
 export default async function LinksPage() {
-  const links = await prisma.link.findMany({
-    where: { isVisible: true },
-    orderBy: { position: "asc" },
+  const links = await db.query.links.findMany({
+    where: eq(linksTable.isVisible, true),
+    orderBy: asc(linksTable.position),
   });
 
   return (

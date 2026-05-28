@@ -1,7 +1,9 @@
 import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { OrderDownloads } from "@/components/OrderDownloads";
 import { Button } from "@/components/ui/button";
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { downloadTokens, orders } from "@/db/schema";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -16,10 +18,15 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 async function getOrCreateValidToken(orderId: number): Promise<string> {
-  const existing = await prisma.downloadToken.findFirst({ where: { orderId } });
+  const existing = await db.query.downloadTokens.findFirst({
+    where: eq(downloadTokens.orderId, orderId),
+  });
   if (existing) return existing.token;
-  const created = await prisma.downloadToken.create({ data: { orderId } });
-  return created.token;
+  const [created] = await db
+    .insert(downloadTokens)
+    .values({ orderId })
+    .returning({ token: downloadTokens.token });
+  return created!.token;
 }
 
 export default async function DemoOrderDetailPage({ params }: Props) {
@@ -27,20 +34,20 @@ export default async function DemoOrderDetailPage({ params }: Props) {
   const orderId = Number.parseInt(id, 10);
   if (!Number.isFinite(orderId)) notFound();
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+    with: {
       items: {
-        include: {
+        with: {
           release: {
-            include: {
+            with: {
               tracks: {
-                orderBy: { trackNumber: "asc" },
-                include: { files: true },
+                orderBy: (t, { asc }) => asc(t.trackNumber),
+                with: { files: true },
               },
             },
           },
-          track: { include: { files: true, release: true } },
+          track: { with: { files: true, release: true } },
         },
       },
     },

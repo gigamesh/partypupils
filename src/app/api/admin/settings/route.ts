@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { siteSettings } from "@/db/schema";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { FAQ_SETTING_KEY } from "@/lib/faq-defaults";
 import { FaqContentSchema } from "@/lib/faq-schema";
@@ -35,11 +36,14 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  const setting = await prisma.siteSetting.upsert({
-    where: { key },
-    update: { value },
-    create: { key, value },
-  });
+  const [setting] = await db
+    .insert(siteSettings)
+    .values({ key, value })
+    .onConflictDoUpdate({
+      target: siteSettings.key,
+      set: { value },
+    })
+    .returning();
 
   return NextResponse.json(setting);
 }

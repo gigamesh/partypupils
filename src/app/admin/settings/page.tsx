@@ -1,12 +1,14 @@
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { siteSettings } from "@/db/schema";
 import { CATALOG_DISCOUNT_KEY, DEFAULT_DISCOUNT_PERCENT } from "@/lib/constants";
 import { SettingsForm } from "./SettingsForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
-  const discountSetting = await prisma.siteSetting.findUnique({
-    where: { key: CATALOG_DISCOUNT_KEY },
+  const discountSetting = await db.query.siteSettings.findFirst({
+    where: eq(siteSettings.key, CATALOG_DISCOUNT_KEY),
   });
 
   return (

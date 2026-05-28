@@ -1,11 +1,13 @@
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/lib/db";
+import { asc } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { links as linksTable } from "@/db/schema";
 import { LinksForm } from "./LinksForm";
 
 export default async function AdminLinksPage() {
-  const links = await prisma.link.findMany({
-    orderBy: { position: "asc" },
+  const links = await db.query.links.findMany({
+    orderBy: asc(linksTable.position),
   });
 
   return (

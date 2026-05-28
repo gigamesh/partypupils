@@ -1,5 +1,7 @@
 import { unstable_cache } from "next/cache";
-import { prisma, queries } from "./db";
+import { eq } from "drizzle-orm";
+import { db, queries } from "./db";
+import { releases } from "@/db/schema";
 import { RELEASES_TAG } from "./cache-tags";
 import { CATALOG_DISCOUNT_KEY, DEFAULT_DISCOUNT_PERCENT } from "./constants";
 
@@ -27,15 +29,15 @@ export async function getCatalogDiscount(): Promise<number> {
  */
 export const getCatalogPrice = unstable_cache(
   async () => {
-    const [releases, discountPercent] = await Promise.all([
-      prisma.release.findMany({
-        where: { isPublished: true },
-        select: { id: true, price: true },
-      }),
+    const [releaseRows, discountPercent] = await Promise.all([
+      db
+        .select({ id: releases.id, price: releases.price })
+        .from(releases)
+        .where(eq(releases.isPublished, true)),
       getCatalogDiscount(),
     ]);
 
-    const originalPrice = releases.reduce((sum, r) => sum + r.price, 0);
+    const originalPrice = releaseRows.reduce((sum, r) => sum + r.price, 0);
     // Round to whole dollars so the displayed price stays tidy.
     const discountedPrice =
       Math.round((originalPrice * (1 - discountPercent / 100)) / 100) * 100;
@@ -44,8 +46,8 @@ export const getCatalogPrice = unstable_cache(
       originalPrice,
       discountedPrice,
       discountPercent,
-      releaseCount: releases.length,
-      releaseIds: releases.map((r) => r.id),
+      releaseCount: releaseRows.length,
+      releaseIds: releaseRows.map((r) => r.id),
     };
   },
   ["catalog-price-v1"],
