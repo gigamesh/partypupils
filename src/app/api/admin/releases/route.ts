@@ -18,14 +18,14 @@ import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
 /**
  * Postgres signals unique-constraint violation with SQLSTATE `23505`; the
  * pg driver exposes it on `err.code`. Replaces the Prisma `P2002` check used
- * before the Drizzle migration.
+ * before the Drizzle migration. Walks the `cause` chain because Drizzle's
+ * `db.transaction()` wrapper re-throws with `code: undefined` and nests the
+ * original pg error under `err.cause`.
  */
-function isUniqueConstraintError(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    (err as { code?: string }).code === "23505"
-  );
+function isUniqueConstraintError(err: unknown, depth = 0): boolean {
+  if (!err || typeof err !== "object" || depth > 5) return false;
+  if ((err as { code?: string }).code === "23505") return true;
+  return isUniqueConstraintError((err as { cause?: unknown }).cause, depth + 1);
 }
 
 export async function POST(req: NextRequest) {
