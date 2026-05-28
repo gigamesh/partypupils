@@ -29,9 +29,6 @@ importers:
       '@gigamusic/checkout':
         specifier: ^0.3.0
         version: 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/node@22.19.19)(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@gigamusic/config':
-        specifier: ^0.3.0
-        version: 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/core':
         specifier: ^0.3.0
         version: 0.3.0
@@ -47,9 +44,6 @@ importers:
       '@gigamusic/storage':
         specifier: ^0.3.0
         version: 0.3.0
-      '@gigamusic/ui':
-        specifier: ^0.3.0
-        version: 0.3.0(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0
