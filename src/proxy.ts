@@ -1,11 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 
-// Admin auth gate. Runs before route handlers — anything under `/admin` or
-// `/api/admin` requires a valid `admin_session` cookie, except the login
-// route itself (which is the on-ramp). `@gigamusic/admin` 0.3.0 dropped
-// its own auth helpers, so without this proxy the admin handler factories
-// would happily serve any unauthenticated request.
+// Admin API auth gate. `@gigamusic/admin` 0.3.0 dropped its own auth
+// helpers, so without this the wrapped handler factories (links,
+// link-pages, upload, etc.) would happily serve any unauthenticated
+// request. `/api/admin/auth` is the one allowed exception — that's the
+// login on-ramp.
+//
+// `/admin` pages are intentionally NOT gated here. `src/app/admin/layout.tsx`
+// already renders the login form inline for unauthenticated requests, and
+// trying to redirect would loop the matcher.
 export async function proxy(req: NextRequest): Promise<NextResponse> {
   const { pathname } = new URL(req.url);
 
@@ -13,19 +17,14 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
-    const authed = await verifyAdminSessionFromRequest(req);
-    if (!authed) {
-      if (pathname.startsWith("/api/admin")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      return NextResponse.redirect(new URL("/admin", req.url));
-    }
+  const authed = await verifyAdminSessionFromRequest(req);
+  if (!authed) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/api/admin/:path*"],
 };
