@@ -8,11 +8,6 @@ import { SITE_NAME } from "@/lib/constants";
 
 const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
-// Server-side bulk-download fallback for browsers (Safari + every iOS browser,
-// plus private/incognito) that can't run the service worker reliably. Audio
-// bytes proxy through Vercel here — slower and costs egress, which is why the
-// SW path stays the default for the engines that handle it. `zipNamePrefix`
-// matches the SW route so both paths produce identically-named archives.
 const handler = createDownloadZipStreamHandler({
   queries,
   storage: storageProvider(),

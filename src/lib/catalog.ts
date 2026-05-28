@@ -10,14 +10,8 @@ const CATALOG_DISCOUNT_KEY = "catalog_discount_percent";
 
 const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
-/**
- * Resolves the configurable "buy whole catalog" discount percentage.
- *
- * Settings are stored as JSON-encoded strings by `@gigamusic/db.setSetting`,
- * but party-pupils' production setting predates that and is a bare integer
- * string. Both `JSON.parse("15")` and the catch-fallback (returning the raw
- * `"15"`) ultimately go through `parseInt`, so either shape works.
- */
+// Tolerates both shapes the setting may take: a JSON-encoded number (current
+// writer) or a bare integer string (legacy production rows).
 export async function getCatalogDiscount(): Promise<number> {
   const raw = await queries.getSetting<string | number>(CATALOG_DISCOUNT_KEY);
   if (raw === null) return DEFAULT_DISCOUNT_PERCENT;
@@ -25,14 +19,8 @@ export async function getCatalogDiscount(): Promise<number> {
   return Number.isNaN(value) ? DEFAULT_DISCOUNT_PERCENT : value;
 }
 
-/**
- * Aggregate published-catalog pricing for the "buy everything" CTA.
- *
- * The release fetch stays as a lean `findMany` (id + price only); routing it
- * through `queries.listPublishedReleases` would pull tracks + files on every
- * homepage render, which this projection is specifically designed to avoid.
- * The discount math is owned by `@gigamusic/core.applyCatalogDiscount`.
- */
+// Lean `findMany` (id + price only) — the package's `listPublishedReleases`
+// would pull tracks + files on every homepage render.
 export const getCatalogPrice = unstable_cache(
   async () => {
     const [releases, discountPercent] = await Promise.all([

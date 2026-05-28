@@ -1,15 +1,3 @@
-/**
- * Admin login route — owns the auth decision and mints the session cookie.
- *
- * `@gigamusic/admin` stopped shipping a login handler in 0.2.0; consumers
- * roll their own. We:
- *   1. Rate-limit per IP via `@gigamusic/db`'s `consumeRateLimit` query
- *      (10 attempts / 15 min, key prefix `admin-login:<ip>`).
- *   2. Verify the supplied password against `ADMIN_PASSWORD_HASH`
- *      (bcrypt) using `@gigamusic/core.verifyPassword`.
- *   3. On success, write the httpOnly admin session cookie via
- *      `@/lib/admin-auth.createAdminSession`.
- */
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPassword } from "@gigamusic/core";
 import { createAdminSession } from "@/lib/admin-auth";

@@ -2,7 +2,6 @@ import type { NextRequest } from "next/server";
 import { createAdminLinkPageByIdHandlers } from "@gigamusic/links/server";
 import { linkPageQueries } from "@/lib/link-pages";
 
-// Auth is enforced upstream by `src/proxy.ts`.
 const handlers = createAdminLinkPageByIdHandlers({ queries: linkPageQueries });
 
 interface RouteContext {

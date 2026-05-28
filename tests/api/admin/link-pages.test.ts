@@ -1,10 +1,3 @@
-/**
- * CRUD + slug validation tests for the LinkPage admin API.
- *
- * Auth is enforced by `src/proxy.ts` upstream of these handlers, so the
- * handlers themselves don't gate requests — these tests skip the session
- * cookie entirely.
- */
 import { describe, it, expect } from "vitest";
 import type { NextRequest } from "next/server";
 import {
@@ -41,12 +34,8 @@ function ctx(id: number) {
   return { params: Promise.resolve({ id: String(id) }) };
 }
 
-/** Empty params context for the root /api/admin/link-pages route (no [id] segment). */
 const rootCtx = { params: Promise.resolve({} as Record<string, never>) };
 
-// One-arg adapters — the route wrappers take (req, ctx) now, but the tests
-// were written against the original (req)-only shape; preserving that here
-// keeps the assertions intact.
 const createPage = (req: NextRequest) => createPageRaw(req, rootCtx);
 const listPages = () =>
   listPagesRaw(
@@ -110,11 +99,6 @@ describe("POST /api/admin/link-pages", () => {
     const body = await res.json();
     expect(body.error).toMatch(/already exists/i);
   });
-
-  // No "401 when not authenticated" test — auth is enforced by
-  // `src/proxy.ts` upstream of these handlers, and is tested separately
-  // via the proxy itself. Tests/api/admin/auth.test.ts covers the
-  // login-route side of the same auth model.
 });
 
 describe("GET /api/admin/link-pages", () => {

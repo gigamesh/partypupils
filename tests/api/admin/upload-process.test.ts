@@ -80,8 +80,6 @@ describe("POST /api/admin/upload/process", () => {
     const data = await res.json();
     expect(data.mp3Url).toBe("https://r2/audio/album/1/track.mp3");
 
-    // The factory pulls the WAV down once (via getFileBuffer), re-uploads
-    // the tagged WAV in place (uploadBuffer), then streams the MP3 up.
     expect(vi.mocked(getFileBuffer)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(uploadBuffer)).toHaveBeenCalled();
     expect(vi.mocked(uploadStream)).toHaveBeenCalledTimes(1);

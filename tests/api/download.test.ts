@@ -184,8 +184,6 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    // `zipNamePrefix: SITE_NAME` ("Party Pupils") is wired into the route
-    // factory, so the zip filename keeps its historical artist-name prefix.
     expect(body.zipName).toBe(`Party Pupils - Order ${order.id} (MP3).zip`);
     // Each track sits under a "Release Name/" folder and keeps its original
     // uploaded filename verbatim — no track-number prefix is added.

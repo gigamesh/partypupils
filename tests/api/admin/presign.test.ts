@@ -60,8 +60,6 @@ describe("POST /api/admin/upload/presign", () => {
       jsonReq({ key: "audio/album-slug/1/Track.wav", contentType: "audio/wav" }),
     );
     expect(res.status).toBe(200);
-    // `@gigamusic/admin`'s presign factory uses the `StorageProvider`
-    // method signature: `(key, { contentType, expiresInSeconds? })`.
     expect(vi.mocked(getPresignedUploadUrl)).toHaveBeenCalledWith(
       "audio/album-slug/1/Track.wav",
       expect.objectContaining({ contentType: "audio/wav" }),

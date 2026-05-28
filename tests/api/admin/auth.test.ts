@@ -1,8 +1,3 @@
-/**
- * Admin auth route — verifies bcrypt password compare and per-IP rate limiting
- * (the gigamusic package owns both; this exercises the wired handler end to
- * end against the real test database).
- */
 import { describe, it, expect, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import { hashPassword } from "@gigamusic/core";

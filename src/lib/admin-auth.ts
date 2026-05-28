@@ -1,17 +1,3 @@
-/**
- * Local admin-auth implementation.
- *
- * `@gigamusic/*` no longer ships an admin auth flow as of 0.2.0 — auth is
- * the consumer's responsibility. This file is the canonical place we
- * decide who's authed and mint/verify the session cookie. The package's
- * admin handler factories trust that requests reaching them have already
- * been gated by `src/proxy.ts`.
- *
- * Session shape: an HS256-signed JWT (via `@gigamusic/core`) carrying
- * `{ admin: true }`. 24-hour expiry; httpOnly cookie. No sliding refresh
- * — admins re-log in once a day. The same `ADMIN_SECRET` env var that
- * already exists signs and verifies.
- */
 import { cookies } from "next/headers";
 import { signSessionToken, verifySessionToken } from "@gigamusic/core";
 import { env } from "./env";
@@ -19,7 +5,6 @@ import { env } from "./env";
 const COOKIE_NAME = "admin_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 24;
 
-/** Mint a fresh session token and write the httpOnly cookie. */
 export async function createAdminSession(): Promise<void> {
   const token = await signSessionToken({
     payload: { admin: true },
@@ -36,7 +21,6 @@ export async function createAdminSession(): Promise<void> {
   });
 }
 
-/** Clear the admin session cookie. */
 export async function clearAdminSession(): Promise<void> {
   const jar = await cookies();
   jar.set(COOKIE_NAME, "", {
@@ -48,12 +32,6 @@ export async function clearAdminSession(): Promise<void> {
   });
 }
 
-/**
- * Verify the admin session cookie in the current request scope. Returns
- * true iff the cookie carries a valid `{ admin: true }` token signed with
- * `ADMIN_SECRET`. Suitable for Server Components, route handlers, and
- * Server Actions — anywhere `next/headers.cookies()` works.
- */
 export async function verifyAdminSession(): Promise<boolean> {
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
@@ -69,11 +47,7 @@ export async function verifyAdminSession(): Promise<boolean> {
   }
 }
 
-/**
- * Stateless variant for use in `proxy.ts` (Next 16 middleware), where
- * `next/headers.cookies()` isn't available. Reads the cookie directly off
- * the request's `Cookie` header.
- */
+// Used from `src/proxy.ts`, where `next/headers.cookies()` isn't available.
 export async function verifyAdminSessionFromRequest(
   req: Request,
 ): Promise<boolean> {

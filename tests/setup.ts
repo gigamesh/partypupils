@@ -18,9 +18,7 @@ if (process.env.DATABASE_URL?.includes("neon.tech")) {
 }
 
 // Admin-auth: every protected route sees an authed admin by default.
-// Re-mock per test for 401 paths. `createAdminSession` is the local
-// cookie writer used by the login route. `verifyAdminSessionFromRequest`
-// is the stateless variant used by `src/proxy.ts`.
+// Re-mock per test for 401 paths.
 vi.mock("@/lib/admin-auth", () => ({
   verifyAdminSession: vi.fn(async () => true),
   verifyAdminSessionFromRequest: vi.fn(async () => true),
@@ -90,16 +88,9 @@ vi.mock("next/server", async () => {
   };
 });
 
-// `next/headers.cookies()` is only used by `src/lib/admin-auth.ts` for the
-// login + session-verify path. The handler factories under test no longer
-// touch cookies (auth is enforced by `src/proxy.ts` upstream of route
-// handlers), so no global stub is required. The login route's own test
-// (`tests/api/admin/auth.test.ts`) sets up its own per-file cookie jar.
-
 // Storage stub — never hit R2 in tests. Tests can spy on `deleteFile` via vi.mocked.
-// `storageProvider` returns a `StorageProvider`-shaped object so the gigamusic
-// route factories that take the provider directly (download, zip, zip-stream)
-// see the same stubbed methods the legacy free-function imports do.
+// `storageProvider()` returns the same stub so route factories that take a
+// provider directly share the methods the free-function imports also see.
 vi.mock("@/lib/storage", async () => {
   const { Readable } = await import("stream");
   const deleteFile = vi.fn(async () => {});

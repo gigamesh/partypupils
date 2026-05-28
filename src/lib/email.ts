@@ -23,9 +23,6 @@ export function emailProvider() {
   return _provider;
 }
 
-// Internal alias preserved so the existing send helpers below don't churn.
-const provider = emailProvider;
-
 /** HTML body for the magic-link email that lets a customer re-access orders. */
 export function orderLookupEmailHtml(verifyUrl: string): string {
   return renderOrderLookup({ branding: BRANDING, verifyUrl }).html;
@@ -65,7 +62,7 @@ export function contactEmailHtml({
 
 export async function sendOrderLookupEmail(email: string, verifyUrl: string) {
   const { subject, html } = renderOrderLookup({ branding: BRANDING, verifyUrl });
-  await provider().send({
+  await emailProvider().send({
     from: env.EMAIL_FROM(),
     to: email,
     subject,
@@ -86,7 +83,7 @@ export async function sendPurchaseConfirmationEmail(
     itemNames,
     totalCents,
   });
-  await provider().send({
+  await emailProvider().send({
     from: env.EMAIL_FROM(),
     to: email,
     subject,
@@ -110,7 +107,7 @@ export async function sendContactEmail({
     fromEmail: email,
     message,
   });
-  await provider().send({
+  await emailProvider().send({
     from: env.EMAIL_FROM(),
     to: env.CONTACT_EMAIL(),
     replyTo: email,

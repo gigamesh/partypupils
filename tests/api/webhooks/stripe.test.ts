@@ -19,8 +19,6 @@ function webhookReq(rawBody: string) {
 
 beforeEach(() => {
   vi.mocked(stripe().webhooks.constructEvent).mockReset();
-  // emailSendStub is reset by tests/setup.ts. Re-installing a default resolution
-  // here is redundant; tests that need a rejection override per-call.
 });
 
 describe("POST /api/webhooks/stripe", () => {

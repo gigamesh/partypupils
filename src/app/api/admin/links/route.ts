@@ -8,9 +8,6 @@ import { LINKS_TAG } from "@/lib/cache-tags";
 
 const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
-// `createAdminLinksHandlers` takes only the slice it actually reads
-// (`queries`, plus an optional `logger`). Auth is enforced upstream by
-// `src/proxy.ts`; the package no longer verifies sessions inside handlers.
 const handlers = createAdminLinksHandlers({ queries });
 
 /** Re-validate the hero/links cache after every write so changes show up immediately. */

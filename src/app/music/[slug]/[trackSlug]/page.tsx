@@ -53,7 +53,7 @@ export default async function TrackPage({ params, searchParams }: Props) {
 
   const { token } = await searchParams;
   const showDownloads =
-    !!token && (await tokenGrantsTrack(token, track.id, release.id));
+    !!token && (await tokenGrantsTrack(token, track.id));
 
   return (
     <ReleaseDetail

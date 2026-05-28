@@ -1,9 +1,5 @@
-/**
- * Admin-only zip-manifest helpers. The customer download routes now build
- * archives through `@gigamusic/checkout`'s `createDownloadZip*Handler` family,
- * so this module is the residual support for the admin release-edit page's
- * "download as a customer would" preview at `/api/admin/download/zip`.
- */
+// Admin-only zip-manifest helpers (the customer routes build archives
+// through `@gigamusic/checkout`). Used by `/api/admin/download/zip`.
 import { prisma } from "@/lib/db";
 import { getPresignedDownloadUrl } from "@/lib/storage";
 import { cleanDownloadFilename } from "@/lib/utils";

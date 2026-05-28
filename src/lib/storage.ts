@@ -16,11 +16,6 @@ function provider() {
   return _provider;
 }
 
-/**
- * Exposed `StorageProvider` accessor so route handlers can hand the same
- * singleton to `@gigamusic/checkout` and `@gigamusic/admin` factories
- * without each one building its own R2 client. Mirrors `emailProvider()`.
- */
 export function storageProvider() {
   return provider();
 }

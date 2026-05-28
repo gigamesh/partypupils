@@ -2,8 +2,6 @@ import { createQueries } from "@gigamusic/db";
 import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
 import { prisma } from "./db";
 
-// The party-pupils Prisma client is generated to src/generated/prisma but is
-// structurally compatible with the one @gigamusic/db expects.
 const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 /**
@@ -11,9 +9,6 @@ const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
  * Vercel function instances. Returns `true` when the request is allowed and the
  * counter has been bumped, `false` when the caller is over the cap for the
  * current window. Older windows reset on the next call (no background sweeper).
- *
- * Wraps `@gigamusic/db`'s `consumeRateLimit` (which returns an object) with the
- * legacy boolean signature party-pupils call sites expect.
  */
 export async function consumeRateLimit(
   key: string,

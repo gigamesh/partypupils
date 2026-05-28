@@ -1,20 +1,10 @@
-/**
- * One-shot: read the current ADMIN_PASSWORD out of env and print a bcrypt
- * hash you can paste into ADMIN_PASSWORD_HASH (locally + in Vercel).
- *
- * Usage:
- *   pnpm tsx scripts/hash-admin-password.ts
- *
- * The hash includes the salt; no separate ADMIN_PASSWORD_SALT is needed.
- * Once `ADMIN_PASSWORD_HASH` is in `.env` and the routes have been swapped,
- * the plaintext `ADMIN_PASSWORD` env var can be deleted.
- */
+// Read ADMIN_PASSWORD from env and print a bcrypt hash for ADMIN_PASSWORD_HASH.
+//   pnpm tsx scripts/hash-admin-password.ts
 import "@dotenvx/dotenvx/config";
 import bcrypt from "bcryptjs";
 
-// 12 matches `@gigamusic/core.hashPassword`. Kept inline so the script can
-// be invoked via tsx (CJS) without dragging in the ESM-only
-// @gigamusic/core entry.
+// Matches `@gigamusic/core.hashPassword`. Inlined so this script runs under
+// tsx (CJS) without pulling the ESM-only @gigamusic/core entry.
 const SALT_ROUNDS = 12;
 
 async function main() {

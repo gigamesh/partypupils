@@ -12,10 +12,8 @@ import { isAllowedRequestOrigin } from "@/lib/urls";
 
 const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
-// Built once at module load. The `catalogDiscount` callback is resolved at
-// request time so an admin-changed catalog-discount SiteSetting picks up on
-// the next call without a deployment cycle — no per-request handler
-// reconstruction needed.
+// `catalogDiscount` resolves at request time so admin SiteSetting changes
+// take effect without a deploy.
 const handler = createCheckoutHandler({
   stripeSecret: env.STRIPE_SECRET_KEY(),
   queries,
@@ -30,14 +28,8 @@ const handler = createCheckoutHandler({
   },
 });
 
-/**
- * Stripe Checkout entry point. Body lives in
- * `@gigamusic/checkout.createCheckoutHandler`; this file is just the
- * env-reading boundary plus a CSRF origin check (the package is intentionally
- * CSRF-agnostic). Cart UI emits the canonical `{ kind, id }` shape directly,
- * so the body passes through untouched.
- */
 export async function POST(req: NextRequest) {
+  // CSRF guard — the upstream handler is intentionally origin-agnostic.
   if (!isAllowedRequestOrigin(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

@@ -7,8 +7,6 @@ import { LINKS_TAG, RELEASES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;
 
-// Party-pupils' Prisma client is generated to src/generated/prisma but is
-// structurally compatible with the one @gigamusic/db expects.
 const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 /**
@@ -35,14 +33,6 @@ async function loggedCacheRead<T>(label: string, op: () => Promise<T>): Promise<
   }
 }
 
-/**
- * Featured releases for the homepage (latest 4 published, with tracks + files).
- * Cached on the `releases` tag so admin writes invalidate it.
- *
- * `@gigamusic/db.listPublishedReleases` returns the full published catalog
- * already ordered by `releasedAt desc`; the slice to four happens here so the
- * package stays agnostic of consumer-specific feature counts.
- */
 export const getFeaturedReleases = unstable_cache(
   () =>
     loggedCacheRead("getFeaturedReleases", () =>
@@ -52,7 +42,6 @@ export const getFeaturedReleases = unstable_cache(
   { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
 );
 
-/** Full published catalog for /music. Same tag as featured. */
 export const getPublishedReleases = unstable_cache(
   () =>
     loggedCacheRead("getPublishedReleases", () =>
@@ -62,16 +51,9 @@ export const getPublishedReleases = unstable_cache(
   { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
 );
 
-/**
- * Single release by slug, used by both `generateMetadata` and the page body.
- * Wrapped in React `cache()` so the metadata query and the page query collapse
- * into one DB round-trip per request, and in `unstable_cache` so repeat
- * visitors hit the in-memory cache layer.
- *
- * `@gigamusic/db.getReleaseBySlug` is intentionally unfiltered on
- * `isPublished` (admins need to fetch drafts too); the public-only filter is
- * applied here so unpublished releases never leak into the music pages.
- */
+// React `cache()` collapses the metadata + page-body queries into one
+// per-request DB round-trip. The published-only re-filter is here because
+// the underlying query intentionally returns drafts too (for admins).
 export const getReleaseBySlug = cache(
   unstable_cache(
     (slug: string) =>
@@ -86,12 +68,6 @@ export const getReleaseBySlug = cache(
   ),
 );
 
-/**
- * Single track by (release slug, track slug). Same React-cache + unstable_cache
- * pattern as `getReleaseBySlug` so `generateMetadata` and the page body share
- * one DB round-trip. Returns the track with its files and parent release
- * (including sibling tracks) for the song page.
- */
 export const getTrackByReleaseAndSlug = cache(
   unstable_cache(
     (releaseSlug: string, trackSlug: string) =>
@@ -103,7 +79,6 @@ export const getTrackByReleaseAndSlug = cache(
   ),
 );
 
-/** Visible hero links — small list, but it's on the homepage so we cache it too. */
 export const getHeroLinks = unstable_cache(
   () =>
     loggedCacheRead("getHeroLinks", () =>
