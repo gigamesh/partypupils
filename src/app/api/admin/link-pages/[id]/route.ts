@@ -1,12 +1,8 @@
 import type { NextRequest } from "next/server";
 import { createAdminLinkPageByIdHandlers } from "@gigamusic/links/server";
 import { linkPageQueries } from "@/lib/link-pages";
-import { env } from "@/lib/env";
 
-const handlers = createAdminLinkPageByIdHandlers({
-  queries: linkPageQueries,
-  adminSessionSecret: env.ADMIN_SECRET(),
-});
+const handlers = createAdminLinkPageByIdHandlers({ queries: linkPageQueries });
 
 interface RouteContext {
   params: Promise<{ id: string }>;

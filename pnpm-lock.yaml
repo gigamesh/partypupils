@@ -21,35 +21,35 @@ importers:
         specifier: ^1.3.0
         version: 1.3.0(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/admin':
-        specifier: ^0.1.1
-        version: 0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.3.0
+        version: 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/audio':
-        specifier: ^0.1.1
-        version: 0.1.1(@gigamusic/storage@0.1.1)
+        specifier: ^0.3.0
+        version: 0.3.0(@gigamusic/storage@0.3.0)
       '@gigamusic/checkout':
-        specifier: ^0.1.1
-        version: 0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/node@22.19.19)(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.3.0
+        version: 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/node@22.19.19)(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/config':
-        specifier: ^0.1.1
-        version: 0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.3.0
+        version: 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.3.0
+        version: 0.3.0
       '@gigamusic/db':
-        specifier: ^0.1.1
-        version: 0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
+        specifier: ^0.3.0
+        version: 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
       '@gigamusic/email':
-        specifier: ^0.1.1
-        version: 0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.3.0
+        version: 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/links':
-        specifier: ^0.1.1
-        version: 0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.3.0
+        version: 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/storage':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.3.0
+        version: 0.3.0
       '@gigamusic/ui':
-        specifier: ^0.1.1
-        version: 0.1.1(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^0.3.0
+        version: 0.3.0(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0
@@ -784,46 +784,46 @@ packages:
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
 
-  '@gigamusic/admin@0.1.1':
-    resolution: {integrity: sha512-nrRl4aKedaClr/ocJWz4nhjhxz/1Z6jEDHoKe8ymzK/LDNybwEe+M2RSW7YSD2rAE/I1+pazydtvxQL7x2c/gg==}
+  '@gigamusic/admin@0.3.0':
+    resolution: {integrity: sha512-oj9k3kzBmZ9q+cBd1cuu4s/Yid6ib0WcRemcEb6+v4cAJ9nxjX3Rb3VYhv2hCgwDLqkGaTo+eyHAiHtyEm3ZKA==}
     peerDependencies:
       next: '>=15'
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@gigamusic/audio@0.1.1':
-    resolution: {integrity: sha512-8giHplx0s8A87KhocJVgfbU9aF9ZeRgJVNe1Miriu+iWQTh65YqZRxZbiAfNY537t0PSM/6djB5EOrI4A+mEMg==}
+  '@gigamusic/audio@0.3.0':
+    resolution: {integrity: sha512-QcaoRv56Vfwb5BhO3cXDIzwycK6cD46XoliKuhqxPN5+5WE6zPtUMrjGW2LPoYm87E6EzY/1SgbtQm/lk2i9iQ==}
     peerDependencies:
-      '@gigamusic/storage': 0.1.1
+      '@gigamusic/storage': 0.3.0
     peerDependenciesMeta:
       '@gigamusic/storage':
         optional: true
 
-  '@gigamusic/checkout@0.1.1':
-    resolution: {integrity: sha512-2vxjkoyawrmIDKGAgduwaXb2P8f/0zmCqCboaJ+V04Ez33OXUz5A3YYQbmTQB43cv70m3LIggsDMLLsEsWJS2A==}
+  '@gigamusic/checkout@0.3.0':
+    resolution: {integrity: sha512-QSm4I51r+UoV/0v6aiHywr6TmfO0hqWW21v9oW8s/hnt05tMUW6pQ0mhvQAL1wBLnje6X+AsexzRSre4KtPVOA==}
     peerDependencies:
       next: '>=15'
 
-  '@gigamusic/config@0.1.1':
-    resolution: {integrity: sha512-NBdnMY6mznDy3HWlJzlN09K1NQofjTHrzjWt/UD6gMu+VAghn8FKANbZvH8wS4tR1OuBkg4qB194q6xJpuGhzQ==}
+  '@gigamusic/config@0.3.0':
+    resolution: {integrity: sha512-XEZpnvK5K4JOYyz01MvZS/ZBZmSOURJjx2x7bjCy9O6RPgcWzmkv0RUq4lBNtITWvMiHZqRuIc8a5nD9L19ZyQ==}
     peerDependencies:
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@gigamusic/core@0.1.1':
-    resolution: {integrity: sha512-AJegdA4FaxwwdxajYdw0G6OZFpJDRUpe361V3iMfUiVZLbK6CJTOXyVPm5MIAU1VjF8SyB/m7PZHXDBUnguoSw==}
+  '@gigamusic/core@0.3.0':
+    resolution: {integrity: sha512-ByT3X7YZxYGUSRZCwqaVWxdJIpIYU0eHAPuh5bKU8NyOPnYDxd6UfYnpRkkMm+KDhzmGhnjGlupk4mYfd3g3yA==}
 
-  '@gigamusic/db@0.1.1':
-    resolution: {integrity: sha512-Xs57nxdDZHvtERLePHePvcgNCktqXBMu3FCL+XUf0uuwUhnvc+bnLhJC0AgVUY9plRSLI4pyKVSKLiPu1JEYmw==}
+  '@gigamusic/db@0.3.0':
+    resolution: {integrity: sha512-4ixBHUTr7bhMhnOOh+1dLVfbfD2JPrS1wZbE5gSQcfCsPAlyAB064OUP7C2RZ4n2zJAnSCgYbUdjIVWjYikKMg==}
     hasBin: true
     peerDependencies:
       '@prisma/client': '>=6'
 
-  '@gigamusic/email@0.1.1':
-    resolution: {integrity: sha512-za0x8X7RBEuuq8qVI7YHI17obsX9ePhfl2Mce9qhrnAsmmQWVJDEvnplo6sZTqgnHOzAFf3GIFezikZ65YyyQw==}
+  '@gigamusic/email@0.3.0':
+    resolution: {integrity: sha512-WqT2P8k9/kYnsrhYDHFOGcHyxWDuGRjmpXMWNWF0pLOWd7gXzWODl3NfHXIq+UdqJ13QNiPgEWbukHRkY4YBdQ==}
 
-  '@gigamusic/links@0.1.1':
-    resolution: {integrity: sha512-yKGs3Gov/Pd43QWO41LSq0gSN9t5auEchRo/xqNufxEHxP5pl5hIKoyxndYkYnb9IdnoaUFO9/gEjVMKGM6uew==}
+  '@gigamusic/links@0.3.0':
+    resolution: {integrity: sha512-g1WQFy+ov8rEreLJdwVRcIJd1z0tLoohiQ4DXCRP99Gc09GDGB+ikUbQnfbBTvTo6Ldvr6ZQY1FvAgSuHPMWBw==}
     hasBin: true
     peerDependencies:
       '@prisma/client': '>=6'
@@ -831,11 +831,11 @@ packages:
       react: '>=18 <20'
       react-dom: '>=18 <20'
 
-  '@gigamusic/storage@0.1.1':
-    resolution: {integrity: sha512-593HcllfqB+ih+Z2OWV6oMGJtc0InwlxIW/wiJi6r+/KGhTOLLq/zF9Q7eHXj65RF2++q+bEkD0ENsGmUviQAg==}
+  '@gigamusic/storage@0.3.0':
+    resolution: {integrity: sha512-+2YzQpBxk/t+HfJg3pVkIgOEELzpSICgLIQHhzW0fa5IDZheQtooG68uBey7AEFs5T7Dx0yi1DvN3HZe4uMtlw==}
 
-  '@gigamusic/ui@0.1.1':
-    resolution: {integrity: sha512-t0kEXqfbgDS3hq1R3Cz7Gfx1ciPj/CM7ZfOkLie+Tg7jA/jCuRIAh0viD4kVkrgio1GDfJKJKZ57jUOt+gD2og==}
+  '@gigamusic/ui@0.3.0':
+    resolution: {integrity: sha512-1MyLCU9SoFmLdeKe4z3EEwqpoLh+rNC71RVK1u/k6sujF+EWqT7Fru8S1nwifFwkapxber+HGZrFlhKZcvE7LQ==}
     peerDependencies:
       next: '>=15'
       react: '>=18 <20'
@@ -6097,15 +6097,15 @@ snapshots:
 
   '@floating-ui/utils@0.2.11': {}
 
-  '@gigamusic/admin@0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@gigamusic/admin@0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@gigamusic/audio': 0.1.1(@gigamusic/storage@0.1.1)
-      '@gigamusic/config': 0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@gigamusic/core': 0.1.1
-      '@gigamusic/db': 0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
-      '@gigamusic/email': 0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@gigamusic/storage': 0.1.1
-      '@gigamusic/ui': 0.1.1(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/audio': 0.3.0(@gigamusic/storage@0.3.0)
+      '@gigamusic/config': 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/core': 0.3.0
+      '@gigamusic/db': 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
+      '@gigamusic/email': 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/storage': 0.3.0
+      '@gigamusic/ui': 0.3.0(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
@@ -6115,23 +6115,23 @@ snapshots:
       - aws-crt
       - supports-color
 
-  '@gigamusic/audio@0.1.1(@gigamusic/storage@0.1.1)':
+  '@gigamusic/audio@0.3.0(@gigamusic/storage@0.3.0)':
     dependencies:
       ffmpeg-static: 5.3.0
       fluent-ffmpeg: 2.1.3
       music-metadata: 11.12.3
       node-id3: 0.2.9
     optionalDependencies:
-      '@gigamusic/storage': 0.1.1
+      '@gigamusic/storage': 0.3.0
     transitivePeerDependencies:
       - supports-color
 
-  '@gigamusic/checkout@0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/node@22.19.19)(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@gigamusic/checkout@0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/node@22.19.19)(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@gigamusic/core': 0.1.1
-      '@gigamusic/db': 0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
-      '@gigamusic/email': 0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@gigamusic/storage': 0.1.1
+      '@gigamusic/core': 0.3.0
+      '@gigamusic/db': 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
+      '@gigamusic/email': 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/storage': 0.3.0
       archiver: 7.0.1
       next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       stripe: 22.1.1(@types/node@22.19.19)
@@ -6145,41 +6145,41 @@ snapshots:
       - react-dom
       - react-native-b4a
 
-  '@gigamusic/config@0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@gigamusic/config@0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@gigamusic/core@0.1.1':
+  '@gigamusic/core@0.3.0':
     dependencies:
       bcryptjs: 2.4.3
       jose: 5.10.0
       zod: 3.25.76
 
-  '@gigamusic/db@0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))':
+  '@gigamusic/db@0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))':
     dependencies:
-      '@gigamusic/core': 0.1.1
+      '@gigamusic/core': 0.3.0
       '@prisma/client': 7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
 
-  '@gigamusic/email@0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@gigamusic/email@0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       resend: 4.8.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
     transitivePeerDependencies:
       - react
       - react-dom
 
-  '@gigamusic/links@0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@gigamusic/links@0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@gigamusic/config': 0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@gigamusic/core': 0.1.1
-      '@gigamusic/db': 0.1.1(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
-      '@gigamusic/ui': 0.1.1(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/config': 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/core': 0.3.0
+      '@gigamusic/db': 0.3.0(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))
+      '@gigamusic/ui': 0.3.0(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@prisma/client': 7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3)
       next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@gigamusic/storage@0.1.1':
+  '@gigamusic/storage@0.3.0':
     dependencies:
       '@aws-sdk/client-s3': 3.1041.0
       '@aws-sdk/lib-storage': 3.1041.0(@aws-sdk/client-s3@3.1041.0)
@@ -6187,10 +6187,10 @@ snapshots:
     transitivePeerDependencies:
       - aws-crt
 
-  '@gigamusic/ui@0.1.1(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@gigamusic/ui@0.3.0(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@gigamusic/config': 0.1.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@gigamusic/core': 0.1.1
+      '@gigamusic/config': 0.3.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@gigamusic/core': 0.3.0
       client-zip: 2.5.0
       clsx: 2.1.1
       next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

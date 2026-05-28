@@ -20,7 +20,9 @@ if (process.env.DATABASE_URL?.includes("neon.tech")) {
 // Admin-auth: every protected route sees an authed admin by default. Re-mock per test for 401 paths.
 vi.mock("@/lib/admin-auth", () => ({
   verifyAdminSession: vi.fn(async () => true),
+  verifyAdminSessionFromRequest: vi.fn(async () => true),
   createAdminSession: vi.fn(async () => {}),
+  clearAdminSession: vi.fn(async () => {}),
 }));
 
 // Stub external services. Stripe stub is a singleton so vi.mocked(stripe().X) and the
@@ -96,8 +98,9 @@ const { adminSessionToken } = vi.hoisted(() => ({
   adminSessionToken: { current: "" as string },
 }));
 vi.mock("next/headers", async () => {
-  const { createAdminSessionToken } = await import("@gigamusic/core");
-  adminSessionToken.current = await createAdminSessionToken({
+  const { signSessionToken } = await import("@gigamusic/core");
+  adminSessionToken.current = await signSessionToken({
+    payload: { admin: true },
     secret: process.env.ADMIN_SECRET ?? "",
   });
   return {

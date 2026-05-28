@@ -19,15 +19,18 @@ import {
 } from "@/app/api/admin/link-pages/[id]/items/route";
 import { prisma } from "@/lib/db";
 import { makeRelease } from "../../factories";
-import { createAdminSessionToken } from "@gigamusic/core";
+import { signSessionToken } from "@gigamusic/core";
 import { env } from "@/lib/env";
 
-// The gigamusic link-pages handlers verify the session by reading
-// `req.headers.get("cookie")` (stateless), so the global vi.mock of
-// `@/lib/admin-auth` doesn't gate these routes. Mint a real token signed
-// with the same secret the route uses; every request below carries it.
+// @gigamusic/links 0.3.0's link-page handlers no longer verify the session
+// themselves (auth moved to `src/proxy.ts`), so this cookie isn't strictly
+// required for these tests anymore. Kept attached to match how a real
+// browser request looks, in case the package re-adds a stateless check.
 const ADMIN_COOKIE = await (async () => {
-  const token = await createAdminSessionToken({ secret: env.ADMIN_SECRET() });
+  const token = await signSessionToken({
+    payload: { admin: true },
+    secret: env.ADMIN_SECRET(),
+  });
   return `admin_session=${token}`;
 })();
 
@@ -125,19 +128,9 @@ describe("POST /api/admin/link-pages", () => {
     expect(body.error).toMatch(/already exists/i);
   });
 
-  it("returns 401 when not authenticated", async () => {
-    // The gigamusic link-pages factory verifies the session statelessly
-    // from req.headers.cookie, so an unauth request is one without the
-    // admin_session cookie attached. The shared `jsonRequest` helper
-    // always attaches it; here we build a request manually that doesn't.
-    const unauthRequest = new Request("http://test/api/admin/link-pages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "X", slug: "unauth" }),
-    }) as unknown as NextRequest;
-    const res = await createPage(unauthRequest);
-    expect(res.status).toBe(401);
-  });
+  // Auth is no longer checked inside the @gigamusic/admin handler factories
+  // (0.3.0). `src/proxy.ts` gates `/api/admin/*` upstream — see
+  // `tests/proxy.test.ts` for that coverage.
 });
 
 describe("GET /api/admin/link-pages", () => {
