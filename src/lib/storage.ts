@@ -16,6 +16,15 @@ function provider() {
   return _provider;
 }
 
+/**
+ * Exposed `StorageProvider` accessor so route handlers can hand the same
+ * singleton to `@gigamusic/checkout` and `@gigamusic/admin` factories
+ * without each one building its own R2 client. Mirrors `emailProvider()`.
+ */
+export function storageProvider() {
+  return provider();
+}
+
 /** Strip the R2 public-URL prefix from a stored URL to recover the bare object key. */
 export function keyFromPublicUrl(url: string): string {
   return provider().keyFromPublicUrl(url);

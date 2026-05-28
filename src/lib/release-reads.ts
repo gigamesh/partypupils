@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { prisma, queries, withDbRetry } from "./db";
+import { queries, withDbRetry } from "./db";
 import { LINKS_TAG, RELEASES_TAG } from "./cache-tags";
 
 const REVALIDATE_SECONDS = 3600;
@@ -85,50 +85,23 @@ export const getReleaseBySlug = cache(
  * pattern as `getReleaseBySlug` so `generateMetadata` and the page body share
  * one DB round-trip. Returns the track with its files and parent release
  * (including sibling tracks) for the song page.
- *
- * Not in `@gigamusic/db`'s `Queries` surface — the package focuses on release-
- * and order-shaped reads, so this stays as a direct Prisma call.
  */
 export const getTrackByReleaseAndSlug = cache(
   unstable_cache(
     (releaseSlug: string, trackSlug: string) =>
       loggedCacheRead(`getTrackByReleaseAndSlug(${releaseSlug}, ${trackSlug})`, () =>
-        withDbRetry(() =>
-          prisma.track.findFirst({
-            where: {
-              slug: trackSlug,
-              release: { slug: releaseSlug, isPublished: true },
-            },
-            include: {
-              files: true,
-              release: {
-                include: {
-                  tracks: { orderBy: { trackNumber: "asc" }, include: { files: true } },
-                },
-              },
-            },
-          }),
-        ),
+        withDbRetry(() => queries.getTrackByReleaseAndSlug(releaseSlug, trackSlug)),
       ),
     ["track-by-release-and-slug-v1"],
     { tags: [RELEASES_TAG], revalidate: REVALIDATE_SECONDS },
   ),
 );
 
-/**
- * Visible hero links — small list, but it's on the homepage so we cache it too.
- *
- * `@gigamusic/db.listVisibleLinks` filters on `isVisible` only; the extra
- * `showOnHero` predicate is party-pupils-specific (hero vs. footer placement)
- * so the filter stays here on top of the package read.
- */
+/** Visible hero links — small list, but it's on the homepage so we cache it too. */
 export const getHeroLinks = unstable_cache(
   () =>
     loggedCacheRead("getHeroLinks", () =>
-      withDbRetry(async () => {
-        const links = await queries.listVisibleLinks();
-        return links.filter((link) => link.showOnHero);
-      }),
+      withDbRetry(() => queries.listVisibleLinks({ showOnHero: true })),
     ),
   ["hero-links-v1"],
   { tags: [LINKS_TAG], revalidate: REVALIDATE_SECONDS },
