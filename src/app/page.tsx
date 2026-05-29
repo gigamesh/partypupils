@@ -9,6 +9,10 @@ import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import { getFeaturedReleases, getHeroLinks } from "@/lib/release-reads";
 import Link from "next/link";
 
+// Reads from the live DB. Skip static prerender so the build doesn't have to
+// reach Postgres and so admins see published changes without a redeploy.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [featuredReleases, links] = await Promise.all([
     getFeaturedReleases(),

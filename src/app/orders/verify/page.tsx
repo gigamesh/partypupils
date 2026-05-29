@@ -1,7 +1,9 @@
 import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { OrderDownloads } from "@/components/OrderDownloads";
 import { Button } from "@/components/ui/button";
-import { prisma } from "@/lib/db";
+import { and, desc, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { downloadTokens, orders } from "@/db/schema";
 import { verifyOrderVerificationToken } from "@/lib/order-auth";
 import type { Metadata } from "next";
 
@@ -14,17 +16,18 @@ export const metadata: Metadata = {
 };
 
 async function getOrCreateValidToken(orderId: number): Promise<string | null> {
-  const existing = await prisma.downloadToken.findFirst({
-    where: { orderId },
+  const existing = await db.query.downloadTokens.findFirst({
+    where: eq(downloadTokens.orderId, orderId),
   });
 
   if (existing) return existing.token;
 
-  const created = await prisma.downloadToken.create({
-    data: { orderId },
-  });
+  const [created] = await db
+    .insert(downloadTokens)
+    .values({ orderId })
+    .returning({ token: downloadTokens.token });
 
-  return created.token;
+  return created?.token ?? null;
 }
 
 export default async function OrderVerifyPage({ searchParams }: Props) {
@@ -39,27 +42,27 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
     return <InvalidLink />;
   }
 
-  const orders = await prisma.order.findMany({
-    where: { email, status: "completed" },
-    include: {
+  const ordersList = await db.query.orders.findMany({
+    where: and(eq(orders.email, email), eq(orders.status, "completed")),
+    with: {
       items: {
-        include: {
+        with: {
           release: {
-            include: {
+            with: {
               tracks: {
-                orderBy: { trackNumber: "asc" },
-                include: { files: true },
+                orderBy: (t, { asc: ascFn }) => ascFn(t.trackNumber),
+                with: { files: true },
               },
             },
           },
-          track: { include: { files: true, release: true } },
+          track: { with: { files: true, release: true } },
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: desc(orders.createdAt),
   });
 
-  if (orders.length === 0) {
+  if (ordersList.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         <h1>No Orders Found</h1>
@@ -71,7 +74,7 @@ export default async function OrderVerifyPage({ searchParams }: Props) {
   }
 
   const ordersWithTokens = await Promise.all(
-    orders.map(async (order) => ({
+    ordersList.map(async (order) => ({
       ...order,
       downloadToken: await getOrCreateValidToken(order.id),
     })),

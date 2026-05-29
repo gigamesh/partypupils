@@ -1,7 +1,9 @@
 import { DownloadFAQ } from "@/components/DownloadFAQ";
 import { OrderDownloads } from "@/components/OrderDownloads";
 import { Button } from "@/components/ui/button";
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { orders } from "@/db/schema";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -19,20 +21,20 @@ export default async function CheckoutSuccessPage({ searchParams }: Props) {
   const { session_id } = await searchParams;
   if (!session_id) redirect("/music");
 
-  const order = await prisma.order.findUnique({
-    where: { stripeSessionId: session_id },
-    include: {
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.stripeSessionId, session_id),
+    with: {
       items: {
-        include: {
+        with: {
           release: {
-            include: {
+            with: {
               tracks: {
-                orderBy: { trackNumber: "asc" },
-                include: { files: true },
+                orderBy: (t, { asc }) => asc(t.trackNumber),
+                with: { files: true },
               },
             },
           },
-          track: { include: { files: true, release: true } },
+          track: { with: { files: true, release: true } },
         },
       },
       downloadTokens: true,

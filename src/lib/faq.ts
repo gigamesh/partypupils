@@ -1,11 +1,13 @@
-import { prisma } from "./db";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import { siteSettings } from "@/db/schema";
 import { FAQ_DEFAULTS, FAQ_SETTING_KEY } from "./faq-defaults";
 import { FaqContentSchema, type FaqContent, type FaqItem } from "./faq-schema";
 
 /** Loads admin-editable FAQ content, falling back to defaults if the row is missing or malformed. */
 export async function getFaqContent(): Promise<FaqContent> {
-  const row = await prisma.siteSetting.findUnique({
-    where: { key: FAQ_SETTING_KEY },
+  const row = await db.query.siteSettings.findFirst({
+    where: eq(siteSettings.key, FAQ_SETTING_KEY),
   });
   if (!row) return FAQ_DEFAULTS;
 

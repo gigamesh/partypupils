@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { releases } from "@/db/schema";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import {
   cleanupR2Objects,
@@ -81,12 +83,12 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     throw err;
   }
 
-  const release = await prisma.release.findUnique({
-    where: { id: releaseId },
-    include: {
+  const release = await db.query.releases.findFirst({
+    where: eq(releases.id, releaseId),
+    with: {
       tracks: {
-        orderBy: { trackNumber: "asc" },
-        include: { files: true },
+        orderBy: (t, { asc }) => asc(t.trackNumber),
+        with: { files: true },
       },
     },
   });
@@ -116,12 +118,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   // so re-validate against the persisted state before letting an invalid draft
   // go live.
   if (data.isPublished === true) {
-    const current = await prisma.release.findUnique({
-      where: { id: releaseId },
-      include: {
+    const current = await db.query.releases.findFirst({
+      where: eq(releases.id, releaseId),
+      with: {
         tracks: {
-          orderBy: { trackNumber: "asc" },
-          include: { files: true },
+          orderBy: (t, { asc }) => asc(t.trackNumber),
+          with: { files: true },
         },
       },
     });
@@ -143,10 +145,11 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
   }
 
-  const release = await prisma.release.update({
-    where: { id: releaseId },
-    data,
-  });
+  const [release] = await db
+    .update(releases)
+    .set(data)
+    .where(eq(releases.id, releaseId))
+    .returning();
 
   if (data.inRadio !== undefined || data.isPublished !== undefined) {
     revalidateTag(RADIO_TRACKS_TAG, "max");
@@ -165,9 +168,9 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   const releaseId = parseInt(id);
 
   // Capture every R2 object referenced by this release before the cascade nukes the rows.
-  const release = await prisma.release.findUnique({
-    where: { id: releaseId },
-    include: { tracks: { include: { files: true } } },
+  const release = await db.query.releases.findFirst({
+    where: eq(releases.id, releaseId),
+    with: { tracks: { with: { files: true } } },
   });
 
   if (!release) {
@@ -179,7 +182,7 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
     ...release.tracks.flatMap((t) => t.files.map((f) => f.storageKey)),
   ];
 
-  await prisma.release.delete({ where: { id: releaseId } });
+  await db.delete(releases).where(eq(releases.id, releaseId));
 
   if (r2KeysToDelete.length > 0) {
     await cleanupR2Objects(r2KeysToDelete);

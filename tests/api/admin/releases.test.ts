@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
+import { and, asc, count, eq } from "drizzle-orm";
 import { POST as createRelease } from "@/app/api/admin/releases/route";
 import {
   PUT as updateRelease,
@@ -16,7 +17,13 @@ import {
 } from "@/app/api/admin/releases/[id]/route";
 import { syncReleaseAndTracks } from "@/lib/release-tracks";
 import { deleteFile } from "@/lib/storage";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import {
+  orderItems,
+  releases,
+  trackFiles,
+  tracks,
+} from "@/db/schema";
 import { makeRelease, makeTrackWithFile, makeCompletedOrder } from "../../factories";
 
 beforeEach(() => {
@@ -36,7 +43,7 @@ function ctx(id: number) {
   return { params: Promise.resolve({ id: String(id) }) };
 }
 
-/** Map a Prisma TrackFile back into the FileInput shape the sync function expects. */
+/** Map a TrackFile row back into the FileInput shape the sync function expects. */
 function asFileInput(f: { format: string; fileName: string; storageKey: string; fileSize: number | null }) {
   return { format: f.format, fileName: f.fileName, storageKey: f.storageKey, fileSize: f.fileSize ?? 0 };
 }
@@ -67,13 +74,13 @@ describe("syncReleaseAndTracks", () => {
       { id: t2.id, name: t2.name, price: t2.price, trackNumber: 2, files: t2.files.map(asFileInput) },
     ]);
 
-    const after = await prisma.release.findUnique({
-      where: { id: release.id },
-      include: { tracks: { orderBy: { trackNumber: "asc" } } },
+    const after = await db.query.releases.findFirst({
+      where: eq(releases.id, release.id),
+      with: { tracks: { orderBy: (t, { asc: ascFn }) => ascFn(t.trackNumber) } },
     });
     expect(after?.name).toBe("Renamed");
     expect(after?.tracks.map((t) => t.id)).toEqual([t1.id, t2.id]);
-    expect(after?.tracks[0].name).toBe("Renamed 1");
+    expect(after?.tracks[0]?.name).toBe("Renamed 1");
   });
 
   it("does NOT silently null OrderItem.trackId for tracks that survived the edit (the regression)", async () => {
@@ -85,7 +92,9 @@ describe("syncReleaseAndTracks", () => {
       { id: t1.id, name: "Bought (renamed)", price: t1.price, trackNumber: 1, files: t1.files.map(asFileInput) },
     ]);
 
-    const orderItem = await prisma.orderItem.findFirst({ where: { trackId: t1.id } });
+    const orderItem = await db.query.orderItems.findFirst({
+      where: eq(orderItems.trackId, t1.id),
+    });
     expect(orderItem?.trackId).toBe(t1.id);
   });
 
@@ -98,9 +107,13 @@ describe("syncReleaseAndTracks", () => {
       { id: keep.id, name: keep.name, price: keep.price, trackNumber: 1, files: keep.files.map(asFileInput) },
     ]);
 
-    const remaining = await prisma.track.findMany({ where: { releaseId: release.id } });
+    const remaining = await db.query.tracks.findMany({
+      where: eq(tracks.releaseId, release.id),
+    });
     expect(remaining.map((t) => t.id)).toEqual([keep.id]);
-    expect(await prisma.track.findUnique({ where: { id: drop.id } })).toBeNull();
+    expect(
+      await db.query.tracks.findFirst({ where: eq(tracks.id, drop.id) }),
+    ).toBeUndefined();
   });
 
   it("creates new tracks (entries without an id)", async () => {
@@ -112,32 +125,34 @@ describe("syncReleaseAndTracks", () => {
       { name: "Brand new", price: 200, trackNumber: 2, files: [{ format: "mp3", fileName: "new.mp3", storageKey: "https://r2/new.mp3", fileSize: 5 }] },
     ]);
 
-    const tracks = await prisma.track.findMany({
-      where: { releaseId: release.id },
-      orderBy: { trackNumber: "asc" },
+    const trackRows = await db.query.tracks.findMany({
+      where: eq(tracks.releaseId, release.id),
+      orderBy: asc(tracks.trackNumber),
     });
-    expect(tracks.map((t) => t.name)).toEqual(["Existing", "Brand new"]);
-    expect(tracks[0].id).toBe(existing.id);
-    expect(tracks[1].id).not.toBe(existing.id);
+    expect(trackRows.map((t) => t.name)).toEqual(["Existing", "Brand new"]);
+    expect(trackRows[0]?.id).toBe(existing.id);
+    expect(trackRows[1]?.id).not.toBe(existing.id);
   });
 
   it("does NOT churn TrackFile rows when (format, storageKey) is unchanged", async () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id);
-    const fileIdBefore = t.files[0].id;
+    const fileIdBefore = t.files[0]!.id;
 
     await syncReleaseAndTracks(release.id, scalarsFor(release), [
       { id: t.id, name: "renamed scalar", price: t.price, trackNumber: 1, files: t.files.map(asFileInput) },
     ]);
 
-    const after = await prisma.trackFile.findFirst({ where: { trackId: t.id } });
+    const after = await db.query.trackFiles.findFirst({
+      where: eq(trackFiles.trackId, t.id),
+    });
     expect(after?.id).toBe(fileIdBefore);
   });
 
   it("replaces TrackFile rows when storageKey changes (new audio uploaded)", async () => {
     const release = await makeRelease();
     const t = await makeTrackWithFile(release.id);
-    const fileIdBefore = t.files[0].id;
+    const fileIdBefore = t.files[0]!.id;
 
     await syncReleaseAndTracks(release.id, scalarsFor(release), [
       {
@@ -149,10 +164,12 @@ describe("syncReleaseAndTracks", () => {
       },
     ]);
 
-    const after = await prisma.trackFile.findMany({ where: { trackId: t.id } });
+    const after = await db.query.trackFiles.findMany({
+      where: eq(trackFiles.trackId, t.id),
+    });
     expect(after).toHaveLength(1);
-    expect(after[0].id).not.toBe(fileIdBefore);
-    expect(after[0].storageKey).toBe("https://r2/newer.mp3");
+    expect(after[0]?.id).not.toBe(fileIdBefore);
+    expect(after[0]?.storageKey).toBe("https://r2/newer.mp3");
   });
 
   it("rolls back the entire update if any operation fails", async () => {
@@ -168,15 +185,14 @@ describe("syncReleaseAndTracks", () => {
 
     expect(failed).toBeInstanceOf(Error);
 
-    // @prisma/adapter-pg leaves the pooled connection in an "aborted transaction" state after
-    // a failed $transaction; subsequent queries fail with a misleading bind-mismatch error.
-    // Force a reconnect so the post-failure assertions hit a clean connection.
-    await prisma.$disconnect();
-
     // Track survives (delete-all-because-tracks-empty must NOT have committed).
-    expect(await prisma.track.findUnique({ where: { id: t.id } })).not.toBeNull();
+    expect(
+      await db.query.tracks.findFirst({ where: eq(tracks.id, t.id) }),
+    ).not.toBeUndefined();
     // Release name unchanged.
-    expect((await prisma.release.findUnique({ where: { id: release.id } }))?.name).toBe(release.name);
+    expect(
+      (await db.query.releases.findFirst({ where: eq(releases.id, release.id) }))?.name,
+    ).toBe(release.name);
   });
 
   it("reorders tracks (same IDs, different trackNumber values)", async () => {
@@ -189,7 +205,10 @@ describe("syncReleaseAndTracks", () => {
       { id: a.id, name: a.name, price: a.price, trackNumber: 2, files: a.files.map(asFileInput) },
     ]);
 
-    const sorted = await prisma.track.findMany({ where: { releaseId: release.id }, orderBy: { trackNumber: "asc" } });
+    const sorted = await db.query.tracks.findMany({
+      where: eq(tracks.releaseId, release.id),
+      orderBy: asc(tracks.trackNumber),
+    });
     expect(sorted.map((t) => t.name)).toEqual(["B", "A"]);
     expect(sorted.map((t) => t.id)).toEqual([b.id, a.id]);
   });
@@ -233,8 +252,11 @@ describe("syncReleaseAndTracks", () => {
     expect(failed).toBeInstanceOf(Error);
     expect(failed.name).toBe("StaleFormError");
     // Original tracks still present.
-    await prisma.$disconnect(); // adapter-pg quirk after expected failure
-    expect(await prisma.track.count({ where: { releaseId: release.id } })).toBe(1);
+    const [trackCount] = await db
+      .select({ count: count() })
+      .from(tracks)
+      .where(eq(tracks.releaseId, release.id));
+    expect(trackCount?.count ?? 0).toBe(1);
   });
 
   it("does NOT trigger StaleFormError when the release has no existing tracks (legit creation flow)", async () => {
@@ -250,9 +272,11 @@ describe("syncReleaseAndTracks", () => {
       },
     ]);
 
-    const tracks = await prisma.track.findMany({ where: { releaseId: release.id } });
-    expect(tracks).toHaveLength(1);
-    expect(tracks[0].name).toBe("Brand new");
+    const trackRows = await db.query.tracks.findMany({
+      where: eq(tracks.releaseId, release.id),
+    });
+    expect(trackRows).toHaveLength(1);
+    expect(trackRows[0]?.name).toBe("Brand new");
   });
 
   it("ignores stray ids that don't belong to this release (treats them as deletions)", async () => {
@@ -265,9 +289,11 @@ describe("syncReleaseAndTracks", () => {
       { id: 99999, name: "Phantom", price: 0, trackNumber: 2, files: [] }, // stray
     ]);
 
-    const tracks = await prisma.track.findMany({ where: { releaseId: release.id } });
+    const trackRows = await db.query.tracks.findMany({
+      where: eq(tracks.releaseId, release.id),
+    });
     // Only the real track survives; the stray id was silently dropped (it's not in existingById).
-    expect(tracks.map((t) => t.id)).toEqual([t.id]);
+    expect(trackRows.map((t) => t.id)).toEqual([t.id]);
   });
 });
 
@@ -305,12 +331,17 @@ describe("POST /api/admin/releases", () => {
       }),
     );
     expect(res.status).toBe(201);
-    const created = await prisma.release.findUnique({
-      where: { slug: "album-one" },
-      include: { tracks: { include: { files: true }, orderBy: { trackNumber: "asc" } } },
+    const created = await db.query.releases.findFirst({
+      where: eq(releases.slug, "album-one"),
+      with: {
+        tracks: {
+          with: { files: true },
+          orderBy: (t, { asc: ascFn }) => ascFn(t.trackNumber),
+        },
+      },
     });
     expect(created?.tracks).toHaveLength(2);
-    expect(created?.tracks[0].files).toHaveLength(2);
+    expect(created?.tracks[0]?.files).toHaveLength(2);
   });
 
   it("rejects duplicate slug with 400", async () => {
@@ -319,10 +350,6 @@ describe("POST /api/admin/releases", () => {
       jsonRequest("POST", { name: "Dup", slug: "dup", price: 100, type: "single", isPublished: false, tracks: [] }),
     );
     expect(res.status).toBe(400);
-    // The unique-constraint failure rolls back the implicit Prisma transaction;
-    // adapter-pg leaves the pooled connection in an aborted state. Same workaround
-    // as the syncReleaseAndTracks rollback tests above.
-    await prisma.$disconnect();
   });
 });
 
@@ -342,10 +369,13 @@ describe("PUT/DELETE /api/admin/releases/[id] (route wiring)", () => {
     );
 
     expect(res.status).toBe(200);
-    const after = await prisma.release.findUnique({ where: { id: release.id }, include: { tracks: true } });
+    const after = await db.query.releases.findFirst({
+      where: eq(releases.id, release.id),
+      with: { tracks: true },
+    });
     expect(after?.name).toBe("Via route");
-    expect(after?.tracks[0].id).toBe(t.id);
-    expect(after?.tracks[0].name).toBe("Via route track");
+    expect(after?.tracks[0]?.id).toBe(t.id);
+    expect(after?.tracks[0]?.name).toBe("Via route track");
   });
 
   it("DELETE removes the release and cascades to its tracks + files", async () => {
@@ -358,26 +388,33 @@ describe("PUT/DELETE /api/admin/releases/[id] (route wiring)", () => {
       ctx(release.id),
     );
     expect(res.status).toBe(200);
-    expect(await prisma.release.findUnique({ where: { id: release.id } })).toBeNull();
-    expect(await prisma.track.count({ where: { releaseId: release.id } })).toBe(0);
+    expect(
+      await db.query.releases.findFirst({ where: eq(releases.id, release.id) }),
+    ).toBeUndefined();
+    const [trackCount] = await db
+      .select({ count: count() })
+      .from(tracks)
+      .where(eq(tracks.releaseId, release.id));
+    expect(trackCount?.count ?? 0).toBe(0);
   });
 
   it("DELETE cleans up R2 cover image and track files", async () => {
-    const release = await prisma.release.create({
-      data: {
+    const [release] = await db
+      .insert(releases)
+      .values({
         name: "Has cover",
         slug: `cover-${Math.random().toString(36).slice(2, 8)}`,
         price: 999,
         type: "single",
         isPublished: true,
         coverImageUrl: "https://r2/cover.jpg",
-      },
-    });
-    await makeTrackWithFile(release.id, { storageKey: "https://r2/track.mp3" });
+      })
+      .returning();
+    await makeTrackWithFile(release!.id, { storageKey: "https://r2/track.mp3" });
 
     await deleteRelease(
       new Request("http://test", { method: "DELETE" }) as unknown as NextRequest,
-      ctx(release.id),
+      ctx(release!.id),
     );
 
     const calls = vi.mocked(deleteFile).mock.calls.map((c) => c[0]).sort();
@@ -430,8 +467,11 @@ describe("Draft / publish validation flows", () => {
     expect(body.price).toBe(0);
     expect(body.type).toBe("single");
 
-    const tracks = await prisma.track.count({ where: { releaseId: body.id } });
-    expect(tracks).toBe(0);
+    const [trackCount] = await db
+      .select({ count: count() })
+      .from(tracks)
+      .where(eq(tracks.releaseId, body.id));
+    expect(trackCount?.count ?? 0).toBe(0);
   });
 
   it("POST with isPublished:true rejects missing price with structured fieldErrors", async () => {
@@ -483,39 +523,43 @@ describe("Draft / publish validation flows", () => {
   });
 
   it("PUT promotes a draft to published when the payload is valid", async () => {
-    const draft = await prisma.release.create({
-      data: {
+    const [draft] = await db
+      .insert(releases)
+      .values({
         name: "Promo",
         slug: `draft-${Math.random().toString(36).slice(2, 8)}`,
         price: 0,
         type: "single",
         isPublished: false,
-      },
-    });
+      })
+      .returning();
 
     const res = await updateRelease(
       jsonRequest("PUT", validPublishedPayload({ name: "Promo", slug: "promo-final" })),
-      ctx(draft.id),
+      ctx(draft!.id),
     );
     expect(res.status).toBe(200);
-    const after = await prisma.release.findUnique({ where: { id: draft.id } });
+    const after = await db.query.releases.findFirst({
+      where: eq(releases.id, draft!.id),
+    });
     expect(after?.isPublished).toBe(true);
     expect(after?.slug).toBe("promo-final");
   });
 
   it("PUT rejects a publish payload whose slug is still auto-generated", async () => {
-    const draft = await prisma.release.create({
-      data: {
+    const [draft] = await db
+      .insert(releases)
+      .values({
         name: "x",
         slug: `draft-${Math.random().toString(36).slice(2, 8)}`,
         price: 0,
         type: "single",
         isPublished: false,
-      },
-    });
+      })
+      .returning();
     const res = await updateRelease(
       jsonRequest("PUT", validPublishedPayload({ slug: "draft-leftover" })),
-      ctx(draft.id),
+      ctx(draft!.id),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -523,79 +567,97 @@ describe("Draft / publish validation flows", () => {
   });
 
   it("PATCH refuses to flip an invalid draft to published", async () => {
-    const draft = await prisma.release.create({
-      data: {
+    const [draft] = await db
+      .insert(releases)
+      .values({
         name: "x",
         slug: `draft-${Math.random().toString(36).slice(2, 8)}`,
         price: 0,
         type: "single",
         isPublished: false,
-      },
-    });
+      })
+      .returning();
 
     const res = await patchRelease(
       jsonRequest("PATCH", { isPublished: true }),
-      ctx(draft.id),
+      ctx(draft!.id),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.fieldErrors).toBeDefined();
-    const stillDraft = await prisma.release.findUnique({ where: { id: draft.id } });
+    const stillDraft = await db.query.releases.findFirst({
+      where: eq(releases.id, draft!.id),
+    });
     expect(stillDraft?.isPublished).toBe(false);
   });
 
   it("PATCH flips a fully-valid draft to published", async () => {
-    const draft = await prisma.release.create({
-      data: {
-        name: "Ready",
-        slug: "ready-to-go",
-        price: 1500,
-        type: "album",
-        isPublished: false,
-        tracks: {
-          create: [
-            {
-              name: "Solo",
-              artist: "Solo Artist",
-              slug: "solo",
-              price: 300,
-              trackNumber: 1,
-              files: {
-                create: [
-                  { format: "wav", fileName: "s.wav", storageKey: "https://r2/s.wav", fileSize: 99 },
-                ],
-              },
-            },
-          ],
-        },
-      },
+    // Build the publish-ready draft top-down: release → track → file. The
+    // Prisma version used nested `create`; in Drizzle we do three inserts in a
+    // transaction so the file references the newly-minted track id.
+    const draftId = await db.transaction(async (tx) => {
+      const [draft] = await tx
+        .insert(releases)
+        .values({
+          name: "Ready",
+          slug: "ready-to-go",
+          price: 1500,
+          type: "album",
+          isPublished: false,
+        })
+        .returning({ id: releases.id });
+      const [track] = await tx
+        .insert(tracks)
+        .values({
+          releaseId: draft!.id,
+          name: "Solo",
+          artist: "Solo Artist",
+          slug: "solo",
+          price: 300,
+          trackNumber: 1,
+        })
+        .returning({ id: tracks.id });
+      await tx.insert(trackFiles).values({
+        trackId: track!.id,
+        format: "wav",
+        fileName: "s.wav",
+        storageKey: "https://r2/s.wav",
+        fileSize: 99,
+      });
+      return draft!.id;
     });
 
     const res = await patchRelease(
       jsonRequest("PATCH", { isPublished: true }),
-      ctx(draft.id),
+      ctx(draftId),
     );
     expect(res.status).toBe(200);
-    const after = await prisma.release.findUnique({ where: { id: draft.id } });
+    const after = await db.query.releases.findFirst({
+      where: eq(releases.id, draftId),
+    });
     expect(after?.isPublished).toBe(true);
   });
 
   it("PATCH ignores re-publish of an already-published release without re-validation", async () => {
     // Already-true → still-true bypasses validation. This guards against forcing
     // admins to fix unrelated data when they only toggle inRadio etc.
-    const release = await prisma.release.create({
-      data: {
+    const [release] = await db
+      .insert(releases)
+      .values({
         name: "Live",
         slug: `live-${Math.random().toString(36).slice(2, 8)}`,
         price: 1000,
         type: "single",
         isPublished: true,
-      },
-    });
+      })
+      .returning();
     const res = await patchRelease(
       jsonRequest("PATCH", { isPublished: true }),
-      ctx(release.id),
+      ctx(release!.id),
     );
     expect(res.status).toBe(200);
   });
 });
+
+// Silence unused-import lint — `and` is exported for future query expansions.
+void and;

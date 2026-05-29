@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { orders } from "@/db/schema";
 import { createOrderVerificationToken } from "@/lib/order-auth";
 import { sendOrderLookupEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/utils";
@@ -11,8 +13,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
   }
 
-  const order = await prisma.order.findFirst({
-    where: { email, status: "completed" },
+  const order = await db.query.orders.findFirst({
+    where: and(eq(orders.email, email), eq(orders.status, "completed")),
   });
 
   if (!order) {

@@ -1,5 +1,7 @@
+import { desc, eq } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { orders as ordersTable } from "@/db/schema";
 import { formatCurrency } from "@/lib/utils";
 import type { Metadata } from "next";
 
@@ -23,17 +25,17 @@ function countTracks(order: {
 }
 
 export default async function DemoOrdersListPage() {
-  const orders = await prisma.order.findMany({
-    where: { status: "completed" },
-    include: {
+  const orders = await db.query.orders.findMany({
+    where: eq(ordersTable.status, "completed"),
+    with: {
       items: {
-        include: {
-          release: { include: { tracks: { select: { id: true } } } },
+        with: {
+          release: { with: { tracks: { columns: { id: true } } } },
         },
       },
     },
-    orderBy: { createdAt: "desc" },
-    take: 50,
+    orderBy: desc(ordersTable.createdAt),
+    limit: 50,
   });
 
   return (

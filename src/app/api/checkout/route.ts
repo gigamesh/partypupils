@@ -1,16 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { createCheckoutHandler } from "@gigamusic/checkout";
-import { createQueries } from "@gigamusic/db";
-import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
-import { prisma } from "@/lib/db";
+import { queries } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/utils";
 import { DEFAULT_CURRENCY, SITE_NAME } from "@/lib/constants";
 import { getCatalogPrice } from "@/lib/catalog";
 import { isAllowedRequestOrigin } from "@/lib/urls";
-
-const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 // `catalogPurchase` is resolved at request time so admin-changed catalog
 // pricing picks up on the next call without redeploying. 0.3.0 made the

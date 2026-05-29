@@ -13,7 +13,6 @@
  * shape and supplies defaults.
  */
 import { z } from "zod";
-import { randomBytes } from "node:crypto";
 
 const fileSchema = z.object({
   format: z.string().min(1),
@@ -141,9 +140,16 @@ function flattenZodErrors(error: z.ZodError): FieldErrorMap {
   return { fieldErrors, formErrors };
 }
 
-/** Random hex suffix so two un-named drafts don't collide on the unique slug. */
+/**
+ * Random hex suffix so two un-named drafts don't collide on the unique slug.
+ * Uses the Web Crypto API so this module stays importable from both server
+ * code (route handlers) and client code (the admin form's pre-flight check).
+ */
 export function generateDraftSlug(): string {
-  return `draft-${randomBytes(4).toString("hex")}`;
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `draft-${hex}`;
 }
 
 /**

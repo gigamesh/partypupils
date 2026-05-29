@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { desc } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { releases as releasesTable } from "@/db/schema";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,13 +19,22 @@ import { DeleteReleaseButton } from "./releases/DeleteReleaseButton";
 import { ReleaseRadioToggle } from "./releases/ReleaseRadioToggle";
 
 export default async function AdminReleasesPage() {
-  const releases = await prisma.release.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { tracks: true } },
-      tracks: { select: { inRadio: true } },
+  // Pull releases + their tracks' `inRadio` flag in one round-trip. Prisma
+  // used `include._count.tracks` + a partial-select `tracks.inRadio`; the
+  // Drizzle relational API can fetch the tracks slice and we derive the
+  // count from `tracks.length` to avoid a second `count()` query per row.
+  const releaseRows = await db.query.releases.findMany({
+    orderBy: desc(releasesTable.createdAt),
+    with: {
+      tracks: { columns: { inRadio: true } },
     },
   });
+  // Mirror Prisma's `_count.tracks` shape so the JSX below can keep reading
+  // `release._count.tracks`.
+  const releases = releaseRows.map((release) => ({
+    ...release,
+    _count: { tracks: release.tracks.length },
+  }));
 
   return (
     <div>

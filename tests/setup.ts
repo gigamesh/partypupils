@@ -2,13 +2,27 @@
  * Global test setup. Tests are launched via `scripts/run-tests.ts`, which:
  *   - guarantees DATABASE_URL points to localhost
  *   - rewrites the URL onto an isolated Postgres `schema=test`
- *   - has already run `prisma db push --force-reset` against that schema
+ *   - has already run `drizzle-kit push` against that schema
  *
  * This file therefore only handles per-test data isolation and module mocks.
  */
 import "@dotenvx/dotenvx/config";
 import { afterAll, beforeAll, beforeEach, vi } from "vitest";
-import { prisma } from "@/lib/db";
+import { sql } from "drizzle-orm";
+import { db } from "@/lib/db";
+import {
+  downloadTokens,
+  linkPageItems,
+  linkPages,
+  links,
+  orderItems,
+  orders,
+  rateLimits,
+  releases,
+  siteSettings,
+  trackFiles,
+  tracks,
+} from "@/db/schema";
 
 // Belt-and-suspenders: never run against a Neon URL even if invoked outside the wrapper.
 if (process.env.DATABASE_URL?.includes("neon.tech")) {
@@ -148,33 +162,36 @@ vi.mock("@/lib/storage", async () => {
 
 beforeAll(async () => {
   // Sanity check the connection up front — clearer than test-time timeouts.
-  await prisma.$queryRaw`SELECT 1`;
+  await db.execute(sql`SELECT 1`);
 });
 
 beforeEach(async () => {
+  // Wipe between tests. The order respects FK constraints (children before
+  // parents). Wrapping in a single transaction keeps the deletes atomic, the
+  // same property the Prisma `$transaction([...])` form provided.
+  await db.transaction(async (tx) => {
+    await tx.delete(trackFiles);
+    await tx.delete(orderItems);
+    await tx.delete(downloadTokens);
+    await tx.delete(tracks);
+    await tx.delete(orders);
+    await tx.delete(linkPageItems);
+    await tx.delete(linkPages);
+    await tx.delete(releases);
+    await tx.delete(siteSettings);
+    await tx.delete(links);
+    await tx.delete(rateLimits);
+  });
+
   // Reset all stripeStub mocks between tests so prior calls don't leak.
   stripeStub.checkout.sessions.create.mockReset();
   stripeStub.webhooks.constructEvent.mockReset();
   emailSendStub.mockReset();
   emailSendStub.mockResolvedValue(undefined);
-
-  // Wipe between tests. deleteMany via the Prisma client (rather than raw TRUNCATE) avoids
-  // an issue where Prisma misparses parameter placeholders in raw SQL with quoted identifiers.
-  await prisma.$transaction([
-    prisma.trackFile.deleteMany(),
-    prisma.orderItem.deleteMany(),
-    prisma.downloadToken.deleteMany(),
-    prisma.track.deleteMany(),
-    prisma.order.deleteMany(),
-    prisma.linkPageItem.deleteMany(),
-    prisma.linkPage.deleteMany(),
-    prisma.release.deleteMany(),
-    prisma.siteSetting.deleteMany(),
-    prisma.link.deleteMany(),
-    prisma.rateLimit.deleteMany(),
-  ]);
 });
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  // Drizzle's `pg`/`neon` pools don't expose a `$disconnect`; the underlying
+  // pool is GC'd when the process exits. Vitest forks shut down cleanly with
+  // no explicit close needed, mirroring the previous Prisma teardown.
 });

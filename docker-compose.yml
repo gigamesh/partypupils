@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: party-pupils-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: party_pupils
+    ports:
+      - "5436:5432"
+    volumes:
+      - party_pupils_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d party_pupils"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  party_pupils_pg:

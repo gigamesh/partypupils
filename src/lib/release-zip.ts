@@ -4,7 +4,9 @@
  * so this module is the residual support for the admin release-edit page's
  * "download as a customer would" preview at `/api/admin/download/zip`.
  */
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { releases } from "@/db/schema";
 import { getPresignedDownloadUrl } from "@/lib/storage";
 import { cleanDownloadFilename } from "@/lib/utils";
 
@@ -101,12 +103,12 @@ export async function buildReleaseZipBundle(
   format: string,
 ): Promise<{ zipName: string; files: ZipFile[] } | null> {
   const audioContentType = format === "wav" ? "audio/wav" : "audio/mpeg";
-  const release = await prisma.release.findUnique({
-    where: { id: releaseId },
-    include: {
+  const release = await db.query.releases.findFirst({
+    where: eq(releases.id, releaseId),
+    with: {
       tracks: {
-        orderBy: { trackNumber: "asc" },
-        include: { files: { where: { format } } },
+        orderBy: (t, { asc: ascFn }) => ascFn(t.trackNumber),
+        with: { files: { where: (f, { eq: eqFn }) => eqFn(f.format, format) } },
       },
     },
   });
@@ -115,8 +117,8 @@ export async function buildReleaseZipBundle(
   const files: ZipFile[] = release.tracks
     .filter((t) => t.files.length > 0)
     .map((track) => ({
-      fileName: zipEntryPath(track.files[0].fileName),
-      storageKey: track.files[0].storageKey,
+      fileName: zipEntryPath(track.files[0]!.fileName),
+      storageKey: track.files[0]!.storageKey,
       contentType: audioContentType,
     }));
   if (files.length > 0 && release.coverImageUrl) {

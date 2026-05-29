@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { tracks } from "@/db/schema";
 import { verifyAdminSession } from "@/lib/admin-auth";
 
 interface RouteContext {
@@ -21,10 +23,11 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "No supported fields to update" }, { status: 400 });
   }
 
-  const track = await prisma.track.update({
-    where: { id: parseInt(id) },
-    data,
-  });
+  const [track] = await db
+    .update(tracks)
+    .set(data)
+    .where(eq(tracks.id, parseInt(id)))
+    .returning();
 
   return NextResponse.json(track);
 }

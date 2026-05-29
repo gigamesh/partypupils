@@ -5,7 +5,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST as stripeWebhook } from "@/app/api/webhooks/stripe/route";
 import { stripe } from "@/lib/stripe";
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db, queries } from "@/lib/db";
+import { downloadTokens, orderItems, orders } from "@/db/schema";
 import { emailSendStub } from "../../setup";
 import { makeRelease, makeTrackWithFile } from "../../factories";
 
@@ -62,41 +64,51 @@ describe("POST /api/webhooks/stripe", () => {
     const res = await stripeWebhook(webhookReq("{}") as never);
     expect(res.status).toBe(200);
 
-    const order = await prisma.order.findUnique({
-      where: { stripeSessionId: "cs_test_abc" },
-      include: { items: true, downloadTokens: true },
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.stripeSessionId, "cs_test_abc"),
+      with: { items: true, downloadTokens: true },
     });
     expect(order?.email).toBe("buyer@test");
     expect(order?.status).toBe("completed");
     expect(order?.items).toHaveLength(2);
     expect(order?.downloadTokens).toHaveLength(1);
 
-    const releaseItem = order?.items.find((i) => i.releaseId === release.id);
-    const trackItem = order?.items.find((i) => i.trackId === track.id);
+    const releaseItem = order?.items.find((i: { releaseId: number | null }) => i.releaseId === release.id);
+    const trackItem = order?.items.find((i: { trackId: number | null }) => i.trackId === track.id);
     expect(releaseItem?.price).toBe(release.price);
     expect(trackItem?.price).toBe(track.price);
   });
 
-  it("is idempotent against a concurrent duplicate delivery (P2002 race)", async () => {
-    // Simulates two parallel deliveries that both pass the findUnique check —
-    // one wins the create, the other hits the unique constraint. Pre-seeding an
-    // order with the same stripeSessionId forces the second create to throw
-    // P2002, which is exactly what the loser of a real race would see.
+  it("is idempotent against a concurrent duplicate delivery (unique-violation race)", async () => {
+    // Simulates two parallel deliveries that both pass the pre-check —
+    // one wins the insert, the other hits the unique constraint. Pre-seeding an
+    // order with the same stripeSessionId forces the second insert to throw
+    // SQLSTATE 23505, which is exactly what the loser of a real race would see.
     const release = await makeRelease();
-    await prisma.order.create({
-      data: {
-        stripeSessionId: "cs_test_race",
-        email: "first@test",
-        amountTotal: release.price,
-        status: "completed",
-        items: { create: [{ releaseId: release.id, price: release.price }] },
-        downloadTokens: { create: {} },
-      },
+    await db.transaction(async (tx) => {
+      const [order] = await tx
+        .insert(orders)
+        .values({
+          stripeSessionId: "cs_test_race",
+          email: "first@test",
+          amountTotal: release.price,
+          status: "completed",
+        })
+        .returning();
+      await tx.insert(orderItems).values({
+        orderId: order!.id,
+        releaseId: release.id,
+        price: release.price,
+      });
+      await tx.insert(downloadTokens).values({ orderId: order!.id });
     });
 
-    // Bypass the findUnique short-circuit by spying on it once, so we exercise
-    // the create-path P2002 catch rather than the pre-check branch.
-    const findSpy = vi.spyOn(prisma.order, "findUnique").mockResolvedValueOnce(null as never);
+    // Bypass the pre-existing-order short-circuit by spying on the
+    // `getOrderByStripeSessionId` query once, so we exercise the insert-path
+    // unique-violation catch rather than the pre-check branch.
+    const findSpy = vi
+      .spyOn(queries, "getOrderByStripeSessionId")
+      .mockResolvedValueOnce(null as never);
 
     vi.mocked(stripe().webhooks.constructEvent).mockReturnValueOnce({
       type: "checkout.session.completed",
@@ -116,15 +128,12 @@ describe("POST /api/webhooks/stripe", () => {
     expect(res.status).toBe(200);
     expect(emailSendStub).not.toHaveBeenCalled();
 
-    // adapter-pg leaves the pooled connection in an aborted-transaction state
-    // after a P2002 inside an implicit transaction; same workaround as the
-    // syncReleaseAndTracks rollback tests.
-    await prisma.$disconnect();
-
     // Only the pre-seeded order remains; no duplicate from the loser of the race.
-    const orders = await prisma.order.findMany({ where: { stripeSessionId: "cs_test_race" } });
-    expect(orders).toHaveLength(1);
-    expect(orders[0].email).toBe("first@test");
+    const orderRows = await db.query.orders.findMany({
+      where: eq(orders.stripeSessionId, "cs_test_race"),
+    });
+    expect(orderRows).toHaveLength(1);
+    expect(orderRows[0]?.email).toBe("first@test");
 
     findSpy.mockRestore();
   });
@@ -152,8 +161,10 @@ describe("POST /api/webhooks/stripe", () => {
     // Let any deferred (after()) email sends run before asserting.
     await new Promise((r) => setTimeout(r, 0));
 
-    const orders = await prisma.order.findMany({ where: { stripeSessionId: "cs_test_dup" } });
-    expect(orders).toHaveLength(1);
+    const orderRows = await db.query.orders.findMany({
+      where: eq(orders.stripeSessionId, "cs_test_dup"),
+    });
+    expect(orderRows).toHaveLength(1);
     // The retry must short-circuit before scheduling another email send.
     expect(emailSendStub).toHaveBeenCalledTimes(1);
   });
@@ -178,8 +189,10 @@ describe("POST /api/webhooks/stripe", () => {
     const res = await stripeWebhook(webhookReq("{}") as never);
     expect(res.status).toBe(200);
 
-    const order = await prisma.order.findUnique({ where: { stripeSessionId: "cs_no_email" } });
-    expect(order).not.toBeNull();
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.stripeSessionId, "cs_no_email"),
+    });
+    expect(order).not.toBeUndefined();
     expect(order?.email).toBe("");
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no customer_details.email"));
     expect(emailSendStub).not.toHaveBeenCalled();
@@ -209,8 +222,10 @@ describe("POST /api/webhooks/stripe", () => {
     // 200 (not 500): we don't want Stripe retrying just because email send failed.
     expect(res.status).toBe(200);
 
-    const order = await prisma.order.findUnique({ where: { stripeSessionId: "cs_email_fail" } });
-    expect(order).not.toBeNull();
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.stripeSessionId, "cs_email_fail"),
+    });
+    expect(order).not.toBeUndefined();
     expect(errSpy).toHaveBeenCalledWith(
       expect.stringContaining("failed to send purchase confirmation"),
       expect.any(Error),
@@ -232,6 +247,10 @@ describe("POST /api/webhooks/stripe", () => {
 
     const res = await stripeWebhook(webhookReq("{}") as never);
     expect(res.status).toBe(200);
-    expect(await prisma.order.findUnique({ where: { stripeSessionId: "cs_test_empty" } })).toBeNull();
+    expect(
+      await db.query.orders.findFirst({
+        where: eq(orders.stripeSessionId, "cs_test_empty"),
+      }),
+    ).toBeUndefined();
   });
 });

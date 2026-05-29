@@ -10,6 +10,10 @@ import { buildPlayerTracksForRelease, toPlayerTrack } from "@/lib/player-data";
 import { getTrackByReleaseAndSlug } from "@/lib/release-reads";
 import { formatCurrency } from "@/lib/utils";
 
+// Reads from the live DB. Skip static prerender so the build doesn't have to
+// reach Postgres and so admins see published changes without a redeploy.
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: Promise<{ slug: string; trackSlug: string }>;
   searchParams: Promise<{ token?: string }>;

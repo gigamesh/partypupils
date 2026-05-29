@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { desc } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { linkPages } from "@/db/schema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,13 +17,19 @@ import {
 import { DeleteLinkPageButton } from "./DeleteLinkPageButton";
 
 export default async function AdminLinkPagesPage() {
-  const pages = await prisma.linkPage.findMany({
-    orderBy: { updatedAt: "desc" },
-    include: {
-      release: { select: { id: true, name: true, slug: true } },
-      _count: { select: { items: true } },
+  // Prisma's `_count.items` becomes `items.length` after a relational fetch.
+  // The items selection stays narrow (just `id`) to keep the row payload small.
+  const pageRows = await db.query.linkPages.findMany({
+    orderBy: desc(linkPages.updatedAt),
+    with: {
+      release: { columns: { id: true, name: true, slug: true } },
+      items: { columns: { id: true } },
     },
   });
+  const pages = pageRows.map((page) => ({
+    ...page,
+    _count: { items: page.items.length },
+  }));
 
   return (
     <div>

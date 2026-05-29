@@ -1,15 +1,11 @@
 import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { createStripeWebhookHandler } from "@gigamusic/checkout";
-import { createQueries } from "@gigamusic/db";
-import type { PrismaClient as GigamusicPrismaClient } from "@gigamusic/db";
-import { prisma } from "@/lib/db";
+import { queries } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/utils";
 import { stripe } from "@/lib/stripe";
 import { EMAIL_BRANDING, emailProvider } from "@/lib/email";
-
-const queries = createQueries(prisma as unknown as GigamusicPrismaClient);
 
 // Built once at module load. The handler captures the Stripe SDK + queries
 // closure; nothing inside reads `process.env` at request time, so this is safe

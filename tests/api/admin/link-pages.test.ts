@@ -17,7 +17,9 @@ import {
   PUT as updateItem,
   DELETE as deleteItem,
 } from "@/app/api/admin/link-pages/[id]/items/route";
-import { prisma } from "@/lib/db";
+import { count, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { linkPageItems, linkPages, releases } from "@/db/schema";
 import { makeRelease } from "../../factories";
 import { signSessionToken } from "@gigamusic/core";
 import { env } from "@/lib/env";
@@ -188,11 +190,13 @@ describe("DELETE /api/admin/link-pages/[id]", () => {
     expect(res.status).toBe(200);
 
     expect(
-      await prisma.linkPage.findUnique({ where: { id: page.id } }),
-    ).toBeNull();
-    expect(
-      await prisma.linkPageItem.count({ where: { pageId: page.id } }),
-    ).toBe(0);
+      await db.query.linkPages.findFirst({ where: eq(linkPages.id, page.id) }),
+    ).toBeUndefined();
+    const [itemCount] = await db
+      .select({ count: count() })
+      .from(linkPageItems)
+      .where(eq(linkPageItems.pageId, page.id));
+    expect(itemCount?.count ?? 0).toBe(0);
   });
 });
 
@@ -262,8 +266,10 @@ describe("LinkPage items API", () => {
     );
     expect(res.status).toBe(200);
     expect(
-      await prisma.linkPageItem.findUnique({ where: { id: item.id } }),
-    ).toBeNull();
+      await db.query.linkPageItems.findFirst({
+        where: eq(linkPageItems.id, item.id),
+      }),
+    ).toBeUndefined();
   });
 });
 
@@ -278,9 +284,9 @@ describe("Release → LinkPage cascade", () => {
       }),
     ).then((r) => r.json());
 
-    await prisma.release.delete({ where: { id: release.id } });
-    const refetched = await prisma.linkPage.findUnique({
-      where: { id: page.id },
+    await db.delete(releases).where(eq(releases.id, release.id));
+    const refetched = await db.query.linkPages.findFirst({
+      where: eq(linkPages.id, page.id),
     });
     expect(refetched).not.toBeNull();
     expect(refetched?.releaseId).toBeNull();

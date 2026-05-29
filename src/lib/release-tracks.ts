@@ -5,10 +5,14 @@
  * apply logic can be unit-tested directly, without constructing HTTP
  * requests or mocking Next route plumbing.
  */
-import { Prisma, type ReleaseType } from "@/generated/prisma/client";
-import { prisma } from "./db";
+import { eq, inArray } from "drizzle-orm";
+import { db } from "./db";
+import { releases, tracks, trackFiles } from "@/db/schema";
 import { deleteFile } from "./storage";
 import { slugify } from "./utils";
+
+/** Mirrors the `ReleaseType` Prisma enum as the same string union the Drizzle schema uses. */
+export type ReleaseType = "album" | "single";
 
 export interface FileInput {
   format: string;
@@ -104,7 +108,7 @@ export class StaleFormError extends Error {
  *                                                         set actually changed
  *   - tracks in `incoming` without an id                → CREATE with nested files
  *
- * All operations run in a single $transaction, so a failure rolls back cleanly.
+ * All operations run in a single transaction, so a failure rolls back cleanly.
  *
  * Track IDs survive across edits — protecting OrderItem.trackId references that
  * would otherwise be silently nulled by Postgres `ON DELETE SET NULL`.
@@ -114,9 +118,9 @@ export async function syncReleaseAndTracks(
   scalars: ReleaseScalarsInput,
   incoming: TrackInput[],
 ): Promise<void> {
-  const existing = await prisma.track.findMany({
-    where: { releaseId },
-    include: { files: true },
+  const existing = await db.query.tracks.findMany({
+    where: eq(tracks.releaseId, releaseId),
+    with: { files: true },
   });
   const existingById = new Map(existing.map((t) => [t.id, t]));
 
@@ -149,10 +153,10 @@ export async function syncReleaseAndTracks(
     t.files.map((f) => f.storageKey),
   );
 
-  const ops: Prisma.PrismaPromise<unknown>[] = [
-    prisma.release.update({
-      where: { id: releaseId },
-      data: {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(releases)
+      .set({
         name: scalars.name,
         slug: scalars.slug,
         description: scalars.description ?? null,
@@ -162,34 +166,27 @@ export async function syncReleaseAndTracks(
         releasedAt: scalars.releasedAt ? new Date(scalars.releasedAt) : null,
         isPublished: scalars.isPublished,
         inRadio: scalars.inRadio ?? true,
-      },
-    }),
-  ];
+      })
+      .where(eq(releases.id, releaseId));
 
-  if (toDeleteIds.length > 0) {
-    ops.push(prisma.track.deleteMany({ where: { id: { in: toDeleteIds } } }));
-  }
-
-  // Park any track whose trackNumber is changing at a unique negative sentinel
-  // first, so the per-row UPDATEs below can't collide on the @@unique([releaseId,
-  // trackNumber]) constraint during an in-place reorder/swap.
-  for (const t of toUpdate) {
-    const existingTrack = existingById.get(t.id)!;
-    if (existingTrack.trackNumber !== t.trackNumber) {
-      ops.push(
-        prisma.track.update({
-          where: { id: t.id },
-          data: { trackNumber: -t.id },
-        }),
-      );
+    if (toDeleteIds.length > 0) {
+      await tx.delete(tracks).where(inArray(tracks.id, toDeleteIds));
     }
-  }
 
-  for (const t of toUpdate) {
-    ops.push(
-      prisma.track.update({
-        where: { id: t.id },
-        data: {
+    // Park any track whose trackNumber is changing at a unique negative sentinel
+    // first, so the per-row UPDATEs below can't collide on the unique
+    // (releaseId, trackNumber) constraint during an in-place reorder/swap.
+    for (const t of toUpdate) {
+      const existingTrack = existingById.get(t.id)!;
+      if (existingTrack.trackNumber !== t.trackNumber) {
+        await tx.update(tracks).set({ trackNumber: -t.id }).where(eq(tracks.id, t.id));
+      }
+    }
+
+    for (const t of toUpdate) {
+      await tx
+        .update(tracks)
+        .set({
           name: t.name,
           artist: t.artist ?? null,
           genre: t.genre ?? null,
@@ -197,48 +194,47 @@ export async function syncReleaseAndTracks(
           price: t.price,
           trackNumber: t.trackNumber,
           inRadio: t.inRadio ?? true,
-        },
-      }),
-    );
+        })
+        .where(eq(tracks.id, t.id));
 
-    const existingTrack = existingById.get(t.id)!;
-    const existingFileKeys = new Set(existingTrack.files.map(fileKey));
-    const incomingFileKeys = new Set(t.files.map(fileKey));
-    const filesUnchanged =
-      existingFileKeys.size === incomingFileKeys.size &&
-      [...incomingFileKeys].every((k) => existingFileKeys.has(k));
+      const existingTrack = existingById.get(t.id)!;
+      const existingFileKeys = new Set(existingTrack.files.map(fileKey));
+      const incomingFileKeys = new Set(t.files.map(fileKey));
+      const filesUnchanged =
+        existingFileKeys.size === incomingFileKeys.size &&
+        [...incomingFileKeys].every((k) => existingFileKeys.has(k));
 
-    if (!filesUnchanged) {
-      ops.push(prisma.trackFile.deleteMany({ where: { trackId: t.id } }));
-      if (t.files.length > 0) {
-        ops.push(
-          prisma.trackFile.createMany({
-            data: t.files.map((f) => ({ ...f, trackId: t.id })),
-          }),
-        );
+      if (!filesUnchanged) {
+        await tx.delete(trackFiles).where(eq(trackFiles.trackId, t.id));
+        if (t.files.length > 0) {
+          await tx
+            .insert(trackFiles)
+            .values(t.files.map((f) => ({ ...f, trackId: t.id })));
+        }
       }
     }
-  }
 
-  for (const t of toCreate) {
-    ops.push(
-      prisma.track.create({
-        data: {
+    for (const t of toCreate) {
+      const [created] = await tx
+        .insert(tracks)
+        .values({
           releaseId,
           name: t.name,
           artist: t.artist ?? null,
           genre: t.genre ?? null,
-          slug: t.slug,
+          slug: t.slug!,
           price: t.price,
           trackNumber: t.trackNumber,
           inRadio: t.inRadio ?? true,
-          files: t.files.length > 0 ? { create: t.files } : undefined,
-        },
-      }),
-    );
-  }
-
-  await prisma.$transaction(ops);
+        })
+        .returning({ id: tracks.id });
+      if (t.files.length > 0) {
+        await tx
+          .insert(trackFiles)
+          .values(t.files.map((f) => ({ ...f, trackId: created!.id })));
+      }
+    }
+  });
 
   if (r2KeysToDelete.length > 0) {
     await cleanupR2Objects(r2KeysToDelete);
