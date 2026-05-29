@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx scripts/dev-bootstrap.ts && dotenvx run -- concurrently -n stripe,next -c magenta,green \"./scripts/stripe-listen.sh\" \"next dev\"",
-    "dev:prod": "dotenvx run -f .env.prod -- next dev",
-    "build": "node scripts/strip-env-on-vercel.mjs && node scripts/prepare-ffmpeg.mjs && next build",
+    "dev": "tsx scripts/dev-bootstrap.ts && dotenvx run -- concurrently -n stripe,next -c magenta,green \"./scripts/stripe-listen.sh\" \"next dev --webpack\"",
+    "dev:prod": "dotenvx run -f .env.prod -- next dev --webpack",
+    "build": "node scripts/strip-env-on-vercel.mjs && node scripts/prepare-ffmpeg.mjs && dotenvx run -- next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "db:push": "dotenvx run -- drizzle-kit push --config drizzle.config.ts",
