@@ -37,19 +37,6 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/admin/upload/process": ["./bin/ffmpeg"],
   },
-  // `@gigamusic/{admin,links}` ship raw TypeScript source whose ESM imports
-  // use the strict `./foo.js` convention to reference sibling `.ts` files.
-  // Turbopack has no built-in `.js → .ts` extension mapping, so we keep
-  // `next dev` / `next build` on webpack and add an `extensionAlias` so
-  // webpack resolves those imports correctly. Drop both once the packages
-  // ship compiled `dist/` outputs.
-  webpack: (config) => {
-    config.resolve.extensionAlias = {
-      ...(config.resolve.extensionAlias ?? {}),
-      ".js": [".ts", ".tsx", ".js", ".jsx"],
-    };
-    return config;
-  },
 };
 
 export default nextConfig;
