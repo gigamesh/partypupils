@@ -25,7 +25,12 @@ const nextConfig: NextConfig = {
   // (Turbopack/Webpack) rewrite that string to a virtual `/ROOT/...` path that
   // doesn't exist at spawn time. Marking the package external keeps the path
   // intact for `@gigamusic/audio`'s dev fallback.
-  serverExternalPackages: ["ffmpeg-static"],
+  //
+  // `ws` is the WebSocket transport for `@neondatabase/serverless`. Webpack's
+  // minifier mangles its internal `bufferUtil.mask` call ("b.mask is not a
+  // function" at runtime). Externalizing it sidesteps the minifier entirely.
+  // `bufferutil` and `utf-8-validate` are its optional native deps.
+  serverExternalPackages: ["ffmpeg-static", "ws", "bufferutil", "utf-8-validate"],
   // In production we don't trust the package-resolved path through pnpm's
   // symlinks. scripts/prepare-ffmpeg.mjs copies the binary to ./bin/ffmpeg at
   // build time and `@gigamusic/audio` spawns from there; this entry bundles it.

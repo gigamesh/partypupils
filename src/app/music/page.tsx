@@ -12,6 +12,10 @@ export const metadata: Metadata = {
   description: "Music by Party Pupils.",
 };
 
+// Reads from the live DB. Skip static prerender so the build doesn't have to
+// reach Postgres and so admins see published changes without a redeploy.
+export const dynamic = "force-dynamic";
+
 export default async function MusicPage() {
   const [releases, catalog] = await Promise.all([
     getPublishedReleases(),
