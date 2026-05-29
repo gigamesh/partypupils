@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withBotId } from "botid/next/config";
 
 const r2Hostname = process.env.R2_PUBLIC_URL
   ? new URL(process.env.R2_PUBLIC_URL).hostname
@@ -34,4 +35,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBotId(nextConfig);

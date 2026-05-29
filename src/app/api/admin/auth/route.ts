@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { checkBotId } from "botid/server";
 import { createAdminSession } from "@/lib/admin-auth";
 import { queries } from "@/lib/db";
 import { env } from "@/lib/env";
@@ -16,6 +17,11 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   const ip = clientIp(req);
   const { ok: allowed } = await queries.consumeRateLimit(
     `admin-login:${ip}`,
