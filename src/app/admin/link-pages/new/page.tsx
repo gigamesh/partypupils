@@ -11,7 +11,13 @@ export default async function NewLinkPagePage({ searchParams }: Props) {
   const { releaseId } = await searchParams;
   const releaseRows = await db.query.releases.findMany({
     orderBy: desc(releases.createdAt),
-    columns: { id: true, name: true, slug: true, isPublished: true },
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      coverImageUrl: true,
+      isPublished: true,
+    },
   });
 
   const initialRelease = releaseId

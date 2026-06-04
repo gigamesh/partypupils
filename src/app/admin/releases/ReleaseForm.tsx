@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
+import { presignAndUpload } from "@/lib/upload-client";
 import { combinedName, deriveTrackArtistTitle } from "@/lib/track-name";
 import {
   validateReleaseFormState,
@@ -352,31 +353,6 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         if (!r.ok) setInRadio(!next);
       })
       .catch(() => setInRadio(!next));
-  }
-
-  async function presignAndUpload(file: File, key: string): Promise<string> {
-    const contentType = file.type || "application/octet-stream";
-    const presignRes = await fetch("/api/admin/upload/presign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, contentType }),
-    });
-    if (!presignRes.ok) {
-      const body = await presignRes.text();
-      throw new Error(
-        `Failed to get upload URL (${presignRes.status}) for key="${key}" contentType="${contentType}": ${body.slice(0, 300)}`,
-      );
-    }
-    const { url, publicUrl } = await presignRes.json();
-
-    const uploadRes = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": file.type || "application/octet-stream" },
-      body: file,
-    });
-    if (!uploadRes.ok) throw new Error("Failed to upload file");
-
-    return publicUrl;
   }
 
   interface UploadMetadata {

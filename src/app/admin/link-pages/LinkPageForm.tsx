@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { detectLinkPlatform, PlatformIcon } from "@/lib/link-platforms";
+import { presignAndUpload } from "@/lib/upload-client";
 
 interface LinkItem {
   id: number;
@@ -100,25 +101,7 @@ export function LinkPageForm({ page, releases, baseUrl }: Props) {
     setUploadingCover(true);
     try {
       const key = `images/link-pages/${page.id}-${Date.now()}-${file.name}`;
-      const contentType = file.type || "application/octet-stream";
-      const presignRes = await fetch("/api/admin/upload/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, contentType }),
-      });
-      if (!presignRes.ok) {
-        const body = await presignRes.text();
-        throw new Error(
-          `Failed to get upload URL (${presignRes.status}) for key="${key}" contentType="${contentType}": ${body.slice(0, 300)}`,
-        );
-      }
-      const { url, publicUrl } = await presignRes.json();
-      const uploadRes = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
-      if (!uploadRes.ok) throw new Error("Upload failed");
+      const publicUrl = await presignAndUpload(file, key);
       setCoverImageUrl(publicUrl);
       await savePage({ coverImageUrl: publicUrl });
     } catch (err) {
