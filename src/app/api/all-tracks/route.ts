@@ -41,7 +41,17 @@ const getRadioTracks = unstable_cache(
   { tags: [RADIO_TRACKS_TAG], revalidate: 3600 },
 );
 
+// Cache the response (same payload for everyone — shuffling is client-side) so
+// the CDN serves it without invoking the function or touching Postgres.
+// `RandomMixSeeder` fires this on every fresh/bot visit, so per-request
+// rendering meant a continuous catalog read that kept Neon's compute awake.
+// Admin writes call revalidateTag(RADIO_TRACKS_TAG) to refresh on demand.
+export const revalidate = 3600;
+
 export async function GET() {
   const tracks = await getRadioTracks();
-  return NextResponse.json({ tracks });
+  return NextResponse.json(
+    { tracks },
+    { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
+  );
 }

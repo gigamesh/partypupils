@@ -1,12 +1,14 @@
 import Image from "@/components/Image";
 import { LinkPageLayout } from "@/components/LinkPageLayout";
-import { asc, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { links as linksTable } from "@/db/schema";
+import { getVisibleLinks } from "@/lib/release-reads";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
+// ISR: serve cached HTML from the CDN and revalidate hourly. Admin link edits
+// call revalidateTag(LINKS_TAG), which refreshes both the cached read and this
+// route immediately. Rendering per-request (force-dynamic) re-queried Postgres
+// on every visit, which kept Neon's compute awake around the clock.
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Links",
@@ -14,10 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function LinksPage() {
-  const links = await db.query.links.findMany({
-    where: eq(linksTable.isVisible, true),
-    orderBy: asc(linksTable.position),
-  });
+  const links = await getVisibleLinks();
 
   return (
     <LinkPageLayout

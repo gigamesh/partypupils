@@ -9,9 +9,11 @@ import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import { getFeaturedReleases, getHeroLinks } from "@/lib/release-reads";
 import Link from "next/link";
 
-// Reads from the live DB. Skip static prerender so the build doesn't have to
-// reach Postgres and so admins see published changes without a redeploy.
-export const dynamic = "force-dynamic";
+// ISR: serve cached HTML from the CDN and revalidate hourly. Admin writes call
+// revalidateTag(), so published changes appear immediately without a redeploy.
+// Rendering per-request (force-dynamic) re-queried Postgres on every visit,
+// which kept Neon's compute awake around the clock.
+export const revalidate = 3600;
 
 export default async function HomePage() {
   const [featuredReleases, links] = await Promise.all([

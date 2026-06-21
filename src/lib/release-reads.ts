@@ -83,3 +83,18 @@ export const getHeroLinks = unstable_cache(
   ["hero-links-v1"],
   { tags: [LINKS_TAG], revalidate: REVALIDATE_SECONDS },
 );
+
+/**
+ * All visible links (ordered by position) for the standalone `/links` page.
+ * Tagged on `LINKS_TAG` so admin link edits invalidate it immediately; the
+ * page previously read the DB raw on every render, which kept Neon's compute
+ * from ever auto-suspending.
+ */
+export const getVisibleLinks = unstable_cache(
+  () =>
+    loggedCacheRead("getVisibleLinks", () =>
+      withDbRetry(() => queries.listVisibleLinks()),
+    ),
+  ["visible-links-v1"],
+  { tags: [LINKS_TAG], revalidate: REVALIDATE_SECONDS },
+);

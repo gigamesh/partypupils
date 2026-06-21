@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { FaqList } from "@/components/DownloadFAQ";
 import { getFaqContent } from "@/lib/faq";
 
-export const dynamic = "force-dynamic";
+// ISR: serve cached HTML from the CDN and revalidate hourly instead of
+// re-querying Postgres on every visit (which kept Neon's compute awake).
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "FAQ",

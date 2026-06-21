@@ -6,9 +6,12 @@ import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import { getReleaseBySlug } from "@/lib/release-reads";
 import { formatCurrency } from "@/lib/utils";
 
-// Reads from the live DB. Skip static prerender so the build doesn't have to
-// reach Postgres and so admins see published changes without a redeploy.
-export const dynamic = "force-dynamic";
+// ISR: serve cached HTML from the CDN and revalidate hourly. Admin writes call
+// revalidateTag(), so published changes appear immediately without a redeploy.
+// Rendering per-request (force-dynamic) re-queried Postgres on every visit,
+// which kept Neon's compute awake around the clock. Unknown slugs are still
+// generated on demand and then cached (dynamicParams defaults to true).
+export const revalidate = 3600;
 
 interface Props {
   params: Promise<{ slug: string }>;
