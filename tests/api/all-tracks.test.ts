@@ -110,6 +110,7 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
         slug: "inv-post",
         price: 100,
         type: "single",
+        coverImageUrl: "https://r2/cover.jpg",
         isPublished: false,
         tracks: [],
       }),
@@ -131,7 +132,7 @@ describe("admin mutations invalidate the radio-tracks cache tag", () => {
         description: null,
         price: release.price,
         type: release.type,
-        coverImageUrl: null,
+        coverImageUrl: "https://r2/cover.jpg",
         releasedAt: null,
         isPublished: false,
         tracks: [

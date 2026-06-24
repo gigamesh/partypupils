@@ -10,12 +10,18 @@ import {
 } from "@/lib/release-validation";
 
 describe("draftReleaseSchema", () => {
-  it("accepts a payload with only name", () => {
+  it("accepts a payload with name + cover", () => {
     const result = draftReleaseSchema.safeParse({
       name: "Test",
+      coverImageUrl: "https://r2/cover.jpg",
       isPublished: false,
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects a missing cover image", () => {
+    const result = draftReleaseSchema.safeParse({ name: "Test", isPublished: false });
+    expect(result.success).toBe(false);
   });
 
   it("rejects an empty name", () => {
@@ -35,6 +41,7 @@ describe("publishedReleaseSchema", () => {
     slug: "release",
     price: 1000,
     type: "single" as const,
+    coverImageUrl: "https://r2/cover.jpg",
     isPublished: true as const,
     tracks: [
       {
@@ -51,6 +58,13 @@ describe("publishedReleaseSchema", () => {
 
   it("accepts a valid payload", () => {
     expect(publishedReleaseSchema.safeParse(baseValid).success).toBe(true);
+  });
+
+  it("rejects a missing cover image", () => {
+    const { coverImageUrl: _omit, ...withoutCover } = baseValid;
+    void _omit;
+    const r = publishedReleaseSchema.safeParse(withoutCover);
+    expect(r.success).toBe(false);
   });
 
   it("rejects empty track artist", () => {
@@ -106,7 +120,11 @@ describe("publishedReleaseSchema", () => {
 
 describe("validateReleasePayload (schema router)", () => {
   it("picks the draft schema when isPublished is false", () => {
-    const r = validateReleasePayload({ name: "x", isPublished: false });
+    const r = validateReleasePayload({
+      name: "x",
+      coverImageUrl: "https://r2/c.jpg",
+      isPublished: false,
+    });
     expect(r.ok).toBe(true);
   });
 
@@ -140,17 +158,17 @@ describe("validateReleasePayload (schema router)", () => {
 
 describe("applyDraftDefaults", () => {
   it("auto-generates a draft- slug when blank", () => {
-    const out = applyDraftDefaults({ name: "Untitled", isPublished: false });
+    const out = applyDraftDefaults({ name: "Untitled", coverImageUrl: "https://r2/cover.jpg", isPublished: false });
     expect(out.slug).toMatch(/^draft-[a-f0-9]+$/);
   });
 
   it("preserves an explicit slug", () => {
-    const out = applyDraftDefaults({ name: "x", slug: "my-slug", isPublished: false });
+    const out = applyDraftDefaults({ name: "x", slug: "my-slug", coverImageUrl: "https://r2/cover.jpg", isPublished: false });
     expect(out.slug).toBe("my-slug");
   });
 
   it("defaults price=0 and type=single", () => {
-    const out = applyDraftDefaults({ name: "x", isPublished: false });
+    const out = applyDraftDefaults({ name: "x", coverImageUrl: "https://r2/cover.jpg", isPublished: false });
     expect(out.price).toBe(0);
     expect(out.type).toBe("single");
   });
@@ -158,6 +176,7 @@ describe("applyDraftDefaults", () => {
   it("fills empty track names with `Track <n>`", () => {
     const out = applyDraftDefaults({
       name: "x",
+      coverImageUrl: "https://r2/cover.jpg",
       isPublished: false,
       tracks: [{ trackNumber: 2 }],
     });
@@ -181,7 +200,7 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
     description: "",
     priceCents: 1000,
     type: "single",
-    coverImageUrl: null,
+    coverImageUrl: "https://r2/cover.jpg",
     releasedAt: null,
     isPublished: true,
     inRadio: true,
@@ -255,7 +274,23 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
     }
   });
 
-  it("accepts a draft state with sparse fields", () => {
+  it("accepts a draft state with sparse fields (cover still required)", () => {
+    const result = validateReleaseFormState({
+      name: "Untitled",
+      slug: "",
+      description: "",
+      priceCents: 0,
+      type: "single",
+      coverImageUrl: "https://r2/cover.jpg",
+      releasedAt: null,
+      isPublished: false,
+      inRadio: true,
+      tracks: [],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a draft state with no cover image", () => {
     const result = validateReleaseFormState({
       name: "Untitled",
       slug: "",
@@ -268,7 +303,10 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
       inRadio: true,
       tracks: [],
     });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.fieldErrors.coverImageUrl).toBeDefined();
+    }
   });
 
   it("returns multiple structured errors at once for a multi-issue published state", () => {

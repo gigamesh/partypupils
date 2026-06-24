@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { revalidateTag } from "next/cache";
 import { eq } from "drizzle-orm";
 import { isUniqueConstraintError } from "@gigamusic/db";
@@ -128,7 +128,9 @@ export async function POST(req: NextRequest) {
   });
 
   // Stamp the authoritative metadata + cover art onto the stored files.
-  await retagReleaseFiles(release);
+  // Deferred via `after()` so it never blocks the admin's save response — each
+  // file is a storage round-trip, which adds up for multi-track releases.
+  after(() => retagReleaseFiles(release));
 
   revalidateTag(RADIO_TRACKS_TAG, "max");
   revalidateTag(RELEASES_TAG, "max");

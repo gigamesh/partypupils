@@ -57,7 +57,7 @@ function scalarsFor(release: { name: string; slug: string; price: number; type: 
     description: null,
     price: release.price,
     type: release.type as ReleaseScalarsInput["type"],
-    coverImageUrl: null,
+    coverImageUrl: "https://r2/cover.jpg",
     releasedAt: null,
     isPublished: release.isPublished,
   };
@@ -305,6 +305,7 @@ describe("POST /api/admin/releases", () => {
         slug: "album-one",
         price: 1500,
         type: "album",
+        coverImageUrl: "https://r2/cover.jpg",
         isPublished: true,
         tracks: [
           {
@@ -347,7 +348,7 @@ describe("POST /api/admin/releases", () => {
   it("rejects duplicate slug with 400", async () => {
     await makeRelease({ slug: "dup" });
     const res = await createRelease(
-      jsonRequest("POST", { name: "Dup", slug: "dup", price: 100, type: "single", isPublished: false, tracks: [] }),
+      jsonRequest("POST", { name: "Dup", slug: "dup", price: 100, type: "single", coverImageUrl: "https://r2/cover.jpg", isPublished: false, tracks: [] }),
     );
     expect(res.status).toBe(400);
   });
@@ -439,6 +440,7 @@ describe("Draft / publish validation flows", () => {
       slug: `pub-${Math.random().toString(36).slice(2, 8)}`,
       price: 1000,
       type: "album",
+      coverImageUrl: "https://r2/cover.jpg",
       isPublished: true,
       tracks: [
         {
@@ -456,9 +458,13 @@ describe("Draft / publish validation flows", () => {
     };
   }
 
-  it("POST creates a draft with only a name (sentinels fill the rest)", async () => {
+  it("POST creates a draft with a name + cover (sentinels fill the rest)", async () => {
     const res = await createRelease(
-      jsonRequest("POST", { name: "Untitled Draft", isPublished: false }),
+      jsonRequest("POST", {
+        name: "Untitled Draft",
+        coverImageUrl: "https://r2/cover.jpg",
+        isPublished: false,
+      }),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -603,6 +609,7 @@ describe("Draft / publish validation flows", () => {
           slug: "ready-to-go",
           price: 1500,
           type: "album",
+          coverImageUrl: "https://r2/cover.jpg",
           isPublished: false,
         })
         .returning({ id: releases.id });

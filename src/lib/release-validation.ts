@@ -3,9 +3,11 @@
  *
  * Two schemas, picked based on the user's intent expressed by `isPublished`:
  *
- *   - `draftReleaseSchema` — only `name` is required. Everything else is
- *     optional and gets sentinel defaults via `applyDraftDefaults` before
- *     persistence. Lets admins gradually build a release out.
+ *   - `draftReleaseSchema` — `name` and `coverImageUrl` are required (the cover
+ *     is mandatory because the save-time retag embeds it into every track file;
+ *     a coverless save would strip existing art). Everything else is optional
+ *     and gets sentinel defaults via `applyDraftDefaults` before persistence.
+ *     Lets admins gradually build a release out.
  *   - `publishedReleaseSchema` — strict floor: real slug, price > 0, at least
  *     one track, each track has name + artist + price > 0 + a WAV file.
  *
@@ -60,7 +62,7 @@ export const draftReleaseSchema = z.object({
   description: z.string().nullish(),
   price: z.number().int().nonnegative().optional(),
   type: releaseTypeSchema.optional(),
-  coverImageUrl: z.string().nullish(),
+  coverImageUrl: z.string().trim().min(1, "A cover image is required"),
   releasedAt: z.union([z.string(), z.date()]).nullish(),
   isPublished: z.literal(false),
   inRadio: z.boolean().optional(),
@@ -80,7 +82,7 @@ export const publishedReleaseSchema = z.object({
   description: z.string().nullish(),
   price: z.number().int().gt(0, "Release price must be greater than 0"),
   type: releaseTypeSchema,
-  coverImageUrl: z.string().nullish(),
+  coverImageUrl: z.string().trim().min(1, "A cover image is required"),
   releasedAt: z.union([z.string(), z.date()]).nullish(),
   isPublished: z.literal(true),
   inRadio: z.boolean().optional(),
