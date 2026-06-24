@@ -17,6 +17,11 @@ import {
   validateReleasePayload,
 } from "@/lib/release-validation";
 import { RADIO_TRACKS_TAG, RELEASES_TAG } from "@/lib/cache-tags";
+import { retagReleaseFiles } from "@/lib/release-retag";
+
+// Re-tagging streams each track file through the function, so allow the same
+// generous budget the upload/process route uses.
+export const maxDuration = 300;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -92,6 +97,10 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       },
     },
   });
+
+  // Stamp the authoritative metadata + cover art onto the stored files.
+  await retagReleaseFiles(release);
+
   revalidateTag(RADIO_TRACKS_TAG, "max");
   revalidateTag(RELEASES_TAG, "max");
   return NextResponse.json(release);

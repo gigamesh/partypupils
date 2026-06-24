@@ -4,7 +4,7 @@ import { createCheckoutHandler } from "@gigamusic/checkout";
 import { queries } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/utils";
-import { DEFAULT_CURRENCY, SITE_NAME } from "@/lib/constants";
+import { DEFAULT_CURRENCY, SITE_ALIAS, SITE_NAME } from "@/lib/constants";
 import { getCatalogPrice } from "@/lib/catalog";
 import { isAllowedRequestOrigin } from "@/lib/urls";
 
@@ -15,6 +15,7 @@ import { isAllowedRequestOrigin } from "@/lib/urls";
 const handler = createCheckoutHandler({
   stripeSecret: env.STRIPE_SECRET_KEY(),
   queries,
+  site: SITE_ALIAS,
   baseUrl: getBaseUrl(),
   currency: DEFAULT_CURRENCY,
   catalogPurchase: async () => {

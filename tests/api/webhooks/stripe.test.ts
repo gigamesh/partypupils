@@ -10,6 +10,7 @@ import { db, queries } from "@/lib/db";
 import { downloadTokens, orderItems, orders } from "@/db/schema";
 import { emailSendStub } from "../../setup";
 import { makeRelease, makeTrackWithFile } from "../../factories";
+import { SITE_ALIAS } from "@/lib/constants";
 
 function webhookReq(rawBody: string) {
   return new Request("http://test/api/webhooks/stripe", {
@@ -54,6 +55,7 @@ describe("POST /api/webhooks/stripe", () => {
           amount_total: 999 + 150,
           customer_details: { email: "buyer@test" },
           metadata: {
+            site: SITE_ALIAS,
             release_ids: JSON.stringify([release.id]),
             track_ids: JSON.stringify([track.id]),
           },
@@ -118,7 +120,7 @@ describe("POST /api/webhooks/stripe", () => {
           payment_intent: "pi_race",
           amount_total: release.price,
           customer_details: { email: "second@test" },
-          metadata: { release_ids: JSON.stringify([release.id]), track_ids: "[]" },
+          metadata: { site: SITE_ALIAS, release_ids: JSON.stringify([release.id]), track_ids: "[]" },
         },
       },
     } as never);
@@ -149,7 +151,7 @@ describe("POST /api/webhooks/stripe", () => {
           payment_intent: "pi_dup",
           amount_total: 999,
           customer_details: { email: "dup@test" },
-          metadata: { release_ids: JSON.stringify([release.id]), track_ids: "[]" },
+          metadata: { site: SITE_ALIAS, release_ids: JSON.stringify([release.id]), track_ids: "[]" },
         },
       },
     };
@@ -181,7 +183,7 @@ describe("POST /api/webhooks/stripe", () => {
           payment_intent: "pi_no_email",
           amount_total: 999,
           customer_details: { email: null },
-          metadata: { release_ids: JSON.stringify([release.id]), track_ids: "[]" },
+          metadata: { site: SITE_ALIAS, release_ids: JSON.stringify([release.id]), track_ids: "[]" },
         },
       },
     } as never);
@@ -213,7 +215,7 @@ describe("POST /api/webhooks/stripe", () => {
           payment_intent: "pi_fail",
           amount_total: 999,
           customer_details: { email: "buyer@test" },
-          metadata: { release_ids: JSON.stringify([release.id]), track_ids: "[]" },
+          metadata: { site: SITE_ALIAS, release_ids: JSON.stringify([release.id]), track_ids: "[]" },
         },
       },
     } as never);
@@ -240,7 +242,7 @@ describe("POST /api/webhooks/stripe", () => {
       data: {
         object: {
           id: "cs_test_empty",
-          metadata: { release_ids: "[]", track_ids: "[]" },
+          metadata: { site: SITE_ALIAS, release_ids: "[]", track_ids: "[]" },
         },
       },
     } as never);

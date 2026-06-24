@@ -11,6 +11,13 @@ import { env } from "./env";
 export const EMAIL_BRANDING: EmailBranding = {
   siteName: SITE_NAME,
   themeColor: "#adfd02",
+  // Match the site's body typography (Inter) with system fallbacks, since email
+  // clients can't reliably load web fonts. Rounded CTAs mirror the site buttons.
+  theme: {
+    fontFamily:
+      "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    buttonRadius: "8px",
+  },
 };
 
 let _provider: ReturnType<typeof createResendProvider> | undefined;

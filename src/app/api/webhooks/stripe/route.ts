@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/utils";
 import { stripe } from "@/lib/stripe";
 import { EMAIL_BRANDING, emailProvider } from "@/lib/email";
+import { SITE_ALIAS } from "@/lib/constants";
 
 // Built once at module load. The handler captures the Stripe SDK + queries
 // closure; nothing inside reads `process.env` at request time, so this is safe
@@ -15,6 +16,7 @@ const handler = createStripeWebhookHandler({
   stripe: stripe() as unknown as Stripe,
   webhookSecret: env.STRIPE_WEBHOOK_SECRET(),
   queries,
+  site: SITE_ALIAS,
   email: emailProvider(),
   branding: EMAIL_BRANDING,
   emailFrom: env.EMAIL_FROM(),

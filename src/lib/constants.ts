@@ -1,4 +1,8 @@
 export const SITE_NAME = "Party Pupils";
+// Stable site identifier stamped onto Stripe session metadata so the webhook
+// only records orders belonging to this deployment. Must stay consistent
+// between the checkout and webhook handlers; never rename once live.
+export const SITE_ALIAS = "party-pupils";
 export const SITE_DESCRIPTION =
   "Music by Party Pupils — download tracks and releases.";
 

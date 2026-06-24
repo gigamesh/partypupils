@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { createAdminLinkPageByIdHandlers } from "@gigamusic/links/server";
-import { linkPageQueries } from "@/lib/link-pages";
+import { queries } from "@/lib/db";
 
-const handlers = createAdminLinkPageByIdHandlers({ queries: linkPageQueries });
+const handlers = createAdminLinkPageByIdHandlers({ queries });
 
 interface RouteContext {
   params: Promise<{ id: string }>;
