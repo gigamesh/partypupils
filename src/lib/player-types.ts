@@ -23,6 +23,8 @@ export interface PlayerState {
   shuffle: boolean;
   repeat: RepeatMode;
   queueSource: QueueSource;
+  /** trackIds heard in the current shuffle cycle; drives no-repeat shuffle. */
+  playedTrackIds: number[];
 }
 
 export const EMPTY_PLAYER_STATE: PlayerState = {
@@ -34,6 +36,7 @@ export const EMPTY_PLAYER_STATE: PlayerState = {
   shuffle: true,
   repeat: "all",
   queueSource: null,
+  playedTrackIds: [],
 };
 
 export interface PersistedPlayerState {
@@ -43,4 +46,5 @@ export interface PersistedPlayerState {
   shuffle: boolean;
   repeat: RepeatMode;
   queueSource: QueueSource;
+  playedTrackIds?: number[];
 }

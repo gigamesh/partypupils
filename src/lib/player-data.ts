@@ -53,6 +53,45 @@ export function shufflePlayerTracks(tracks: PlayerTrack[]): PlayerTrack[] {
   return out;
 }
 
+/**
+ * "Shuffle bag" picker: choose the next track to play in shuffle mode without
+ * repeating any track until every other track has played. `playedTrackIds` is
+ * the set of trackIds already heard in the current cycle (including the one
+ * playing now). Keying on trackId — not queue index — keeps the bag correct
+ * even when the queue array is re-fetched/re-shuffled mid-cycle (radio refresh).
+ *
+ * Returns the chosen queue index and the updated played set, or null for an
+ * empty queue. When the bag is exhausted a fresh cycle begins, excluding the
+ * just-played `currentTrackId` so a track never repeats across the wrap.
+ */
+export function pickNextShuffleTrack(
+  queue: PlayerTrack[],
+  playedTrackIds: number[],
+  currentTrackId: number | null,
+): { index: number; playedTrackIds: number[] } | null {
+  if (queue.length === 0) return null;
+  if (queue.length === 1) return { index: 0, playedTrackIds: [queue[0].trackId] };
+
+  const played = new Set(playedTrackIds);
+  const unplayed = queue
+    .map((track, index) => ({ track, index }))
+    .filter(({ track }) => !played.has(track.trackId));
+
+  if (unplayed.length > 0) {
+    const pick = unplayed[Math.floor(Math.random() * unplayed.length)];
+    return { index: pick.index, playedTrackIds: [...playedTrackIds, pick.track.trackId] };
+  }
+
+  // Bag exhausted → start a new cycle, avoiding an immediate repeat of the
+  // track that just finished.
+  const fresh = queue
+    .map((track, index) => ({ track, index }))
+    .filter(({ track }) => track.trackId !== currentTrackId);
+  const candidates = fresh.length > 0 ? fresh : queue.map((track, index) => ({ track, index }));
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  return { index: pick.index, playedTrackIds: [pick.track.trackId] };
+}
+
 /** Map a release-with-tracks (Prisma include shape) to its non-null PlayerTrack[]. */
 export function buildPlayerTracksForRelease(
   release: ReleaseInput & { tracks: TrackInput[] },
