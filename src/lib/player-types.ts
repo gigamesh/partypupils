@@ -25,6 +25,10 @@ export interface PlayerState {
   queueSource: QueueSource;
   /** trackIds heard in the current shuffle cycle; drives no-repeat shuffle. */
   playedTrackIds: number[];
+  /** Ordered trackIds in the exact order played; drives shuffle back/forward navigation. */
+  history: number[];
+  /** Pointer into `history` for the currently-playing track (-1 when nothing is loaded). */
+  historyIndex: number;
 }
 
 export const EMPTY_PLAYER_STATE: PlayerState = {
@@ -37,6 +41,8 @@ export const EMPTY_PLAYER_STATE: PlayerState = {
   repeat: "all",
   queueSource: null,
   playedTrackIds: [],
+  history: [],
+  historyIndex: -1,
 };
 
 export interface PersistedPlayerState {
@@ -47,4 +53,6 @@ export interface PersistedPlayerState {
   repeat: RepeatMode;
   queueSource: QueueSource;
   playedTrackIds?: number[];
+  history?: number[];
+  historyIndex?: number;
 }

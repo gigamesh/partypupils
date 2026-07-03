@@ -15,7 +15,7 @@ import {
   type QueueSource,
   type RepeatMode,
 } from "@/lib/player-types";
-import { pickNextShuffleTrack, shufflePlayerTracks } from "@/lib/player-data";
+import { resolveShuffleNext, resolveShufflePrev, shufflePlayerTracks } from "@/lib/player-data";
 
 const STORAGE_KEY = "party-pupils-player";
 
@@ -78,6 +78,8 @@ function persist(s: PlayerState) {
     repeat: s.repeat,
     queueSource: s.queueSource,
     playedTrackIds: s.playedTrackIds,
+    history: s.history,
+    historyIndex: s.historyIndex,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -175,9 +177,15 @@ function nextTrackInQueue(): PlayerTrack | null {
   if (i < 0 || state.queue.length === 0) return null;
   if (state.shuffle) {
     if (state.queue.length <= 1) return null;
-    // Prefetch hint: the actual next pick is random over the bag, so we can't
-    // predict it exactly. Preload the first still-unplayed track as a best
-    // effort — a mismatch only wastes a preload, never causes a wrong play.
+    // If the listener has navigated back, the next track is the known retrace
+    // target from history — preload that exact track.
+    for (let h = state.historyIndex + 1; h < state.history.length; h++) {
+      const t = state.queue.find((track) => track.trackId === state.history[h]);
+      if (t) return t;
+    }
+    // At the tip the next pick is random over the bag, so we can't predict it
+    // exactly. Preload the first still-unplayed track as a best effort — a
+    // mismatch only wastes a preload, never causes a wrong play.
     const played = new Set(state.playedTrackIds);
     return state.queue.find((t) => !played.has(t.trackId)) ?? null;
   }
@@ -245,10 +253,21 @@ function nextImpl(fromEnded: boolean) {
   let nextIdx: number;
   if (state.shuffle) {
     const currentTrackId = state.queue[state.currentIndex]?.trackId ?? null;
-    const pick = pickNextShuffleTrack(state.queue, state.playedTrackIds, currentTrackId);
+    const pick = resolveShuffleNext(
+      state.queue,
+      state.history,
+      state.historyIndex,
+      state.playedTrackIds,
+      currentTrackId,
+    );
     if (!pick) return;
     nextIdx = pick.index;
-    state = { ...state, playedTrackIds: pick.playedTrackIds };
+    state = {
+      ...state,
+      history: pick.history,
+      historyIndex: pick.historyIndex,
+      playedTrackIds: pick.playedTrackIds,
+    };
   } else if (state.currentIndex + 1 < state.queue.length) {
     nextIdx = state.currentIndex + 1;
   } else if (state.repeat === "all") {
@@ -270,7 +289,17 @@ function prevImpl() {
     return;
   }
   let nextIdx: number;
-  if (state.currentIndex > 0) {
+  if (state.shuffle) {
+    // Walk the play-history stack backward so "previous" retraces the actual
+    // order heard, not the queue array index (which shuffle jumps around).
+    const pick = resolveShufflePrev(state.queue, state.history, state.historyIndex);
+    if (!pick) {
+      seekImpl(0);
+      return;
+    }
+    nextIdx = pick.index;
+    state = { ...state, historyIndex: pick.historyIndex };
+  } else if (state.currentIndex > 0) {
     nextIdx = state.currentIndex - 1;
   } else if (state.repeat === "all") {
     nextIdx = state.queue.length - 1;
@@ -386,6 +415,8 @@ function playQueueImpl(
     shuffle: options?.shuffle ?? state.shuffle,
     repeat: options?.repeat ?? state.repeat,
     playedTrackIds: [queue[idx].trackId],
+    history: [queue[idx].trackId],
+    historyIndex: 0,
   };
   loadTrackAt(idx, true);
 }
@@ -402,7 +433,14 @@ function playNextImpl(track: PlayerTrack) {
     track,
     ...state.queue.slice(insertAt),
   ];
-  state = { ...state, queue: newQueue, playedTrackIds: [...state.playedTrackIds, track.trackId] };
+  const trimmedHistory = state.history.slice(0, state.historyIndex + 1);
+  state = {
+    ...state,
+    queue: newQueue,
+    playedTrackIds: [...state.playedTrackIds, track.trackId],
+    history: [...trimmedHistory, track.trackId],
+    historyIndex: trimmedHistory.length,
+  };
   loadTrackAt(insertAt, true);
 }
 
@@ -423,6 +461,8 @@ function seedQueueImpl(queue: PlayerTrack[], startIndex: number = 0, source: Que
     isPlaying: false,
     queueSource: source,
     playedTrackIds: [queue[idx].trackId],
+    history: [queue[idx].trackId],
+    historyIndex: 0,
   });
   setMediaSessionMetadata(track);
 }
@@ -472,6 +512,10 @@ function rehydrate() {
       // Older storage predates the shuffle bag: seed it with the current track
       // so it isn't treated as unplayed and picked again right away.
       playedTrackIds: persisted.playedTrackIds ?? (track ? [track.trackId] : []),
+      // Older storage predates the history stack: seed it with the current
+      // track so back/forward navigation has a valid starting point.
+      history: persisted.history ?? (track ? [track.trackId] : []),
+      historyIndex: persisted.historyIndex ?? (track ? 0 : -1),
     },
     { persist: "skip" }
   );

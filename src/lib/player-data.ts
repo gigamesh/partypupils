@@ -92,6 +92,64 @@ export function pickNextShuffleTrack(
   return { index: pick.index, playedTrackIds: [pick.track.trackId] };
 }
 
+/**
+ * Resolve the next track in shuffle mode using a play-history stack. When the
+ * listener has navigated backward (`historyIndex` sits before the tip), "next"
+ * retraces the recorded order so forward/back are reversible — it does NOT draw
+ * a fresh random track until the pointer reaches the tip of `history`. Only at
+ * the tip does it consult the shuffle bag via `pickNextShuffleTrack`, appending
+ * the chosen trackId to history. History entries whose track is no longer in the
+ * queue (e.g. pulled from the radio) are skipped.
+ *
+ * Returns the chosen queue index plus the updated history, pointer, and bag, or
+ * null for an empty queue.
+ */
+export function resolveShuffleNext(
+  queue: PlayerTrack[],
+  history: number[],
+  historyIndex: number,
+  playedTrackIds: number[],
+  currentTrackId: number | null,
+): { index: number; history: number[]; historyIndex: number; playedTrackIds: number[] } | null {
+  if (queue.length === 0) return null;
+
+  // Retrace forward through recorded history when the pointer is behind the tip.
+  for (let i = historyIndex + 1; i < history.length; i++) {
+    const idx = queue.findIndex((t) => t.trackId === history[i]);
+    if (idx >= 0) return { index: idx, history, historyIndex: i, playedTrackIds };
+  }
+
+  // At the tip: draw a fresh track from the shuffle bag and extend history,
+  // trimming any stale forward entries that could not be found in the queue.
+  const pick = pickNextShuffleTrack(queue, playedTrackIds, currentTrackId);
+  if (!pick) return null;
+  const trimmed = history.slice(0, historyIndex + 1);
+  return {
+    index: pick.index,
+    history: [...trimmed, queue[pick.index].trackId],
+    historyIndex: trimmed.length,
+    playedTrackIds: pick.playedTrackIds,
+  };
+}
+
+/**
+ * Resolve the previous track in shuffle mode by walking the play-history stack
+ * backward, skipping entries whose track has left the queue. Returns the chosen
+ * queue index and the new pointer, or null when there is no earlier track to
+ * return to (the caller then restarts the current track).
+ */
+export function resolveShufflePrev(
+  queue: PlayerTrack[],
+  history: number[],
+  historyIndex: number,
+): { index: number; historyIndex: number } | null {
+  for (let i = historyIndex - 1; i >= 0; i--) {
+    const idx = queue.findIndex((t) => t.trackId === history[i]);
+    if (idx >= 0) return { index: idx, historyIndex: i };
+  }
+  return null;
+}
+
 /** Map a release-with-tracks (Prisma include shape) to its non-null PlayerTrack[]. */
 export function buildPlayerTracksForRelease(
   release: ReleaseInput & { tracks: TrackInput[] },
