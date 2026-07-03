@@ -15,7 +15,7 @@ import {
   type QueueSource,
   type RepeatMode,
 } from "@/lib/player-types";
-import { shufflePlayerTracks } from "@/lib/player-data";
+import { pickNextShuffleTrack, shufflePlayerTracks } from "@/lib/player-data";
 
 const STORAGE_KEY = "party-pupils-player";
 
@@ -77,6 +77,7 @@ function persist(s: PlayerState) {
     shuffle: s.shuffle,
     repeat: s.repeat,
     queueSource: s.queueSource,
+    playedTrackIds: s.playedTrackIds,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -174,7 +175,11 @@ function nextTrackInQueue(): PlayerTrack | null {
   if (i < 0 || state.queue.length === 0) return null;
   if (state.shuffle) {
     if (state.queue.length <= 1) return null;
-    return state.queue[Math.floor(Math.random() * state.queue.length)];
+    // Prefetch hint: the actual next pick is random over the bag, so we can't
+    // predict it exactly. Preload the first still-unplayed track as a best
+    // effort — a mismatch only wastes a preload, never causes a wrong play.
+    const played = new Set(state.playedTrackIds);
+    return state.queue.find((t) => !played.has(t.trackId)) ?? null;
   }
   if (i + 1 < state.queue.length) return state.queue[i + 1];
   if (state.repeat === "all") return state.queue[0] ?? null;
@@ -219,7 +224,17 @@ async function maybeRefreshRadioQueue() {
     if (!r.ok) return;
     const data = (await r.json()) as { tracks: PlayerTrack[] };
     if (!Array.isArray(data.tracks) || data.tracks.length === 0) return;
-    state = { ...state, queue: shufflePlayerTracks(data.tracks) };
+    // Re-point currentIndex at the still-playing track's new position so the
+    // shuffle bag (which reads the current trackId to avoid immediate repeats)
+    // stays consistent after the queue array is replaced.
+    const currentTrackId = state.queue[state.currentIndex]?.trackId ?? null;
+    const newQueue = shufflePlayerTracks(data.tracks);
+    const remapped = currentTrackId == null ? -1 : newQueue.findIndex((t) => t.trackId === currentTrackId);
+    state = {
+      ...state,
+      queue: newQueue,
+      currentIndex: remapped >= 0 ? remapped : state.currentIndex,
+    };
   } catch {
     /* keep current queue on failure */
   }
@@ -229,7 +244,11 @@ function nextImpl(fromEnded: boolean) {
   if (state.queue.length === 0) return;
   let nextIdx: number;
   if (state.shuffle) {
-    nextIdx = Math.floor(Math.random() * state.queue.length);
+    const currentTrackId = state.queue[state.currentIndex]?.trackId ?? null;
+    const pick = pickNextShuffleTrack(state.queue, state.playedTrackIds, currentTrackId);
+    if (!pick) return;
+    nextIdx = pick.index;
+    state = { ...state, playedTrackIds: pick.playedTrackIds };
   } else if (state.currentIndex + 1 < state.queue.length) {
     nextIdx = state.currentIndex + 1;
   } else if (state.repeat === "all") {
@@ -366,6 +385,7 @@ function playQueueImpl(
     queueSource: source,
     shuffle: options?.shuffle ?? state.shuffle,
     repeat: options?.repeat ?? state.repeat,
+    playedTrackIds: [queue[idx].trackId],
   };
   loadTrackAt(idx, true);
 }
@@ -382,7 +402,7 @@ function playNextImpl(track: PlayerTrack) {
     track,
     ...state.queue.slice(insertAt),
   ];
-  state = { ...state, queue: newQueue };
+  state = { ...state, queue: newQueue, playedTrackIds: [...state.playedTrackIds, track.trackId] };
   loadTrackAt(insertAt, true);
 }
 
@@ -402,6 +422,7 @@ function seedQueueImpl(queue: PlayerTrack[], startIndex: number = 0, source: Que
     duration: 0,
     isPlaying: false,
     queueSource: source,
+    playedTrackIds: [queue[idx].trackId],
   });
   setMediaSessionMetadata(track);
 }
@@ -448,6 +469,9 @@ function rehydrate() {
       shuffle: persisted.shuffle ?? false,
       repeat: persisted.repeat ?? "off",
       queueSource: persisted.queueSource ?? null,
+      // Older storage predates the shuffle bag: seed it with the current track
+      // so it isn't treated as unplayed and picked again right away.
+      playedTrackIds: persisted.playedTrackIds ?? (track ? [track.trackId] : []),
     },
     { persist: "skip" }
   );
