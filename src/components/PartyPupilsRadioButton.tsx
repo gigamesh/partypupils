@@ -16,7 +16,7 @@ export function PartyPupilsRadioButton({ className }: { className?: string }) {
   const { state, playQueue, toggle } = useAudio();
   const [loading, setLoading] = useState(false);
 
-  const hasQueue = state.currentIndex >= 0;
+  const hasQueue = state.currentTrack !== null;
   const isPlaying = hasQueue && state.isPlaying;
 
   const handleClick = async () => {

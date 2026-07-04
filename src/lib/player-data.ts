@@ -1,4 +1,4 @@
-import type { PlayerTrack } from "./player-types";
+import type { PlayerTrack, RepeatMode } from "./player-types";
 
 interface TrackInput {
   id: number;
@@ -53,101 +53,106 @@ export function shufflePlayerTracks(tracks: PlayerTrack[]): PlayerTrack[] {
   return out;
 }
 
-/**
- * "Shuffle bag" picker: choose the next track to play in shuffle mode without
- * repeating any track until every other track has played. `playedTrackIds` is
- * the set of trackIds already heard in the current cycle (including the one
- * playing now). Keying on trackId — not queue index — keeps the bag correct
- * even when the queue array is re-fetched/re-shuffled mid-cycle (radio refresh).
- *
- * Returns the chosen queue index and the updated played set, or null for an
- * empty queue. When the bag is exhausted a fresh cycle begins, excluding the
- * just-played `currentTrackId` so a track never repeats across the wrap.
- */
-export function pickNextShuffleTrack(
-  queue: PlayerTrack[],
-  playedTrackIds: number[],
-  currentTrackId: number | null,
-): { index: number; playedTrackIds: number[] } | null {
-  if (queue.length === 0) return null;
-  if (queue.length === 1) return { index: 0, playedTrackIds: [queue[0].trackId] };
+/** Cap on retained history so a long radio session can't grow state unbounded. */
+export const HISTORY_LIMIT = 100;
 
-  const played = new Set(playedTrackIds);
-  const unplayed = queue
-    .map((track, index) => ({ track, index }))
-    .filter(({ track }) => !played.has(track.trackId));
+/** The three-part play timeline: already-played, current, and materialized future. */
+export interface MaterializedQueue {
+  history: PlayerTrack[];
+  current: PlayerTrack | null;
+  upNext: PlayerTrack[];
+}
 
-  if (unplayed.length > 0) {
-    const pick = unplayed[Math.floor(Math.random() * unplayed.length)];
-    return { index: pick.index, playedTrackIds: [...playedTrackIds, pick.track.trackId] };
-  }
-
-  // Bag exhausted → start a new cycle, avoiding an immediate repeat of the
-  // track that just finished.
-  const fresh = queue
-    .map((track, index) => ({ track, index }))
-    .filter(({ track }) => track.trackId !== currentTrackId);
-  const candidates = fresh.length > 0 ? fresh : queue.map((track, index) => ({ track, index }));
-  const pick = candidates[Math.floor(Math.random() * candidates.length)];
-  return { index: pick.index, playedTrackIds: [pick.track.trackId] };
+/** Append to history, keeping only the most recent HISTORY_LIMIT entries. */
+function pushHistory(history: PlayerTrack[], track: PlayerTrack): PlayerTrack[] {
+  const next = [...history, track];
+  return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
 }
 
 /**
- * Resolve the next track in shuffle mode using a play-history stack. When the
- * listener has navigated backward (`historyIndex` sits before the tip), "next"
- * retraces the recorded order so forward/back are reversible — it does NOT draw
- * a fresh random track until the pointer reaches the tip of `history`. Only at
- * the tip does it consult the shuffle bag via `pickNextShuffleTrack`, appending
- * the chosen trackId to history. History entries whose track is no longer in the
- * queue (e.g. pulled from the radio) are skipped.
- *
- * Returns the chosen queue index plus the updated history, pointer, and bag, or
- * null for an empty queue.
+ * Build one full cycle of upcoming tracks from `source`. In order mode this is
+ * the source in its natural order. In shuffle mode it is a fresh Fisher-Yates
+ * permutation of the whole source — so every track plays exactly once per cycle
+ * — with the first entry swapped away from `current` to avoid a back-to-back
+ * repeat across the cycle wrap.
  */
-export function resolveShuffleNext(
-  queue: PlayerTrack[],
-  history: number[],
-  historyIndex: number,
-  playedTrackIds: number[],
-  currentTrackId: number | null,
-): { index: number; history: number[]; historyIndex: number; playedTrackIds: number[] } | null {
-  if (queue.length === 0) return null;
-
-  // Retrace forward through recorded history when the pointer is behind the tip.
-  for (let i = historyIndex + 1; i < history.length; i++) {
-    const idx = queue.findIndex((t) => t.trackId === history[i]);
-    if (idx >= 0) return { index: idx, history, historyIndex: i, playedTrackIds };
+function buildCycle(source: PlayerTrack[], current: PlayerTrack | null, shuffle: boolean): PlayerTrack[] {
+  if (!shuffle) return source.slice();
+  const cycle = shufflePlayerTracks(source);
+  if (cycle.length > 1 && current && cycle[0].trackId === current.trackId) {
+    const swapWith = 1 + Math.floor(Math.random() * (cycle.length - 1));
+    [cycle[0], cycle[swapWith]] = [cycle[swapWith], cycle[0]];
   }
+  return cycle;
+}
 
-  // At the tip: draw a fresh track from the shuffle bag and extend history,
-  // trimming any stale forward entries that could not be found in the queue.
-  const pick = pickNextShuffleTrack(queue, playedTrackIds, currentTrackId);
-  if (!pick) return null;
-  const trimmed = history.slice(0, historyIndex + 1);
+/**
+ * Materialize the initial timeline for a freshly-loaded source. `current` is the
+ * track at `startIndex`. In shuffle mode the remaining tracks are shuffled into
+ * `upNext` (history starts empty). In order mode the tracks before/after
+ * `startIndex` become history/up-next so back and forward walk the list.
+ */
+export function buildInitialQueue(
+  source: PlayerTrack[],
+  startIndex: number,
+  shuffle: boolean,
+): MaterializedQueue {
+  if (source.length === 0) return { history: [], current: null, upNext: [] };
+  const idx = Math.max(0, Math.min(startIndex, source.length - 1));
+  const current = source[idx];
+  if (shuffle) {
+    const rest = source.filter((_, i) => i !== idx);
+    return { history: [], current, upNext: shufflePlayerTracks(rest) };
+  }
+  return { history: source.slice(0, idx), current, upNext: source.slice(idx + 1) };
+}
+
+/**
+ * Advance to the next track: shift the head of `upNext` into `current` and push
+ * the old `current` onto history. When `upNext` is empty, start a new cycle from
+ * `source` if `repeat === "all"`; otherwise return null to signal end-of-queue.
+ */
+export function advanceQueue(
+  queue: MaterializedQueue & { source: PlayerTrack[] },
+  shuffle: boolean,
+  repeat: RepeatMode,
+): MaterializedQueue | null {
+  const { history, current, upNext, source } = queue;
+  const nextHistory = current ? pushHistory(history, current) : history;
+  const pool = upNext.length > 0 ? upNext : repeat === "all" ? buildCycle(source, current, shuffle) : [];
+  if (pool.length === 0) return null;
+  const [next, ...rest] = pool;
+  return { history: nextHistory, current: next, upNext: rest };
+}
+
+/**
+ * Step back to the previously-played track: pop the tail of `history` into
+ * `current` and unshift the old `current` back onto `upNext`, so a later "next"
+ * retraces the exact same track. Returns null when history is empty.
+ */
+export function retreatQueue(queue: MaterializedQueue): MaterializedQueue | null {
+  const { history, current, upNext } = queue;
+  if (history.length === 0) return null;
   return {
-    index: pick.index,
-    history: [...trimmed, queue[pick.index].trackId],
-    historyIndex: trimmed.length,
-    playedTrackIds: pick.playedTrackIds,
+    history: history.slice(0, -1),
+    current: history[history.length - 1],
+    upNext: current ? [current, ...upNext] : upNext,
   };
 }
 
 /**
- * Resolve the previous track in shuffle mode by walking the play-history stack
- * backward, skipping entries whose track has left the queue. Returns the chosen
- * queue index and the new pointer, or null when there is no earlier track to
- * return to (the caller then restarts the current track).
+ * Reconcile the up-next queue against a refreshed `source`. The radio re-fetches
+ * its catalog at song boundaries so admin `inRadio` changes reach live listeners:
+ * tracks pulled from the catalog drop out of `upNext` immediately, while newly
+ * added tracks enter at the next cycle wrap (when `buildCycle` reads the updated
+ * source). `current` and `history` are left untouched.
  */
-export function resolveShufflePrev(
-  queue: PlayerTrack[],
-  history: number[],
-  historyIndex: number,
-): { index: number; historyIndex: number } | null {
-  for (let i = historyIndex - 1; i >= 0; i--) {
-    const idx = queue.findIndex((t) => t.trackId === history[i]);
-    if (idx >= 0) return { index: idx, historyIndex: i };
-  }
-  return null;
+export function reconcileSource(
+  upNext: PlayerTrack[],
+  newSource: PlayerTrack[],
+): { upNext: PlayerTrack[]; source: PlayerTrack[] } {
+  const live = new Set(newSource.map((t) => t.trackId));
+  return { upNext: upNext.filter((t) => live.has(t.trackId)), source: newSource };
 }
 
 /** Map a release-with-tracks (Prisma include shape) to its non-null PlayerTrack[]. */

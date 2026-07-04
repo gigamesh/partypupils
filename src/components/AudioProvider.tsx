@@ -15,7 +15,12 @@ import {
   type QueueSource,
   type RepeatMode,
 } from "@/lib/player-types";
-import { resolveShuffleNext, resolveShufflePrev, shufflePlayerTracks } from "@/lib/player-data";
+import {
+  advanceQueue,
+  buildInitialQueue,
+  reconcileSource,
+  retreatQueue,
+} from "@/lib/player-data";
 
 const STORAGE_KEY = "party-pupils-player";
 
@@ -42,27 +47,57 @@ function isValidPersistedTrack(t: unknown): t is PlayerTrack {
   );
 }
 
+function cleanTracks(arr: unknown): PlayerTrack[] {
+  return Array.isArray(arr) ? arr.filter(isValidPersistedTrack) : [];
+}
+
 function loadPersisted(): PersistedPlayerState | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as PersistedPlayerState;
-    if (!Array.isArray(parsed.queue) || typeof parsed.currentIndex !== "number") return null;
-    // Drop any queue entries from older app versions that don't satisfy the current PlayerTrack shape.
-    // Without this, a stale localStorage from a deploy that pre-dates a field (e.g. trackSlug) would
-    // leak `undefined` into URLs and break navigation.
-    const cleanQueue = parsed.queue.filter(isValidPersistedTrack);
-    if (cleanQueue.length !== parsed.queue.length) {
-      const droppedCurrent = parsed.currentIndex >= cleanQueue.length;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const currentTime = typeof parsed.currentTime === "number" ? parsed.currentTime : 0;
+    const shuffle = typeof parsed.shuffle === "boolean" ? parsed.shuffle : false;
+    const repeat = (parsed.repeat as RepeatMode) ?? "off";
+    const queueSource = (parsed.queueSource as QueueSource) ?? null;
+
+    // Current timeline shape (history / current / upNext / source). Invalid
+    // track entries — e.g. from a deploy that pre-dates a PlayerTrack field —
+    // are dropped so `undefined` can't leak into a stream URL.
+    if ("current" in parsed || "upNext" in parsed) {
+      const current = isValidPersistedTrack(parsed.current) ? (parsed.current as PlayerTrack) : null;
       return {
-        ...parsed,
-        queue: cleanQueue,
-        currentIndex: droppedCurrent ? -1 : parsed.currentIndex,
-        currentTime: droppedCurrent ? 0 : parsed.currentTime,
+        history: cleanTracks(parsed.history),
+        current,
+        upNext: cleanTracks(parsed.upNext),
+        source: cleanTracks(parsed.source),
+        currentTime,
+        shuffle,
+        repeat,
+        queueSource,
       };
     }
-    return parsed;
+
+    // Legacy shape (pre-timeline: `queue` + `currentIndex`). Migrate once so a
+    // mid-song listener keeps their spot; the stored array order becomes the
+    // up-next, the tracks before the cursor become history.
+    if (Array.isArray(parsed.queue) && typeof parsed.currentIndex === "number") {
+      const queue = cleanTracks(parsed.queue);
+      const idx = parsed.currentIndex;
+      if (idx < 0 || idx >= queue.length) return null;
+      return {
+        history: queue.slice(0, idx),
+        current: queue[idx],
+        upNext: queue.slice(idx + 1),
+        source: queue,
+        currentTime,
+        shuffle,
+        repeat,
+        queueSource,
+      };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -71,15 +106,14 @@ function loadPersisted(): PersistedPlayerState | null {
 function persist(s: PlayerState) {
   if (typeof window === "undefined") return;
   const toSave: PersistedPlayerState = {
-    queue: s.queue,
-    currentIndex: s.currentIndex,
+    history: s.history,
+    current: s.current,
+    upNext: s.upNext,
+    source: s.source,
     currentTime: s.currentTime,
     shuffle: s.shuffle,
     repeat: s.repeat,
     queueSource: s.queueSource,
-    playedTrackIds: s.playedTrackIds,
-    history: s.history,
-    historyIndex: s.historyIndex,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -172,41 +206,22 @@ function maybePrefetch() {
   prefetchEl.load();
 }
 
+/** The exact track that will play on "next" — the head of up-next. Materializing
+ *  the queue makes this precise (no guessing), so prefetch never mispredicts. */
 function nextTrackInQueue(): PlayerTrack | null {
-  const i = state.currentIndex;
-  if (i < 0 || state.queue.length === 0) return null;
-  if (state.shuffle) {
-    if (state.queue.length <= 1) return null;
-    // If the listener has navigated back, the next track is the known retrace
-    // target from history — preload that exact track.
-    for (let h = state.historyIndex + 1; h < state.history.length; h++) {
-      const t = state.queue.find((track) => track.trackId === state.history[h]);
-      if (t) return t;
-    }
-    // At the tip the next pick is random over the bag, so we can't predict it
-    // exactly. Preload the first still-unplayed track as a best effort — a
-    // mismatch only wastes a preload, never causes a wrong play.
-    const played = new Set(state.playedTrackIds);
-    return state.queue.find((t) => !played.has(t.trackId)) ?? null;
-  }
-  if (i + 1 < state.queue.length) return state.queue[i + 1];
-  if (state.repeat === "all") return state.queue[0] ?? null;
-  return null;
+  if (!state.current) return null;
+  return state.upNext[0] ?? null;
 }
 
-function loadTrackAt(index: number, autoplay: boolean) {
-  if (index < 0 || index >= state.queue.length) return;
+/** Load `state.current` into the audio element and (optionally) start playback.
+ *  The timeline (history/current/upNext) must already be set on `state`. */
+function loadCurrent(autoplay: boolean) {
+  const track = state.current;
+  if (!track) return;
   const audio = ensureAudio();
-  const track = state.queue[index];
   audio.src = track.streamUrl;
   audio.load();
-  emit({
-    ...state,
-    currentIndex: index,
-    currentTime: 0,
-    duration: 0,
-    isPlaying: autoplay,
-  });
+  emit({ ...state, currentTime: 0, duration: 0, isPlaying: autoplay });
   setMediaSessionMetadata(track);
   if (autoplay) {
     audio.play().catch((e) => {
@@ -219,11 +234,11 @@ function loadTrackAt(index: number, autoplay: boolean) {
 }
 
 /**
- * When the queue source is the radio, refresh `state.queue` from /api/all-tracks
- * before picking the next track. This lets admin `inRadio` toggles propagate to
- * already-listening visitors at song boundaries — the currently-playing track
- * finishes, then the next pick comes from the fresh list. Silent no-op on
- * network failure or empty result; non-radio queues are left untouched.
+ * When the queue source is the radio, refresh the track pool from /api/all-tracks
+ * before advancing. This lets admin `inRadio` toggles reach already-listening
+ * visitors at song boundaries: pulled tracks drop from up-next immediately, added
+ * tracks join at the next cycle wrap. Silent no-op on network failure or empty
+ * result; non-radio queues are left untouched.
  */
 async function maybeRefreshRadioQueue() {
   if (state.queueSource !== "radio") return;
@@ -232,88 +247,52 @@ async function maybeRefreshRadioQueue() {
     if (!r.ok) return;
     const data = (await r.json()) as { tracks: PlayerTrack[] };
     if (!Array.isArray(data.tracks) || data.tracks.length === 0) return;
-    // Re-point currentIndex at the still-playing track's new position so the
-    // shuffle bag (which reads the current trackId to avoid immediate repeats)
-    // stays consistent after the queue array is replaced.
-    const currentTrackId = state.queue[state.currentIndex]?.trackId ?? null;
-    const newQueue = shufflePlayerTracks(data.tracks);
-    const remapped = currentTrackId == null ? -1 : newQueue.findIndex((t) => t.trackId === currentTrackId);
-    state = {
-      ...state,
-      queue: newQueue,
-      currentIndex: remapped >= 0 ? remapped : state.currentIndex,
-    };
+    const { upNext, source } = reconcileSource(state.upNext, data.tracks);
+    state = { ...state, upNext, source };
   } catch {
     /* keep current queue on failure */
   }
 }
 
 function nextImpl(fromEnded: boolean) {
-  if (state.queue.length === 0) return;
-  let nextIdx: number;
-  if (state.shuffle) {
-    const currentTrackId = state.queue[state.currentIndex]?.trackId ?? null;
-    const pick = resolveShuffleNext(
-      state.queue,
-      state.history,
-      state.historyIndex,
-      state.playedTrackIds,
-      currentTrackId,
-    );
-    if (!pick) return;
-    nextIdx = pick.index;
-    state = {
-      ...state,
-      history: pick.history,
-      historyIndex: pick.historyIndex,
-      playedTrackIds: pick.playedTrackIds,
-    };
-  } else if (state.currentIndex + 1 < state.queue.length) {
-    nextIdx = state.currentIndex + 1;
-  } else if (state.repeat === "all") {
-    nextIdx = 0;
-  } else {
+  if (!state.current) return;
+  const next = advanceQueue(
+    { history: state.history, current: state.current, upNext: state.upNext, source: state.source },
+    state.shuffle,
+    state.repeat,
+  );
+  if (!next) {
+    // End of a non-repeating queue: stop at the final track.
     if (fromEnded) {
       stopTimeUpdates();
       emit({ ...state, isPlaying: false, currentTime: 0 });
     }
     return;
   }
-  loadTrackAt(nextIdx, true);
+  state = { ...state, history: next.history, current: next.current, upNext: next.upNext };
+  loadCurrent(true);
 }
 
 function prevImpl() {
-  if (state.queue.length === 0) return;
+  if (!state.current) return;
   if (state.currentTime > 3) {
     seekImpl(0);
     return;
   }
-  let nextIdx: number;
-  if (state.shuffle) {
-    // Walk the play-history stack backward so "previous" retraces the actual
-    // order heard, not the queue array index (which shuffle jumps around).
-    const pick = resolveShufflePrev(state.queue, state.history, state.historyIndex);
-    if (!pick) {
-      seekImpl(0);
-      return;
-    }
-    nextIdx = pick.index;
-    state = { ...state, historyIndex: pick.historyIndex };
-  } else if (state.currentIndex > 0) {
-    nextIdx = state.currentIndex - 1;
-  } else if (state.repeat === "all") {
-    nextIdx = state.queue.length - 1;
-  } else {
+  const prev = retreatQueue({ history: state.history, current: state.current, upNext: state.upNext });
+  if (!prev) {
+    // Nothing earlier in the timeline — restart the current track.
     seekImpl(0);
     return;
   }
-  loadTrackAt(nextIdx, true);
+  state = { ...state, history: prev.history, current: prev.current, upNext: prev.upNext };
+  loadCurrent(true);
 }
 
 function seekImpl(time: number) {
   const audio = ensureAudio();
-  if (audio.readyState === 0 && state.queue[state.currentIndex]) {
-    audio.src = state.queue[state.currentIndex].streamUrl;
+  if (audio.readyState === 0 && state.current) {
+    audio.src = state.current.streamUrl;
     audio.load();
   }
   const clamped = Math.max(0, isFinite(time) ? time : 0);
@@ -366,9 +345,9 @@ function syncMediaSessionPosition() {
 }
 
 function toggleImpl() {
-  if (state.currentIndex < 0) return;
+  if (!state.current) return;
   const audio = ensureAudio();
-  const track = state.queue[state.currentIndex];
+  const track = state.current;
   if (state.isPlaying) {
     audio.pause();
     stopTimeUpdates();
@@ -400,71 +379,58 @@ interface PlayQueueOptions {
 }
 
 function playQueueImpl(
-  queue: PlayerTrack[],
+  tracks: PlayerTrack[],
   startIndex: number,
   source: QueueSource = "release",
   options?: PlayQueueOptions,
 ) {
-  if (queue.length === 0) return;
-  const idx = Math.max(0, Math.min(startIndex, queue.length - 1));
+  if (tracks.length === 0) return;
+  const shuffle = options?.shuffle ?? state.shuffle;
+  const built = buildInitialQueue(tracks, startIndex, shuffle);
   state = {
     ...state,
-    queue,
-    currentIndex: idx,
+    history: built.history,
+    current: built.current,
+    upNext: built.upNext,
+    source: tracks,
     queueSource: source,
-    shuffle: options?.shuffle ?? state.shuffle,
+    shuffle,
     repeat: options?.repeat ?? state.repeat,
-    playedTrackIds: [queue[idx].trackId],
-    history: [queue[idx].trackId],
-    historyIndex: 0,
   };
-  loadTrackAt(idx, true);
+  loadCurrent(true);
 }
 
-/** Insert a track immediately after the current one and play it. After it ends, the queue continues. */
+/** Insert a track to play immediately; the prior track moves to history and the
+ *  rest of the queue resumes after it ends. */
 function playNextImpl(track: PlayerTrack) {
-  if (state.queue.length === 0 || state.currentIndex < 0) {
+  if (!state.current) {
     playQueueImpl([track], 0, "track");
     return;
   }
-  const insertAt = state.currentIndex + 1;
-  const newQueue = [
-    ...state.queue.slice(0, insertAt),
-    track,
-    ...state.queue.slice(insertAt),
-  ];
-  const trimmedHistory = state.history.slice(0, state.historyIndex + 1);
-  state = {
-    ...state,
-    queue: newQueue,
-    playedTrackIds: [...state.playedTrackIds, track.trackId],
-    history: [...trimmedHistory, track.trackId],
-    historyIndex: trimmedHistory.length,
-  };
-  loadTrackAt(insertAt, true);
+  state = { ...state, upNext: [track, ...state.upNext] };
+  nextImpl(false);
 }
 
 /** Load a queue without autoplay — used for first-visit seeding so the bar appears ready-to-play. */
-function seedQueueImpl(queue: PlayerTrack[], startIndex: number = 0, source: QueueSource = "radio") {
-  if (queue.length === 0) return;
-  if (state.currentIndex >= 0) return;
-  const idx = Math.max(0, Math.min(startIndex, queue.length - 1));
-  const track = queue[idx];
+function seedQueueImpl(tracks: PlayerTrack[], startIndex: number = 0, source: QueueSource = "radio") {
+  if (tracks.length === 0) return;
+  if (state.current) return;
+  const built = buildInitialQueue(tracks, startIndex, state.shuffle);
+  if (!built.current) return;
   const audio = ensureAudio();
-  audio.src = track.streamUrl;
+  audio.src = built.current.streamUrl;
   emit({
     ...state,
-    queue,
-    currentIndex: idx,
+    history: built.history,
+    current: built.current,
+    upNext: built.upNext,
+    source: tracks,
     currentTime: 0,
     duration: 0,
     isPlaying: false,
     queueSource: source,
-    playedTrackIds: [queue[idx].trackId],
-    history: [queue[idx].trackId],
-    historyIndex: 0,
   });
-  setMediaSessionMetadata(track);
+  setMediaSessionMetadata(built.current);
 }
 
 function clearImpl() {
@@ -484,38 +450,31 @@ async function nextPublic() {
 
 function rehydrate() {
   const persisted = loadPersisted();
-  if (!persisted || persisted.queue.length === 0 || persisted.currentIndex < 0) return;
+  if (!persisted || !persisted.current) return;
   const audio = ensureAudio();
-  const track = persisted.queue[persisted.currentIndex];
-  if (track) {
-    audio.src = track.streamUrl;
-    const resume = persisted.currentTime;
-    const onMeta = () => {
-      try {
-        if (resume > 0 && resume < (audio.duration || Infinity)) audio.currentTime = resume;
-      } catch {}
-      audio.removeEventListener("loadedmetadata", onMeta);
-    };
-    audio.addEventListener("loadedmetadata", onMeta);
-    setMediaSessionMetadata(track);
-  }
+  const track = persisted.current;
+  audio.src = track.streamUrl;
+  const resume = persisted.currentTime;
+  const onMeta = () => {
+    try {
+      if (resume > 0 && resume < (audio.duration || Infinity)) audio.currentTime = resume;
+    } catch {}
+    audio.removeEventListener("loadedmetadata", onMeta);
+  };
+  audio.addEventListener("loadedmetadata", onMeta);
+  setMediaSessionMetadata(track);
   emit(
     {
-      queue: persisted.queue,
-      currentIndex: persisted.currentIndex,
+      history: persisted.history,
+      current: persisted.current,
+      upNext: persisted.upNext,
+      source: persisted.source,
       currentTime: persisted.currentTime,
       duration: 0,
       isPlaying: false,
-      shuffle: persisted.shuffle ?? false,
-      repeat: persisted.repeat ?? "off",
-      queueSource: persisted.queueSource ?? null,
-      // Older storage predates the shuffle bag: seed it with the current track
-      // so it isn't treated as unplayed and picked again right away.
-      playedTrackIds: persisted.playedTrackIds ?? (track ? [track.trackId] : []),
-      // Older storage predates the history stack: seed it with the current
-      // track so back/forward navigation has a valid starting point.
-      history: persisted.history ?? (track ? [track.trackId] : []),
-      historyIndex: persisted.historyIndex ?? (track ? 0 : -1),
+      shuffle: persisted.shuffle,
+      repeat: persisted.repeat,
+      queueSource: persisted.queueSource,
     },
     { persist: "skip" }
   );
@@ -548,7 +507,7 @@ const AudioContext = createContext<AudioContextType | null>(null);
 
 export function AudioProvider({ children }: { children: ReactNode }) {
   const raw = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const currentTrack = raw.currentIndex >= 0 ? raw.queue[raw.currentIndex] ?? null : null;
+  const currentTrack = raw.current;
   const trackId = currentTrack?.trackId ?? null;
 
   const value: AudioContextType = {
@@ -574,7 +533,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           target.isContentEditable)
       )
         return;
-      if (state.currentIndex < 0) return;
+      if (!state.current) return;
       switch (e.code) {
         case "Space":
           e.preventDefault();

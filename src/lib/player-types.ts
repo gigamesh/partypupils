@@ -14,45 +14,46 @@ export interface PlayerTrack {
   streamUrl: string;
 }
 
+/**
+ * The player models playback as a single timeline: `history` (already played,
+ * oldest→newest), `current`, and `upNext` (materialized future). "Next"/"prev"
+ * shift tracks between these three, so forward and back are always reversible.
+ * `source` is the pool `upNext` is regenerated from on a cycle wrap or a radio
+ * catalog refresh; it never itself drives the play order.
+ */
 export interface PlayerState {
-  queue: PlayerTrack[];
-  currentIndex: number;
+  history: PlayerTrack[];
+  current: PlayerTrack | null;
+  upNext: PlayerTrack[];
+  source: PlayerTrack[];
   isPlaying: boolean;
   currentTime: number;
   duration: number;
   shuffle: boolean;
   repeat: RepeatMode;
   queueSource: QueueSource;
-  /** trackIds heard in the current shuffle cycle; drives no-repeat shuffle. */
-  playedTrackIds: number[];
-  /** Ordered trackIds in the exact order played; drives shuffle back/forward navigation. */
-  history: number[];
-  /** Pointer into `history` for the currently-playing track (-1 when nothing is loaded). */
-  historyIndex: number;
 }
 
 export const EMPTY_PLAYER_STATE: PlayerState = {
-  queue: [],
-  currentIndex: -1,
+  history: [],
+  current: null,
+  upNext: [],
+  source: [],
   isPlaying: false,
   currentTime: 0,
   duration: 0,
   shuffle: true,
   repeat: "all",
   queueSource: null,
-  playedTrackIds: [],
-  history: [],
-  historyIndex: -1,
 };
 
 export interface PersistedPlayerState {
-  queue: PlayerTrack[];
-  currentIndex: number;
+  history: PlayerTrack[];
+  current: PlayerTrack | null;
+  upNext: PlayerTrack[];
+  source: PlayerTrack[];
   currentTime: number;
   shuffle: boolean;
   repeat: RepeatMode;
   queueSource: QueueSource;
-  playedTrackIds?: number[];
-  history?: number[];
-  historyIndex?: number;
 }
