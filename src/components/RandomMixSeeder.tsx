@@ -17,7 +17,7 @@ export function RandomMixSeeder() {
 
   useEffect(() => {
     if (fetchedRef.current) return;
-    if (state.currentIndex >= 0) return;
+    if (state.currentTrack !== null) return;
     fetchedRef.current = true;
 
     let cancelled = false;
@@ -31,7 +31,7 @@ export function RandomMixSeeder() {
     return () => {
       cancelled = true;
     };
-  }, [state.currentIndex, seedQueue]);
+  }, [state.currentTrack, seedQueue]);
 
   return null;
 }

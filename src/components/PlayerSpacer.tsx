@@ -6,7 +6,7 @@ import { useAudio } from "./AudioProvider";
 /** Adds bottom padding to the body when a track is loaded so the fixed PlayerBar doesn't cover content. */
 export function PlayerSpacer() {
   const { state } = useAudio();
-  const active = state.currentIndex >= 0;
+  const active = state.currentTrack !== null;
   useEffect(() => {
     document.body.classList.toggle("has-player", active);
     return () => {
