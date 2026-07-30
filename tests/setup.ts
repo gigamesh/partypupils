@@ -33,8 +33,19 @@ if (process.env.DATABASE_URL?.includes("neon.tech")) {
 
 // Admin-auth: every protected route sees an authed admin by default. Re-mock per test for 401 paths.
 vi.mock("@/lib/admin-auth", () => ({
+  ADMIN_SESSION_COOKIE: "admin_session",
+  adminSessionCookieOptions: {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24,
+    path: "/",
+  },
   verifyAdminSession: vi.fn(async () => true),
-  verifyAdminSessionFromRequest: vi.fn(async () => true),
+  verifyAdminSessionFromRequest: vi.fn(async () => ({
+    authed: true,
+    refreshedToken: null,
+  })),
   createAdminSession: vi.fn(async () => {}),
   clearAdminSession: vi.fn(async () => {}),
 }));

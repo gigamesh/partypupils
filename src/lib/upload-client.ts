@@ -1,3 +1,5 @@
+import { throwIfSessionExpired } from "./session-expired";
+
 /**
  * Presigns an upload via the admin presign endpoint, PUTs the file to the
  * returned URL, and resolves to the file's public URL. Browser-only.
@@ -9,6 +11,9 @@ export async function presignAndUpload(file: File, key: string): Promise<string>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ key, contentType }),
   });
+  // Presign is the first admin call of a save, so an expired session surfaces
+  // here first — as a 401 from the proxy gate, not an upload problem.
+  throwIfSessionExpired(presignRes);
   if (!presignRes.ok) {
     const body = await presignRes.text();
     throw new Error(

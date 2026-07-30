@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
 import { presignAndUpload } from "@/lib/upload-client";
+import { SESSION_EXPIRED_MESSAGE, throwIfSessionExpired } from "@/lib/session-expired";
 import { combinedName, deriveTrackArtistTitle } from "@/lib/track-name";
 import {
   validateReleaseFormState,
@@ -384,6 +385,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         coverImageUrl: artwork.coverImageUrl || undefined,
       }),
     });
+    throwIfSessionExpired(processRes);
     const data = await processRes.json();
 
     if (!processRes.ok) {
@@ -588,6 +590,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         body: JSON.stringify(body),
       });
 
+      throwIfSessionExpired(res);
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Something went wrong");
@@ -1153,7 +1156,21 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           )}
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <div role="alert" className="space-y-1 text-sm text-destructive">
+          <p>{error}</p>
+          {error === SESSION_EXPIRED_MESSAGE && (
+            <a
+              href="/admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:no-underline"
+            >
+              Open the admin login in a new tab
+            </a>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-3">
         <Button type="submit" disabled={loading}>

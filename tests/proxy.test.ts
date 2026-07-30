@@ -68,4 +68,61 @@ describe("proxy (admin auth gate)", () => {
     const res = await proxy(req("/api/admin/links", { cookie: `admin_session=${token}` }) as never);
     expect(res.status).toBe(401);
   });
+
+  it("lets an unauthenticated /admin page through to the inline login form", async () => {
+    const res = await proxy(req("/admin/releases") as never);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+});
+
+describe("proxy (sliding session refresh)", () => {
+  /** Sign a session token that expires `seconds` from now. */
+  async function agedCookie(seconds: number): Promise<string> {
+    const token = await signSessionToken({
+      payload: { admin: true },
+      secret: env.ADMIN_SECRET(),
+      expiresIn: `${seconds}s`,
+    });
+    return `admin_session=${token}`;
+  }
+
+  it("reissues the cookie when the token is inside the 12h refresh window", async () => {
+    const cookie = await agedCookie(60 * 60 * 6);
+    const res = await proxy(req("/api/admin/links", { cookie }) as never);
+
+    expect(res.status).toBe(200);
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie).toContain("admin_session=");
+    expect(setCookie).toContain("Max-Age=86400");
+    expect(setCookie).toContain("HttpOnly");
+    // The reissued token must differ from the one that came in, or the
+    // refresh isn't actually extending anything.
+    expect(setCookie).not.toContain(cookie.slice("admin_session=".length));
+  });
+
+  it("refreshes on an /admin page view, not just API calls", async () => {
+    const cookie = await agedCookie(60 * 60 * 6);
+    const res = await proxy(req("/admin/releases", { cookie }) as never);
+
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("set-cookie")).toContain("admin_session=");
+  });
+
+  it("leaves a fresh token alone", async () => {
+    const cookie = await agedCookie(60 * 60 * 23);
+    const res = await proxy(req("/api/admin/links", { cookie }) as never);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("does not resurrect an already-expired session", async () => {
+    const cookie = await agedCookie(-60);
+    const res = await proxy(req("/api/admin/links", { cookie }) as never);
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
 });
