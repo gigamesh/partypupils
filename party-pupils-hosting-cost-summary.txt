@@ -1,0 +1,32 @@
+====================================================================
+ PARTY PUPILS — WEBSITE HOSTING
+====================================================================
+
+Monthly fee: $100 / month (flat)
+
+--------------------------------------------------------------------
+ACTUAL COST SINCE LAUNCH (measured)
+--------------------------------------------------------------------
+┌───────────────────────┬───────┬──────┬──────┐
+│                       │ April │  May │ June │
+├───────────────────────┼───────┼──────┼──────┤
+│ Estimated actual cost │  ~$70 │ ~$86 │ ~$88 │
+└───────────────────────┴───────┴──────┴──────┘
+
+Costs ramped up during launch (heavy development) and are now
+leveling off around ~$88/month. The $100 flat rate sits just above
+that, so normal month-to-month movement is already absorbed.
+
+--------------------------------------------------------------------
+WHAT MAKES UP A TYPICAL MONTH
+--------------------------------------------------------------------
+┌─────────────────────┬───────────┬─────────────────────────────────────────────┬────────────────────────────────┐
+│ Component           │ % of bill │ What it covers                              │ Main cost driver               │
+├─────────────────────┼───────────┼─────────────────────────────────────────────┼────────────────────────────────┤
+│ Database (Postgres) │      ~70% │ Your dedicated, always-on database          │ Traffic & database queries     │
+│ Web hosting & app   │      ~30% │ Pages, bandwidth, builds, images, analytics │ Visitor traffic & site updates │
+└─────────────────────┴───────────┴─────────────────────────────────────────────┴────────────────────────────────┘
+
+The database is the largest piece: it runs continuously so the site
+responds instantly, and its cost tracks how much the site is used.
+

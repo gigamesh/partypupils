@@ -16,6 +16,13 @@
  */
 import { z } from "zod";
 
+/**
+ * Stand-in for an asset the form is about to upload but hasn't yet. The schemas
+ * only check that these fields are non-empty strings, never that they resolve,
+ * so the placeholder is enough to let the pre-flight pass.
+ */
+const PENDING_UPLOAD = "pending://upload";
+
 const fileSchema = z.object({
   format: z.string().min(1),
   fileName: z.string().min(1),
@@ -167,7 +174,10 @@ export interface ReleaseFormState {
   description: string;
   priceCents: number;
   type: "album" | "single";
+  /** Cover already persisted on the existing release, or null on a new one. */
   coverImageUrl: string | null;
+  /** True when the user has selected a fresh cover File not yet uploaded. */
+  hasNewCover: boolean;
   releasedAt: string | null;
   isPublished: boolean;
   inRadio: boolean;
@@ -197,10 +207,12 @@ export interface ReleaseFormState {
  * minutes of waiting for transcoding to finish on the server round-trip.
  *
  * Projects the form state into the API body shape, substituting a placeholder
- * `pending://upload` storage key for tracks where a WAV will be uploaded but
- * doesn't exist yet. The published-schema only checks for presence of an
- * entry with `format: "wav"` (not whether the URL is reachable), so this
- * placeholder is enough to short-circuit the "missing WAV" error.
+ * `pending://upload` storage key for assets that will be uploaded but don't
+ * exist yet — both per-track WAVs and the release cover. The schemas only
+ * check for presence (a `format: "wav"` entry, a non-empty cover string) and
+ * never that the URL resolves, so the placeholder short-circuits the spurious
+ * "missing WAV" / "missing cover" errors that would otherwise fire on a new
+ * release where nothing has been uploaded at submit time yet.
  */
 export function validateReleaseFormState(state: ReleaseFormState): ValidationResult {
   const body = projectFormStateToApiBody(state);
@@ -214,7 +226,7 @@ function projectFormStateToApiBody(state: ReleaseFormState): unknown {
     description: state.description || null,
     price: state.priceCents,
     type: state.type,
-    coverImageUrl: state.coverImageUrl,
+    coverImageUrl: state.hasNewCover ? PENDING_UPLOAD : state.coverImageUrl,
     releasedAt: state.releasedAt,
     isPublished: state.isPublished,
     inRadio: state.inRadio,
@@ -234,7 +246,7 @@ function projectFormStateToApiBody(state: ReleaseFormState): unknown {
 
 function filesForTrack(hasNewWav: boolean, hasExistingWav: boolean) {
   if (!hasNewWav && !hasExistingWav) return [];
-  return [{ format: "wav", fileName: "pending.wav", storageKey: "pending://upload" }];
+  return [{ format: "wav", fileName: "pending.wav", storageKey: PENDING_UPLOAD }];
 }
 
 /**

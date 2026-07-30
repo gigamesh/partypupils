@@ -201,6 +201,7 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
     priceCents: 1000,
     type: "single",
     coverImageUrl: "https://r2/cover.jpg",
+    hasNewCover: false,
     releasedAt: null,
     isPublished: true,
     inRadio: true,
@@ -274,34 +275,61 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
     }
   });
 
+  const sparseDraftState: ReleaseFormState = {
+    name: "Untitled",
+    slug: "",
+    description: "",
+    priceCents: 0,
+    type: "single",
+    coverImageUrl: "https://r2/cover.jpg",
+    hasNewCover: false,
+    releasedAt: null,
+    isPublished: false,
+    inRadio: true,
+    tracks: [],
+  };
+
   it("accepts a draft state with sparse fields (cover still required)", () => {
-    const result = validateReleaseFormState({
-      name: "Untitled",
-      slug: "",
-      description: "",
-      priceCents: 0,
-      type: "single",
-      coverImageUrl: "https://r2/cover.jpg",
-      releasedAt: null,
-      isPublished: false,
-      inRadio: true,
-      tracks: [],
-    });
+    const result = validateReleaseFormState(sparseDraftState);
     expect(result.ok).toBe(true);
   });
 
   it("rejects a draft state with no cover image", () => {
     const result = validateReleaseFormState({
-      name: "Untitled",
-      slug: "",
-      description: "",
-      priceCents: 0,
-      type: "single",
+      ...sparseDraftState,
       coverImageUrl: null,
-      releasedAt: null,
-      isPublished: false,
-      inRadio: true,
-      tracks: [],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.fieldErrors.coverImageUrl).toBeDefined();
+    }
+  });
+
+  it("accepts a new draft whose cover is picked but not yet uploaded", () => {
+    // The reported bug: a brand-new release has no persisted cover, so the
+    // pre-flight saw null and failed before the upload that would have set it.
+    const result = validateReleaseFormState({
+      ...sparseDraftState,
+      coverImageUrl: null,
+      hasNewCover: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts publishing a new release whose cover is picked but not yet uploaded", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      coverImageUrl: null,
+      hasNewCover: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("still rejects a new release with neither a picked nor persisted cover", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      coverImageUrl: null,
+      hasNewCover: false,
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {

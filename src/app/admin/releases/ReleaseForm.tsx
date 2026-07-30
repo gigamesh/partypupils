@@ -422,6 +422,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       priceCents: price,
       type,
       coverImageUrl: release?.coverImageUrl ?? null,
+      hasNewCover: coverImage != null,
       releasedAt: releasedAt
         ? new Date(releasedAt + "T00:00:00Z").toISOString()
         : null,
