@@ -25,6 +25,12 @@ import {
   validateReleaseFormState,
   type ReleaseFormState,
 } from "@/lib/release-validation";
+import {
+  artUploadTypeFor,
+  nextTrackSlug,
+  readJsonBody,
+  slugToPersist,
+} from "@/lib/release-form";
 import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { DownloadButtons } from "@/components/DownloadButtons";
@@ -175,6 +181,29 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+/**
+ * Park a track's embedded cover art in storage and return its public URL, or
+ * null if it can't be stored.
+ *
+ * The art reaches the transcode endpoint as a storage key rather than inline
+ * base64 because that request is a JSON body, and JSON bodies are capped at
+ * 4.5 MB by the platform. Cover art embedded in a master is routinely a
+ * 3000x3000 JPEG, which base64-encodes past that cap — the request is then
+ * rejected with a plain-text "Request Entity Too Large" before it ever
+ * reaches the function. Uploading the art as a file sidesteps the cap
+ * entirely: file uploads go straight to R2 via a presigned URL.
+ */
+async function uploadTrackArt(
+  dataUrl: string,
+  prefix: string,
+): Promise<string | null> {
+  const blob = await (await fetch(dataUrl)).blob();
+  const type = artUploadTypeFor(blob.type);
+  if (!type) return null;
+  const file = new File([blob], `art.${type.ext}`, { type: type.mime });
+  return presignAndUpload(file, `${prefix}/art.${type.ext}`);
+}
+
 interface LinkPageSummary {
   id: number;
   slug: string;
@@ -277,6 +306,14 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     setTracks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   }
 
+  // Slug rules live in `@/lib/release-form` so they're unit-testable; both
+  // take the *persisted* publish state, so ticking "publish" on this save
+  // doesn't retroactively freeze a placeholder slug that never went live.
+  const trackSlugOnEdit = (track: TrackInput, name: string) =>
+    nextTrackSlug(track, name, release?.isPublished ?? false);
+  const trackSlugOnSave = (track: TrackInput, name: string) =>
+    slugToPersist(track, name, release?.isPublished ?? false);
+
   /**
    * Read embedded ID3/RIFF tags and cover art from a freshly selected WAV and
    * auto-fill the track's still-empty fields. The parsed tags and artwork are
@@ -313,7 +350,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
             artist,
             title,
             genre,
-            slug: t.existingId == null ? slugify(combinedName(artist, title)) : t.slug,
+            slug: trackSlugOnEdit(t, combinedName(artist, title)),
             wavTags: { artist: wavArtist, title: wavTitle, genre: wavGenre },
             wavArtDataUrl,
           };
@@ -370,7 +407,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     file: File,
     prefix: string,
     metadata: UploadMetadata,
-    artwork: { artDataUrl?: string | null; coverImageUrl?: string | null },
+    artUrl: string | null,
   ): Promise<{ url: string; mp3Url: string }> {
     const key = `${prefix}/${file.name}`;
     const url = await presignAndUpload(file, key);
@@ -381,22 +418,22 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       body: JSON.stringify({
         key,
         metadata,
-        artDataUrl: artwork.artDataUrl || undefined,
-        coverImageUrl: artwork.coverImageUrl || undefined,
+        coverImageUrl: artUrl || undefined,
       }),
     });
     throwIfSessionExpired(processRes);
-    const data = await processRes.json();
+    const data = await readJsonBody(processRes);
 
     if (!processRes.ok) {
       const detail = data.mp3Error || data.error || "Unknown error";
-      throw new Error(`Transcoding ${file.name} failed: ${detail}`);
+      throw new Error(`Transcoding ${file.name} failed: ${String(detail)}`);
     }
-    if (!data.mp3Url) {
+    const mp3Url = typeof data.mp3Url === "string" ? data.mp3Url : "";
+    if (!mp3Url) {
       throw new Error(`Transcoding ${file.name} incomplete: mp3 missing`);
     }
 
-    return { url, mp3Url: data.mp3Url };
+    return { url, mp3Url };
   }
 
   async function uploadFile(file: File, prefix: string): Promise<string> {
@@ -441,7 +478,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           name: trackName,
           artist: t.artist,
           genre: t.genre,
-          slug: t.slug || slugify(trackName) || `track-${t.trackNumber}`,
+          slug: trackSlugOnSave(t, trackName),
           priceCents: trackPrice,
           trackNumber: t.trackNumber,
           inRadio: t.inRadio,
@@ -502,6 +539,21 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           currentStep++;
           setProgress({ current: currentStep, total: totalSteps });
           setStatus(`Uploading & transcoding "${trackName || track.wavFile.name}"...`);
+          // A track's own embedded art wins over the release cover for its
+          // tags. Store it first so the transcode request can reference it by
+          // URL — art is cosmetic, so a failure here falls back to the cover
+          // rather than sinking the whole save.
+          let trackArtUrl: string | null = null;
+          if (track.wavArtDataUrl) {
+            try {
+              trackArtUrl = await uploadTrackArt(
+                track.wavArtDataUrl,
+                `images/track-art/${slug}/${track.trackNumber}`,
+              );
+            } catch (err) {
+              console.warn("Track art upload failed; using release cover:", err);
+            }
+          }
           const result = await uploadWav(
             track.wavFile,
             `audio/${slug}/${track.trackNumber}`,
@@ -514,7 +566,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               trackTotal,
               year: releaseYear,
             },
-            { artDataUrl: track.wavArtDataUrl, coverImageUrl },
+            trackArtUrl ?? coverImageUrl,
           );
           files.push({
             format: "wav",
@@ -550,7 +602,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           name: trackName,
           artist: track.artist || null,
           genre: track.genre || null,
-          slug: track.slug || slugify(trackName) || `track-${track.trackNumber}`,
+          slug: trackSlugOnSave(track, trackName),
           price: trackPrice,
           trackNumber: track.trackNumber,
           inRadio: track.inRadio,
@@ -592,8 +644,8 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
       throwIfSessionExpired(res);
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Something went wrong");
+        const data = await readJsonBody(res);
+        setError(typeof data.error === "string" ? data.error : "Something went wrong");
         if (data.fieldErrors && typeof data.fieldErrors === "object") {
           setFieldErrors(
             flattenFieldErrors(
@@ -875,7 +927,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                           ? {
                               ...t,
                               artist: value,
-                              slug: t.existingId == null ? slugify(combinedName(value, t.title)) : t.slug,
+                              slug: trackSlugOnEdit(t, combinedName(value, t.title)),
                             }
                           : t,
                       ),
@@ -905,7 +957,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                           ? {
                               ...t,
                               title: value,
-                              slug: t.existingId == null ? slugify(combinedName(t.artist, value)) : t.slug,
+                              slug: trackSlugOnEdit(t, combinedName(t.artist, value)),
                             }
                           : t,
                       ),

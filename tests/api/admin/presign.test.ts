@@ -84,3 +84,54 @@ describe("POST /api/admin/upload/presign", () => {
     expect(res.status).toBe(200);
   });
 });
+
+/**
+ * Real filenames come off a mastering engineer's drive untouched — the form
+ * uses `file.name` verbatim — so the key allowlist has to survive spaces,
+ * parens, apostrophes and ampersands. A rejection here reads as a generic
+ * "upload failed" to the admin, with nothing pointing at the filename.
+ */
+describe("presign key shapes seen in production", () => {
+  const cases: Array<[string, string]> = [
+    [
+      "spaces, digits and parens",
+      "audio/yacht-house-summer-vol-3/1/01 Love Will Find A Way (Party Pupils Remix).wav",
+    ],
+    ["an apostrophe", "audio/album/2/Don't Stop (Extended Mix).wav"],
+    ["an ampersand and a comma", "audio/album/3/Smith & Jones, Pt. 2.wav"],
+    ["a plus and brackets", "audio/album/4/Track [Bonus] + Reprise.wav"],
+  ];
+
+  for (const [label, key] of cases) {
+    it(`accepts a track filename with ${label}`, async () => {
+      const res = await presign(jsonReq({ key, contentType: "audio/wav" }));
+      expect(res.status).toBe(200);
+      expect(getPresignedUploadUrl).toHaveBeenCalledWith(
+        key,
+        expect.objectContaining({ contentType: "audio/wav" }),
+      );
+    });
+  }
+
+  it("accepts the per-track art key the release form uploads", async () => {
+    // Embedded WAV art is stored as a file rather than sent inline as base64,
+    // which is what keeps the transcode request under the 4.5 MB body cap.
+    const res = await presign(
+      jsonReq({
+        key: "images/track-art/yacht-house-summer-vol-3/1/art.jpg",
+        contentType: "image/jpeg",
+      }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("still rejects a traversal attempt dressed up as a real filename", async () => {
+    const res = await presign(
+      jsonReq({
+        key: "audio/album/1/../../../etc/passwd (Remix).wav",
+        contentType: "audio/wav",
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+});
