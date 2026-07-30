@@ -12,6 +12,12 @@ export interface TrackSlugState {
   existingId?: number;
   slug: string;
   trackNumber: number;
+  /**
+   * True once the slug belongs to the admin rather than to the form: either
+   * they typed in the slug field, or the track loaded carrying a real slug
+   * from a previous save. Seed it with `slugIsOwned` when loading a track.
+   */
+  slugTouched?: boolean;
 }
 
 /**
@@ -24,31 +30,75 @@ export function isPlaceholderTrackSlug(slug: string): boolean {
 }
 
 /**
- * The slug a track should carry after its artist/title changed.
- *
- * An already-saved track's slug is normally frozen — it's the public
- * /music/<release>/<track> URL, and renaming it breaks every link to it. The
- * exception is a placeholder on a release that was never published: nothing
- * can be linking to that URL yet, and freezing it strands the track on
- * `track-1` no matter what the admin types afterwards.
+ * True for a release slug the server generated as a stand-in. Matches the
+ * `draft-` test in `publishedReleaseSchema` exactly, so the form keeps
+ * syncing precisely the slugs that publishing would otherwise reject.
  */
+export function isPlaceholderReleaseSlug(slug: string): boolean {
+  return !slug || slug.startsWith("draft-");
+}
+
+/**
+ * Seed for `slugTouched` when loading a saved track: a real slug is the
+ * admin's (or an earlier save's) and must not be rewritten, while a
+ * placeholder is the form's own filler and is fair game to keep syncing.
+ */
+export function slugIsOwned(slug: string): boolean {
+  return !isPlaceholderTrackSlug(slug);
+}
+
+/**
+ * The slug to show when a saved record loads. A placeholder is replaced with
+ * one derived from the name straight away, rather than waiting for the admin
+ * to edit a field that may already be correct — otherwise the form displays
+ * `track-1` (or `draft-a1b2c3d4`) next to a perfectly good title, and
+ * publishing later rejects it for being auto-generated.
+ */
+export function healPlaceholderSlug(
+  stored: string,
+  name: string,
+  isPlaceholder: (slug: string) => boolean,
+): string {
+  if (!isPlaceholder(stored)) return stored;
+  return slugify(name) || stored;
+}
+
+/**
+ * Whether the form should keep this track's slug mirroring its name.
+ *
+ * Deliberately independent of the *current* slug value. An earlier version
+ * asked "is the slug still a placeholder?" on every keystroke, which latched:
+ * typing the first letter of the artist rewrote `track-1` to `p-track-1`,
+ * that no longer looked like a placeholder, and every later keystroke was
+ * frozen out. Ownership is a property of the track, not of whatever the slug
+ * happens to say mid-edit.
+ */
+export function shouldSyncSlug(
+  track: TrackSlugState,
+  releasePublished: boolean,
+): boolean {
+  if (track.slugTouched) return false;
+  // Never saved — there's no URL to protect yet.
+  if (track.existingId == null) return true;
+  // Saved and live: the slug is a public URL, so it's frozen.
+  return !releasePublished;
+}
+
+/** The slug a track should carry after its artist/title changed. */
 export function nextTrackSlug(
   track: TrackSlugState,
   name: string,
   releasePublished: boolean,
 ): string {
-  const derived = slugify(name);
-  if (track.existingId == null) return derived;
-  const healable = isPlaceholderTrackSlug(track.slug) && !releasePublished;
-  return derived && healable ? derived : track.slug;
+  return shouldSyncSlug(track, releasePublished) ? slugify(name) : track.slug;
 }
 
 /**
- * The slug to persist for a track. Applies the same placeholder rule as
- * `nextTrackSlug`, so a draft saved before its title was filled in heals on
- * the next save rather than only when the admin happens to retype the title.
- * The trailing fallback keeps the column non-null for a sparse draft — which
- * is what writes `track-<n>` in the first place.
+ * The slug to persist for a track. Applies the same rule as `nextTrackSlug`,
+ * so a draft saved before its title was filled in heals on the next save
+ * rather than only when the admin happens to retype the title. The trailing
+ * fallback keeps the column non-null for a sparse draft — which is what
+ * writes `track-<n>` in the first place.
  */
 export function slugToPersist(
   track: TrackSlugState,

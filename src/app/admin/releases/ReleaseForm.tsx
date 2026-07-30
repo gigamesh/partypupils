@@ -27,8 +27,11 @@ import {
 } from "@/lib/release-validation";
 import {
   artUploadTypeFor,
+  healPlaceholderSlug,
+  isPlaceholderReleaseSlug,
   nextTrackSlug,
   readJsonBody,
+  slugIsOwned,
   slugToPersist,
 } from "@/lib/release-form";
 import { PlayButton } from "@/components/PlayButton";
@@ -70,6 +73,8 @@ interface TrackInput {
   title: string;
   genre: string;
   slug: string;
+  /** True once the slug is the admin's own rather than derived from the name. */
+  slugTouched?: boolean;
   priceStr: string;
   trackNumber: number;
   inRadio: boolean;
@@ -237,7 +242,15 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [unpublishConfirmOpen, setUnpublishConfirmOpen] = useState(false);
   const [name, setName] = useState(release?.name || "");
-  const [slug, setSlug] = useState(release?.slug || "");
+  const [slug, setSlug] = useState(() =>
+    healPlaceholderSlug(release?.slug ?? "", release?.name ?? "", isPlaceholderReleaseSlug),
+  );
+  // The release slug follows the name until the admin takes it over. A saved
+  // release carrying a `draft-<hex>` slug hasn't been taken over — publishing
+  // rejects that slug outright, so it has to keep syncing.
+  const [slugTouched, setSlugTouched] = useState(
+    () => !isPlaceholderReleaseSlug(release?.slug ?? ""),
+  );
   const [description, setDescription] = useState(release?.description || "");
   const [priceStr, setPriceStr] = useState(
     release ? (release.price / 100).toFixed(2) : ""
@@ -265,7 +278,15 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           artist: split.artist,
           title: split.title,
           genre: t.genre ?? "",
-          slug: t.slug,
+          // A real stored slug is a URL someone may already be using; a
+          // `track-N` placeholder is the form's own filler, so it heals from
+          // the name right away and keeps syncing until the admin takes over.
+          slug: healPlaceholderSlug(
+            t.slug,
+            combinedName(split.artist, split.title),
+            (s) => !slugIsOwned(s),
+          ),
+          slugTouched: slugIsOwned(t.slug),
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
           inRadio: t.inRadio,
@@ -308,11 +329,39 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
   // Slug rules live in `@/lib/release-form` so they're unit-testable; both
   // take the *persisted* publish state, so ticking "publish" on this save
-  // doesn't retroactively freeze a placeholder slug that never went live.
+  // doesn't retroactively freeze a slug that never went live.
   const trackSlugOnEdit = (track: TrackInput, name: string) =>
     nextTrackSlug(track, name, release?.isPublished ?? false);
   const trackSlugOnSave = (track: TrackInput, name: string) =>
     slugToPersist(track, name, release?.isPublished ?? false);
+
+  /** Take the slug as the admin's own — the form stops deriving it from here on. */
+  function editTrackSlug(index: number, value: string) {
+    setTracks((prev) =>
+      prev.map((t, i) => (i === index ? { ...t, slug: value, slugTouched: true } : t)),
+    );
+  }
+
+  /** Hand the slug back to the form and re-derive it from the current name. */
+  function resetTrackSlug(index: number) {
+    setTracks((prev) =>
+      prev.map((t, i) =>
+        i === index
+          ? {
+              ...t,
+              slug: slugify(combinedName(t.artist, t.title)),
+              slugTouched: false,
+            }
+          : t,
+      ),
+    );
+  }
+
+  /** True when the slug has drifted from what the track's name would produce. */
+  function slugDiffersFromName(track: TrackInput): boolean {
+    const derived = slugify(combinedName(track.artist, track.title));
+    return Boolean(derived) && track.slug !== derived;
+  }
 
   /**
    * Read embedded ID3/RIFF tags and cover art from a freshly selected WAV and
@@ -677,6 +726,9 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               ...t,
               existingId: savedTrack.id,
               slug: savedTrack.slug,
+              // Re-seed from what was persisted so continuing to edit after a
+              // save behaves exactly like editing after a reload.
+              slugTouched: slugIsOwned(savedTrack.slug),
               wavFile: null,
               existingWavName: wav?.fileName,
               existingWavStorageKey: wav?.storageKey,
@@ -741,15 +793,37 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           value={name}
           onChange={(e) => {
             setName(e.target.value);
-            if (!release) setSlug(slugify(e.target.value));
+            if (!slugTouched) setSlug(slugify(e.target.value));
           }}
           required
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="slug">Slug</Label>
-        <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} required />
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="slug">Slug</Label>
+          {slugify(name) && slug !== slugify(name) && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline hover:no-underline"
+              onClick={() => {
+                setSlug(slugify(name));
+                setSlugTouched(false);
+              }}
+            >
+              Reset from name
+            </button>
+          )}
+        </div>
+        <Input
+          id="slug"
+          value={slug}
+          onChange={(e) => {
+            setSlug(e.target.value);
+            setSlugTouched(true);
+          }}
+          required
+        />
         {fieldErrors.slug && (
           <p className="text-xs text-destructive">{fieldErrors.slug}</p>
         )}
@@ -992,11 +1066,22 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 )}
               </div>
               <div className="space-y-1">
-                <Label htmlFor={`track-${index}-slug`}>Slug</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor={`track-${index}-slug`}>Slug</Label>
+                  {slugDiffersFromName(track) && (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground underline hover:no-underline"
+                      onClick={() => resetTrackSlug(index)}
+                    >
+                      Reset from title
+                    </button>
+                  )}
+                </div>
                 <Input
                   id={`track-${index}-slug`}
                   value={track.slug}
-                  onChange={(e) => updateTrack(index, "slug", e.target.value)}
+                  onChange={(e) => editTrackSlug(index, e.target.value)}
                 />
               </div>
             </div>

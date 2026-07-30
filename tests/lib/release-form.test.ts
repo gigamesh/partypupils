@@ -11,19 +11,51 @@
 import { describe, it, expect } from "vitest";
 import {
   artUploadTypeFor,
+  healPlaceholderSlug,
+  isPlaceholderReleaseSlug,
   isPlaceholderTrackSlug,
   nextTrackSlug,
   readJsonBody,
+  shouldSyncSlug,
+  slugIsOwned,
   slugToPersist,
   type TrackSlugState,
 } from "@/lib/release-form";
+import { combinedName } from "@/lib/track-name";
 
 const PUBLISHED = true;
 const UNPUBLISHED = false;
 
-/** A track as the form holds it. Omit `existingId` for a not-yet-saved track. */
+/**
+ * A track as the form holds it. Omit `existingId` for a not-yet-saved track.
+ * `slugTouched` defaults the way the form seeds it — from the slug itself.
+ */
 function track(overrides: Partial<TrackSlugState> = {}): TrackSlugState {
-  return { existingId: 1, slug: "some-slug", trackNumber: 1, ...overrides };
+  const base = { existingId: 1, slug: "some-slug", trackNumber: 1, ...overrides };
+  return { slugTouched: slugIsOwned(base.slug), ...base };
+}
+
+/**
+ * Replay typing into a form field one character at a time, threading the slug
+ * through exactly as the change handler does. Single-call assertions can't see
+ * a rule that latches on its own output — which is how `p-track-1` shipped.
+ */
+function typeInto(
+  start: TrackSlugState,
+  field: "artist" | "title",
+  text: string,
+  other: string,
+  releasePublished = UNPUBLISHED,
+): string {
+  let state = { ...start };
+  let typed = "";
+  for (const ch of text) {
+    typed += ch;
+    const name =
+      field === "artist" ? combinedName(typed, other) : combinedName(other, typed);
+    state = { ...state, slug: nextTrackSlug(state, name, releasePublished) };
+  }
+  return state.slug;
 }
 
 describe("isPlaceholderTrackSlug", () => {
@@ -40,6 +72,118 @@ describe("isPlaceholderTrackSlug", () => {
   });
 });
 
+describe("isPlaceholderReleaseSlug", () => {
+  it("matches the server-generated draft slug", () => {
+    expect(isPlaceholderReleaseSlug("draft-a1b2c3d4")).toBe(true);
+    expect(isPlaceholderReleaseSlug("")).toBe(true);
+  });
+
+  it("treats a real release slug as owned", () => {
+    expect(isPlaceholderReleaseSlug("yacht-house-summer-vol-3")).toBe(false);
+  });
+
+  it("agrees with the publish guard, so the form syncs exactly what publishing rejects", async () => {
+    const { validateReleasePayload } = await import("@/lib/release-validation");
+    const publishable = {
+      name: "Yacht House Summer Vol. 3",
+      slug: "draft-a1b2c3d4",
+      price: 999,
+      type: "album",
+      coverImageUrl: "https://cdn/cover.jpg",
+      releasedAt: new Date().toISOString(),
+      isPublished: true,
+      inRadio: true,
+      tracks: [
+        {
+          name: "Party Pupils - Love Will Find A Way",
+          artist: "Party Pupils",
+          slug: "love-will-find-a-way",
+          price: 199,
+          trackNumber: 1,
+          inRadio: true,
+          files: [{ format: "wav", fileName: "t.wav", storageKey: "https://r2/t.wav" }],
+        },
+      ],
+    };
+    const result = validateReleasePayload(publishable);
+    expect(result.ok).toBe(false);
+    expect(isPlaceholderReleaseSlug(publishable.slug)).toBe(true);
+  });
+});
+
+describe("slugIsOwned", () => {
+  it("treats a real stored slug as the admin's, a placeholder as the form's", () => {
+    expect(slugIsOwned("love-will-find-a-way")).toBe(true);
+    expect(slugIsOwned("track-1")).toBe(false);
+    expect(slugIsOwned("")).toBe(false);
+  });
+});
+
+/**
+ * Load-time healing. Without this the form displays `track-1` (or
+ * `draft-a1b2c3d4`) next to a perfectly good title, because the sync only
+ * fires on a keystroke — and the admin has no reason to retype a field that
+ * already reads correctly. For the release slug that's not cosmetic:
+ * publishing rejects a `draft-` slug outright.
+ */
+describe("healPlaceholderSlug", () => {
+  const trackPlaceholder = (s: string) => !slugIsOwned(s);
+
+  it("replaces a track placeholder with one derived from the name", () => {
+    expect(
+      healPlaceholderSlug("track-1", "Party Pupils - Love Will Find A Way", trackPlaceholder),
+    ).toBe("party-pupils-love-will-find-a-way");
+  });
+
+  it("replaces a draft release slug with one derived from the name", () => {
+    expect(
+      healPlaceholderSlug("draft-a1b2c3d4", "Yacht House Summer Vol. 3", isPlaceholderReleaseSlug),
+    ).toBe("yacht-house-summer-vol-3");
+  });
+
+  it("leaves a real slug untouched — it may already be a live URL", () => {
+    expect(
+      healPlaceholderSlug("love-will-find-a-way", "Something Else", trackPlaceholder),
+    ).toBe("love-will-find-a-way");
+    expect(
+      healPlaceholderSlug("yacht-house-summer-vol-3", "Renamed", isPlaceholderReleaseSlug),
+    ).toBe("yacht-house-summer-vol-3");
+  });
+
+  it("keeps the placeholder when the name yields nothing", () => {
+    expect(healPlaceholderSlug("track-1", "", trackPlaceholder)).toBe("track-1");
+    expect(healPlaceholderSlug("draft-a1b2", "!!!", isPlaceholderReleaseSlug)).toBe("draft-a1b2");
+  });
+
+  it("is idempotent across reloads", () => {
+    const once = healPlaceholderSlug("track-1", "Love Will Find A Way", trackPlaceholder);
+    expect(healPlaceholderSlug(once, "Love Will Find A Way", trackPlaceholder)).toBe(once);
+  });
+});
+
+describe("shouldSyncSlug", () => {
+  it("syncs a track that has never been saved", () => {
+    expect(shouldSyncSlug(track({ existingId: undefined, slug: "" }), UNPUBLISHED)).toBe(true);
+  });
+
+  it("stops syncing once the admin owns the slug", () => {
+    expect(shouldSyncSlug(track({ slug: "track-1", slugTouched: true }), UNPUBLISHED)).toBe(false);
+    expect(
+      shouldSyncSlug(track({ existingId: undefined, slug: "custom", slugTouched: true }), UNPUBLISHED),
+    ).toBe(false);
+  });
+
+  it("never syncs a saved track on a published release", () => {
+    expect(shouldSyncSlug(track({ slug: "track-1" }), PUBLISHED)).toBe(false);
+  });
+
+  it("ignores what the slug currently says — ownership is a property of the track", () => {
+    // The regression: this must not flip to false just because a mid-edit
+    // slug stopped looking like a placeholder.
+    expect(shouldSyncSlug(track({ slug: "p-track-1", slugTouched: false }), UNPUBLISHED)).toBe(true);
+  });
+});
+
 describe("nextTrackSlug", () => {
   it("derives freely for a track that hasn't been saved yet", () => {
     const t = track({ existingId: undefined, slug: "" });
@@ -49,7 +193,7 @@ describe("nextTrackSlug", () => {
   });
 
   it("clears a new track's slug when its name is emptied, so it re-derives later", () => {
-    const t = track({ existingId: undefined, slug: "old-slug" });
+    const t = track({ existingId: undefined, slug: "old-slug", slugTouched: false });
     expect(nextTrackSlug(t, "", UNPUBLISHED)).toBe("");
   });
 
@@ -82,17 +226,54 @@ describe("nextTrackSlug", () => {
     expect(nextTrackSlug(t, "Love Will Find A Way", PUBLISHED)).toBe("track-1");
   });
 
-  it("never blanks an existing slug when the name is emptied", () => {
-    expect(nextTrackSlug(track({ slug: "track-1" }), "", UNPUBLISHED)).toBe("track-1");
-    expect(nextTrackSlug(track({ slug: "real-slug" }), "", UNPUBLISHED)).toBe(
-      "real-slug",
+  it("leaves an owned slug alone when the name is emptied", () => {
+    expect(nextTrackSlug(track({ slug: "real-slug" }), "", UNPUBLISHED)).toBe("real-slug");
+  });
+});
+
+/**
+ * The `p-track-1` regression, end to end. An untitled draft save stores the
+ * name as "Track 1", so the Title field reloads holding that filler while the
+ * slug holds `track-1` — then the admin starts typing the artist.
+ */
+describe("nextTrackSlug across a whole typing session", () => {
+  it("follows every keystroke instead of latching on the first one", () => {
+    const loaded = track({ slug: "track-1" });
+    expect(typeInto(loaded, "artist", "Party Pupils", "Track 1")).toBe(
+      "party-pupils-track-1",
     );
   });
 
-  it("keeps the placeholder when the name has nothing sluggable in it", () => {
-    expect(nextTrackSlug(track({ slug: "track-1" }), "!!!", UNPUBLISHED)).toBe(
-      "track-1",
+  it("ends on the full title when both fields are typed out", () => {
+    let state = track({ slug: "track-1" });
+    state = { ...state, slug: typeInto(state, "artist", "Party Pupils", "") };
+    const finalSlug = typeInto(
+      state,
+      "title",
+      "Love Will Find A Way",
+      "Party Pupils",
     );
+    expect(finalSlug).toBe("party-pupils-love-will-find-a-way");
+  });
+
+  it("does not produce the `p-track-1` shape at any point after typing settles", () => {
+    const loaded = track({ slug: "track-1" });
+    expect(typeInto(loaded, "artist", "P", "Track 1")).toBe("p-track-1");
+    // ...but one more keystroke must move it on, not freeze it.
+    expect(typeInto(loaded, "artist", "Pa", "Track 1")).toBe("pa-track-1");
+    expect(typeInto(loaded, "artist", "Party", "Track 1")).toBe("party-track-1");
+  });
+
+  it("stays frozen through a typing session once the admin owns the slug", () => {
+    const owned = track({ slug: "my-custom-slug", slugTouched: true });
+    expect(typeInto(owned, "title", "Anything At All", "Party Pupils")).toBe(
+      "my-custom-slug",
+    );
+  });
+
+  it("stays frozen through a typing session on a published release", () => {
+    const live = track({ slug: "track-1" });
+    expect(typeInto(live, "artist", "Party Pupils", "Track 1", PUBLISHED)).toBe("track-1");
   });
 });
 
@@ -107,6 +288,11 @@ describe("slugToPersist", () => {
   it("keeps a published track's slug stable on save", () => {
     const t = track({ slug: "track-1" });
     expect(slugToPersist(t, "Love Will Find A Way", PUBLISHED)).toBe("track-1");
+  });
+
+  it("keeps an admin-owned slug on save", () => {
+    const t = track({ slug: "b-side-version", slugTouched: true });
+    expect(slugToPersist(t, "Love Will Find A Way", UNPUBLISHED)).toBe("b-side-version");
   });
 
   it("falls back to `track-<n>` when there's nothing to derive from", () => {
