@@ -10,7 +10,7 @@ import { env } from "./env";
 
 export const EMAIL_BRANDING: EmailBranding = {
   siteName: SITE_NAME,
-  themeColor: "#adfd02",
+  themeColor: "#efff0a",
   // Match the site's body typography (Inter) with system fallbacks, since email
   // clients can't reliably load web fonts. Rounded CTAs mirror the site buttons.
   theme: {

@@ -107,7 +107,7 @@ function Scrubber({ currentTime, duration, onSeek }: { currentTime: number; dura
           }}
         />
         <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-neon shadow-[0_0_6px_rgba(173,253,2,0.6)]"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-neon shadow-[0_0_6px_rgba(239,255,10,0.6)]"
           style={{
             left: `${ratio * 100}%`,
             height: isDragging ? "16px" : "12px",
@@ -132,7 +132,7 @@ export function PlayerBar() {
   return (
     <div
       data-expanded={expanded ? "true" : "false"}
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-background/85 backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 z-40 glass-panel rounded-none border-x-0 border-b-0 border-t border-white/10"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {/* Brand strip */}

@@ -2,7 +2,6 @@ import { HashScroll } from "@/components/HashScroll";
 import Image from "@/components/Image";
 import { LinksList } from "@/components/LinksList";
 import { ReleaseCard } from "@/components/ReleaseCard";
-import { ScrollOverlay } from "@/components/ScrollOverlay";
 import { SeatedTourWidget } from "@/components/SeatedTourWidget";
 import { SocialLinks } from "@/components/SocialLinks";
 import { buildPlayerTracksForRelease } from "@/lib/player-data";
@@ -29,7 +28,6 @@ export default async function HomePage() {
   return (
     <div>
       <HashScroll />
-      <ScrollOverlay />
       <section className="relative min-h-[85dvh] flex items-center justify-center px-4 pt-16 pb-32">
         <div className="relative w-full max-w-5xl min-h-[75dvh] flex items-center justify-center glass-panel overflow-hidden">
           <div className="relative z-10 flex w-full max-w-5xl items-center justify-center">
@@ -39,7 +37,7 @@ export default async function HomePage() {
                 alt="Party Pupils"
                 width={500}
                 height={210}
-                className="w-full max-w-[280px] md:max-w-[420px] h-auto"
+                className="logo-glow w-full max-w-[280px] md:max-w-[420px] h-auto"
                 priority
               />
             </div>
@@ -51,7 +49,7 @@ export default async function HomePage() {
               alt="Party Pupils"
               width={600}
               height={720}
-              className="h-[65vh] w-auto object-contain"
+              className="h-[65vh] w-auto object-contain contrast-80 brightness-110"
               priority
             />
           </div>
