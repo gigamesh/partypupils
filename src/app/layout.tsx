@@ -7,19 +7,19 @@ import { env } from "@/lib/env";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const baseUrl = env.NEXT_PUBLIC_BASE_URL();
 
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-heading-var",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-body-var",
+const urbancat = localFont({
+  src: [
+    { path: "./fonts/urbancat-light.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/urbancat-regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/urbancat-bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-urbancat",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -63,7 +63,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${outfit.variable} ${inter.variable} antialiased dark`}
+      className={`${urbancat.variable} antialiased dark`}
     >
       <body>
         <FixedBackground />

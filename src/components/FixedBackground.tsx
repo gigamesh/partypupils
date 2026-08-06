@@ -29,14 +29,10 @@ export function FixedBackground() {
       />
       <div
         className="absolute inset-0"
-        style={{ background: "rgba(31, 112, 178, 0.3)" }}
-      />
-      <div
-        className="absolute inset-0"
         style={{
           backgroundImage: GRAIN_TILE,
           backgroundSize: "180px 180px",
-          opacity: 0.55,
+          opacity: 0.35,
         }}
       />
       {imrovedContrast && (

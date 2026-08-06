@@ -51,6 +51,10 @@
 }
 
 :root {
+  /* Both roles map to Urbancat today; kept as separate tokens so headings can
+     diverge from body copy later without touching every consumer. */
+  --font-heading-var: var(--font-urbancat);
+  --font-body-var: var(--font-urbancat);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
