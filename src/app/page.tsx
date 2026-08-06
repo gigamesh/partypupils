@@ -29,7 +29,7 @@ export default async function HomePage() {
     <div>
       <HashScroll />
       <section className="relative min-h-[85dvh] flex items-center justify-center px-4 pt-16 pb-32">
-        <div className="relative w-full max-w-5xl min-h-[75dvh] flex items-center justify-center glass-panel overflow-hidden">
+        <div className="relative w-full max-w-5xl min-h-[75dvh] flex items-center justify-center glass-panel backdrop-blur-none overflow-hidden">
           <div className="relative z-10 flex w-full max-w-5xl items-center justify-center">
             <div className="flex-1 flex justify-center md:-translate-x-[15%]">
               <Image
