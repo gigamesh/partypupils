@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, compareAudioFormats } from "@/lib/utils";
 import { Loader2Icon } from "lucide-react";
 
 interface DownloadFormat {
@@ -18,6 +18,9 @@ interface DownloadButtonsProps {
 
 export function DownloadButtons({ formats, className }: DownloadButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
+  const orderedFormats = [...formats].sort((a, b) =>
+    compareAudioFormats(a.format, b.format),
+  );
 
   function handleClick(format: string) {
     setLoading(format);
@@ -26,7 +29,7 @@ export function DownloadButtons({ formats, className }: DownloadButtonsProps) {
 
   return (
     <div className={cn("flex gap-2", className)}>
-      {formats.map(({ format, href }) => {
+      {orderedFormats.map(({ format, href }) => {
         const label = loading === format ? (
           <><Loader2Icon className="h-4 w-4 animate-spin" /> Downloading</>
         ) : (

@@ -1128,15 +1128,15 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                     className="ml-auto"
                     formats={[
                       {
-                        format: "wav",
-                        href: track.existingWavStorageKey
-                          ? `/api/admin/download?trackId=${track.existingId}&format=wav`
-                          : null,
-                      },
-                      {
                         format: "mp3",
                         href: track.existingMp3StorageKey
                           ? `/api/admin/download?trackId=${track.existingId}&format=mp3`
+                          : null,
+                      },
+                      {
+                        format: "wav",
+                        href: track.existingWavStorageKey
+                          ? `/api/admin/download?trackId=${track.existingId}&format=wav`
                           : null,
                       },
                     ]}

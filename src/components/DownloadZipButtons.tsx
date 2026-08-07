@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, compareAudioFormats } from "@/lib/utils";
 import { Loader2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -98,6 +98,7 @@ export function DownloadZipButtons({
 }: DownloadZipButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [swState, setSwState] = useState<SwState>("registering");
+  const orderedFormats = [...availableFormats].sort(compareAudioFormats);
   const swRef = useRef<ServiceWorker | null>(null);
   // Tracks the active keepalive interval so we can clear it on unmount —
   // a click that fires the interval but then leaves the page (back to the
@@ -244,7 +245,7 @@ export function DownloadZipButtons({
     // doesn't try to SPA-navigate to an attachment response.
     return (
       <div className={cn("flex gap-2", className)}>
-        {availableFormats.map((format) => {
+        {orderedFormats.map((format) => {
           const href = `${streamEndpoint}?format=${encodeURIComponent(format)}`;
           return (
             <Button
@@ -274,7 +275,7 @@ export function DownloadZipButtons({
 
   return (
     <div className={cn("flex gap-2", className)}>
-      {availableFormats.map((format) => (
+      {orderedFormats.map((format) => (
         <Button
           key={format}
           type="button"
