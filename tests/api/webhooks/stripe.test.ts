@@ -196,7 +196,7 @@ describe("POST /api/webhooks/stripe", () => {
     });
     expect(order).not.toBeUndefined();
     expect(order?.email).toBe("");
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no customer_details.email"));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no customer email"));
     expect(emailSendStub).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();

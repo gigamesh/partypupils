@@ -56,7 +56,9 @@ vi.mock("@/lib/admin-auth", () => ({
 // `new Stripe()` calls made by the gigamusic checkout handler.
 const { stripeStub, emailSendStub } = vi.hoisted(() => ({
   stripeStub: {
-    checkout: { sessions: { create: vi.fn() } },
+    // `retrieve` backs the success page's on-demand fulfillment, which reads the
+    // session straight from Stripe rather than waiting for the webhook.
+    checkout: { sessions: { create: vi.fn(), retrieve: vi.fn() } },
     webhooks: { constructEvent: vi.fn() },
   },
   // Shared `send` mock backing `emailProvider().send(...)`. Tests can grab it

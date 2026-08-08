@@ -27,8 +27,8 @@ importers:
         specifier: ^4.3.0
         version: 4.3.0(@gigamusic/storage@3.0.0)
       '@gigamusic/checkout':
-        specifier: ^4.4.0
-        version: 4.4.0(@types/node@22.19.19)(drizzle-orm@0.45.2(@electric-sql/pglite@0.4.1)(@neondatabase/serverless@1.1.0)(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.20.0)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.20.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^4.5.0
+        version: 4.5.0(@types/node@22.19.19)(drizzle-orm@0.45.2(@electric-sql/pglite@0.4.1)(@neondatabase/serverless@1.1.0)(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.20.0)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.20.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@gigamusic/core':
         specifier: ^4.2.0
         version: 4.2.0
@@ -1085,8 +1085,8 @@ packages:
       '@gigamusic/storage':
         optional: true
 
-  '@gigamusic/checkout@4.4.0':
-    resolution: {integrity: sha512-AMb45a5R/S8eXg0KitmAjmOQDfHkkbbpwj+Z1QK/nLnRK8rxHkf8iTMLf/GU0aqE9cLFkqh6iSGIf3hnfNF7mw==}
+  '@gigamusic/checkout@4.5.0':
+    resolution: {integrity: sha512-JAp54TvJzxBhwKzXyibBzdXvkltO0JgkTBbYbKyCSw1DvvaOQ3F3B2SSew+Z2yz5YLx3jd0rta34UE4NllDbsQ==}
     peerDependencies:
       next: '>=15'
 
@@ -6682,7 +6682,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@gigamusic/checkout@4.4.0(@types/node@22.19.19)(drizzle-orm@0.45.2(@electric-sql/pglite@0.4.1)(@neondatabase/serverless@1.1.0)(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.20.0)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.20.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@gigamusic/checkout@4.5.0(@types/node@22.19.19)(drizzle-orm@0.45.2(@electric-sql/pglite@0.4.1)(@neondatabase/serverless@1.1.0)(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.20.0)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.20.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@gigamusic/core': 4.2.0
       '@gigamusic/db': 4.4.0(drizzle-orm@0.45.2(@electric-sql/pglite@0.4.1)(@neondatabase/serverless@1.1.0)(@prisma/client@7.6.0(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.20.0)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.6.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))(pg@8.20.0)
