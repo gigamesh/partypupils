@@ -54,7 +54,10 @@ export function BundlesSection({ bundles, catalog }: BundlesSectionProps) {
   if (cards.length === 0) return null;
 
   return (
-    <div className="mb-8 grid gap-3 md:grid-cols-2">
+    // A single card (the common case before any bundle is defined) stays full
+    // width — a lone half-width card with an empty column beside it reads as a
+    // layout bug rather than a deliberate grid.
+    <div className={cards.length > 1 ? "mb-8 grid gap-3 md:grid-cols-2" : "mb-8"}>
       {cards.map((card) => (
         <BundleCard key={card.kind === "catalog" ? "catalog" : card.id} bundle={card} />
       ))}
