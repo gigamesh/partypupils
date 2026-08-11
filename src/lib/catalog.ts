@@ -4,6 +4,7 @@ import { db, queries } from "./db";
 import { releases } from "@/db/schema";
 import { RELEASES_TAG } from "./cache-tags";
 import { CATALOG_DISCOUNT_KEY, DEFAULT_DISCOUNT_PERCENT } from "./constants";
+import { applyBundleDiscount } from "./pricing";
 
 /**
  * Resolves the configurable "buy whole catalog" discount percentage.
@@ -31,25 +32,31 @@ export const getCatalogPrice = unstable_cache(
   async () => {
     const [releaseRows, discountPercent] = await Promise.all([
       db
-        .select({ id: releases.id, price: releases.price })
+        .select({
+          id: releases.id,
+          price: releases.price,
+          coverImageUrl: releases.coverImageUrl,
+        })
         .from(releases)
         .where(eq(releases.isPublished, true)),
       getCatalogDiscount(),
     ]);
 
     const originalPrice = releaseRows.reduce((sum, r) => sum + r.price, 0);
-    // Round to whole dollars so the displayed price stays tidy.
-    const discountedPrice =
-      Math.round((originalPrice * (1 - discountPercent / 100)) / 100) * 100;
 
     return {
       originalPrice,
-      discountedPrice,
+      discountedPrice: applyBundleDiscount(originalPrice, discountPercent),
       discountPercent,
       releaseCount: releaseRows.length,
       releaseIds: releaseRows.map((r) => r.id),
+      coverImageUrls: releaseRows
+        .map((r) => r.coverImageUrl)
+        .filter((url): url is string => url !== null)
+        .slice(0, 4),
     };
   },
-  ["catalog-price-v1"],
+  // v2 adds `coverImageUrls`; a warm v1 entry would serve the card undefined covers.
+  ["catalog-price-v2"],
   { tags: [RELEASES_TAG], revalidate: 3600 },
 );

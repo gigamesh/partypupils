@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { db } from "@/lib/db";
 import { siteSettings } from "@/db/schema";
 import { verifyAdminSession } from "@/lib/admin-auth";
+import { RELEASES_TAG } from "@/lib/cache-tags";
+import { CATALOG_DISCOUNT_KEY } from "@/lib/constants";
 import { FAQ_SETTING_KEY } from "@/lib/faq-defaults";
 import { FaqContentSchema } from "@/lib/faq-schema";
 
 type ValidationResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Keys whose value feeds a `RELEASES_TAG`-cached read. Without this the
+ * catalog discount could take up to an hour (the ISR window on `/music`) to
+ * reach the storefront.
+ */
+const RELEASE_TAGGED_KEYS = new Set([CATALOG_DISCOUNT_KEY]);
 
 /** Per-key validators run before persisting site settings. Keys not listed here accept any string. */
 const VALIDATORS: Record<string, (raw: string) => ValidationResult> = {
@@ -44,6 +54,10 @@ export async function PUT(req: NextRequest) {
       set: { value },
     })
     .returning();
+
+  if (RELEASE_TAGGED_KEYS.has(key)) {
+    revalidateTag(RELEASES_TAG, "max");
+  }
 
   return NextResponse.json(setting);
 }
