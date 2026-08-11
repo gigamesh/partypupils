@@ -1,37 +1,39 @@
 "use client";
 
 import { createContext, useContext, useCallback, useSyncExternalStore, type ReactNode } from "react";
+import {
+  addCartItem,
+  bundleConflict,
+  cartItemKey,
+  coverageOf,
+  hasCatalog as hasCatalogItem,
+  isItemInCart,
+  removeCartItem,
+  type CartItem,
+  type CartItemRef,
+  type Coverage,
+} from "@/lib/cart-rules";
 
-export interface CartItem {
-  releaseId?: number;
-  trackId?: number;
-  catalogPurchase?: boolean;
-  name: string;
-  slug: string;
-  price: number;
-  coverImageUrl: string | null;
-  releaseName?: string;
-}
+export type { CartItem, CartItemRef, Coverage };
 
 interface CartContextType {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (item: CartItem) => void;
+  removeItem: (item: CartItemRef) => void;
   clearCart: () => void;
   itemCount: number;
   total: number;
-  isInCart: (item: { releaseId?: number; trackId?: number; catalogPurchase?: boolean }) => boolean;
+  isInCart: (item: CartItemRef) => boolean;
+  /** Why an item already counts as bought — lets the UI distinguish "in your cart" from "included in a bundle". */
+  coverage: (item: CartItemRef) => Coverage | null;
+  /** Why a bundle can't be added right now, or null if it can. */
+  conflictFor: (bundle: { bundleId: string; bundleReleaseIds: number[] }) => "catalog" | "overlap" | null;
   hasCatalog: boolean;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
 
 const CART_KEY = "party-pupils-cart";
-
-function cartItemKey(item: { releaseId?: number; trackId?: number; catalogPurchase?: boolean }): string {
-  if (item.catalogPurchase) return "catalog";
-  return item.releaseId ? `release-${item.releaseId}` : `track-${item.trackId}`;
-}
 
 let listeners: (() => void)[] = [];
 let snapshot: CartItem[] = [];
@@ -73,32 +75,25 @@ function emitChange(items: CartItem[]) {
 export function CartProvider({ children }: { children: ReactNode }) {
   const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const hasCatalog = items.some((i) => i.catalogPurchase);
+  const hasCatalog = hasCatalogItem(items);
 
-  const isInCart = useCallback(
-    (item: { releaseId?: number; trackId?: number; catalogPurchase?: boolean }) => {
-      if (item.catalogPurchase) return hasCatalog;
-      if (hasCatalog) return true;
-      const key = cartItemKey(item);
-      return items.some((i) => cartItemKey(i) === key);
-    },
-    [items, hasCatalog]
+  const isInCart = useCallback((item: CartItemRef) => isItemInCart(items, item), [items]);
+
+  const coverage = useCallback((item: CartItemRef) => coverageOf(items, item), [items]);
+
+  const conflictFor = useCallback(
+    (bundle: { bundleId: string; bundleReleaseIds: number[] }) => bundleConflict(items, bundle),
+    [items],
   );
 
   const addItem = useCallback((item: CartItem) => {
-    if (item.catalogPurchase) {
-      emitChange([item]);
-      return;
-    }
-    if (items.some((i) => i.catalogPurchase)) return;
-    const key = cartItemKey(item);
-    if (items.some((i) => cartItemKey(i) === key)) return;
-    emitChange([...items, item]);
+    const next = addCartItem(items, item);
+    // The rules return the same array when the add is a no-op.
+    if (next !== items) emitChange(next);
   }, [items]);
 
-  const removeItem = useCallback((item: { releaseId?: number; trackId?: number; catalogPurchase?: boolean }) => {
-    const key = cartItemKey(item);
-    emitChange(items.filter((i) => cartItemKey(i) !== key));
+  const removeItem = useCallback((item: CartItemRef) => {
+    emitChange(removeCartItem(items, item));
   }, [items]);
 
   const clearCart = useCallback(() => {
@@ -109,7 +104,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, clearCart, itemCount: items.length, total, isInCart, hasCatalog }}
+      value={{
+        items,
+        addItem,
+        removeItem,
+        clearCart,
+        itemCount: items.length,
+        total,
+        isInCart,
+        coverage,
+        conflictFor,
+        hasCatalog,
+      }}
     >
       {children}
     </CartContext.Provider>
@@ -121,3 +127,5 @@ export function useCart() {
   if (!ctx) throw new Error("useCart must be used within CartProvider");
   return ctx;
 }
+
+export { cartItemKey };

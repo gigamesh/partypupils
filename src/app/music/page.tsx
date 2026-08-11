@@ -1,7 +1,8 @@
-import { CatalogBanner } from "@/components/CatalogBanner";
+import { BundlesSection } from "@/components/BundlesSection";
 import { PartyPupilsRadioButton } from "@/components/PartyPupilsRadioButton";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { Button } from "@/components/ui/button";
+import { getPublishedBundles } from "@/lib/bundles";
 import { getCatalogPrice } from "@/lib/catalog";
 import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import { getPublishedReleases } from "@/lib/release-reads";
@@ -19,9 +20,10 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function MusicPage() {
-  const [releases, catalog] = await Promise.all([
+  const [releases, catalog, bundles] = await Promise.all([
     getPublishedReleases(),
     getCatalogPrice(),
+    getPublishedBundles(),
   ]);
 
   const releasesWithTracks = releases.map((r) => ({
@@ -41,7 +43,11 @@ export default async function MusicPage() {
         </div>
       </div>
 
-      {catalog.releaseCount > 1 && <CatalogBanner catalog={catalog} />}
+      <BundlesSection
+        bundles={bundles}
+        catalog={catalog.releaseCount > 1 ? catalog : null}
+      />
+
 
       {releases.length === 0 ? (
         <p className="text-muted-foreground">

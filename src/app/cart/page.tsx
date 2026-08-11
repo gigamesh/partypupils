@@ -3,7 +3,9 @@
 import Image from "@/components/Image";
 import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
+import { BundleCoverStack } from "@/components/BundleCoverStack";
 import { Button } from "@/components/ui/button";
+import { cartItemKey } from "@/lib/cart-rules";
 import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
@@ -11,6 +13,9 @@ export default function CartPage() {
   const { items, removeItem, total } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Bundles the server rejected as no longer available — an admin can delete a
+  // bundle while it's sitting in someone's localStorage.
+  const [staleBundleIds, setStaleBundleIds] = useState<string[]>([]);
 
   useEffect(() => {
     function handlePageShow(e: PageTransitionEvent) {
@@ -20,12 +25,20 @@ export default function CartPage() {
     return () => window.removeEventListener("pageshow", handlePageShow);
   }, []);
 
+  function removeStaleBundles() {
+    for (const bundleId of staleBundleIds) removeItem({ bundleId });
+    setStaleBundleIds([]);
+    setError("");
+  }
+
   async function handleCheckout() {
     setLoading(true);
     setError("");
+    setStaleBundleIds([]);
     try {
       const cartItems = items.map((i) => {
         if (i.catalogPurchase) return { kind: "catalog" as const };
+        if (i.bundleId) return { kind: "bundle" as const, bundleId: i.bundleId };
         if (i.trackId != null) return { kind: "track" as const, id: i.trackId };
         return { kind: "release" as const, id: i.releaseId };
       });
@@ -35,7 +48,16 @@ export default function CartPage() {
         body: JSON.stringify({ items: cartItems }),
       });
       if (!res.ok) {
-        setError("Checkout failed. Please try again.");
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          bundleIds?: string[];
+        };
+        if (res.status === 409 && body.error === "bundle-unavailable") {
+          setStaleBundleIds(body.bundleIds ?? []);
+          setError("A bundle in your cart is no longer available.");
+        } else {
+          setError("Checkout failed. Please try again.");
+        }
         setLoading(false);
         return;
       }
@@ -62,30 +84,42 @@ export default function CartPage() {
       <h1>Your Cart</h1>
       <div className="space-y-4">
         {items.map((item) => {
-          const key = item.catalogPurchase ? "catalog" : item.releaseId ? `release-${item.releaseId}` : `track-${item.trackId}`;
+          const key = cartItemKey(item);
+          const isBundle = Boolean(item.bundleId) || Boolean(item.catalogPurchase);
           return (
             <div
               key={key}
               className="flex items-center gap-4 rounded-lg border border-border p-4"
             >
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded bg-muted">
-                {item.coverImageUrl ? (
-                  <Image
-                    src={item.coverImageUrl}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                    sizes="64px"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xl text-muted-foreground">
-                    ♪
-                  </div>
-                )}
-              </div>
+              {isBundle ? (
+                <BundleCoverStack coverImageUrls={item.bundleCoverImageUrls ?? []} />
+              ) : (
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded bg-muted">
+                  {item.coverImageUrl ? (
+                    <Image
+                      src={item.coverImageUrl}
+                      alt={item.name}
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xl text-muted-foreground">
+                      ♪
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
-                {item.catalogPurchase ? (
-                  <span className="font-medium text-sm">{item.name}</span>
+                {isBundle ? (
+                  <div>
+                    <span className="font-medium text-sm">{item.name}</span>
+                    {item.bundleReleaseIds && (
+                      <p className="text-xs text-muted-foreground">
+                        {item.bundleReleaseIds.length} releases
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <Link
                     href={`/music/${item.slug}`}
@@ -109,7 +143,16 @@ export default function CartPage() {
           );
         })}
       </div>
-      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+      {error && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-destructive">{error}</p>
+          {staleBundleIds.length > 0 && (
+            <Button variant="secondary" size="sm" onClick={removeStaleBundles}>
+              Remove {staleBundleIds.length === 1 ? "it" : "them"}
+            </Button>
+          )}
+        </div>
+      )}
       <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
         <p className="text-lg font-semibold">Total: {formatCurrency(total)}</p>
         <Button onClick={handleCheckout} disabled={loading} size="lg">

@@ -121,6 +121,7 @@ export function ReleaseDetail({ release, header, highlightedTrackId }: Props) {
                       <AddToCartButton
                         item={{
                           trackId: track.id,
+                          parentReleaseId: release.id,
                           name: track.name,
                           slug: release.slug,
                           price: track.price,

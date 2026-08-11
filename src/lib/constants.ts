@@ -12,6 +12,9 @@ export const AUDIO_FORMATS = ["mp3", "wav"] as const;
 export const CATALOG_DISCOUNT_KEY = "catalog_discount_percent";
 export const DEFAULT_DISCOUNT_PERCENT = 15;
 
+// Admin-defined discounted bundles, stored as one JSON `site_settings` row.
+export const BUNDLES_SETTING_KEY = "custom_bundles";
+
 export const SEATED_ARTIST_ID = "f5bd3ef2-2234-4972-8124-93f835758465";
 export const SEATED_WIDGET_ID = "seated-55fdf2c0";
 
