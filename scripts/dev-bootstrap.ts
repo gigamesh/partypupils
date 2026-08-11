@@ -10,6 +10,11 @@
  *
  * Triggered by `pnpm dev`. Re-runnable safely; nothing is destructive after
  * the first run.
+ *
+ * Pass `--reseed` (or run `pnpm db:seed:force`) to wipe the seeded tables and
+ * reload the dump regardless of row count. Without it, a single hand-created
+ * release is enough to make step 5 skip forever, which silently leaves you
+ * with no catalog, no bundles, and no site settings.
  */
 import "@dotenvx/dotenvx/config";
 import { spawnSync } from "node:child_process";
@@ -57,20 +62,60 @@ async function main() {
   // Seed the catalog from db/seed.sql IF the DB is empty. Skipping when there's
   // already data preserves anything the dev creates locally — releases, link
   // pages, test orders, etc. — across restarts.
+  const reseed = process.argv.slice(2).includes("--reseed");
   const releaseCount = pgCount(url, "releases");
-  if (releaseCount === 0) {
-    console.log("🌱 Empty DB — loading db/seed.sql...");
-    const seed = spawnSync("psql", [url, "-f", resolve(REPO_ROOT, "db/seed.sql")], {
-      stdio: "inherit",
-      cwd: REPO_ROOT,
-    });
-    if (seed.status !== 0) die("seed load failed");
-    console.log(
-      `✅ Seeded (${pgCount(url, "releases")} releases, ${pgCount(url, "tracks")} tracks)`,
-    );
-  } else {
+
+  if (releaseCount > 0 && !reseed) {
     console.log(`✅ DB already has data (${releaseCount} releases) — skipping seed`);
+    console.log("   Run `pnpm db:seed:force` to wipe and reload db/seed.sql.");
+    return;
   }
+
+  if (reseed && releaseCount > 0) {
+    console.log(`🧹 Reseeding — clearing ${releaseCount} existing release(s)...`);
+    truncateSeededTables(url);
+  } else {
+    console.log("🌱 Empty DB — loading db/seed.sql...");
+  }
+
+  const seed = spawnSync("psql", [url, "-f", resolve(REPO_ROOT, "db/seed.sql")], {
+    stdio: "inherit",
+    cwd: REPO_ROOT,
+  });
+  if (seed.status !== 0) die("seed load failed");
+  console.log(
+    `✅ Seeded (${pgCount(url, "releases")} releases, ${pgCount(url, "tracks")} tracks)`,
+  );
+}
+
+/**
+ * Every table `db/seed.sql` populates. The dump is data-only — it carries no
+ * TRUNCATEs of its own — so a reload onto a populated DB would collide on
+ * primary keys and, worse, rewind the sequences via the dump's trailing
+ * `setval` calls. Clearing first keeps ids and sequences consistent.
+ *
+ * `CASCADE` covers FK dependents; `RESTART IDENTITY` resets the sequences the
+ * dump is about to set explicitly.
+ */
+function truncateSeededTables(url: string): void {
+  const tables = [
+    "order_items",
+    "orders",
+    "download_tokens",
+    "track_files",
+    "tracks",
+    "link_page_items",
+    "link_pages",
+    "releases",
+    "links",
+    "site_settings",
+  ];
+  const result = spawnSync(
+    "psql",
+    [url, "-v", "ON_ERROR_STOP=1", "-c", `TRUNCATE ${tables.join(", ")} RESTART IDENTITY CASCADE`],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) die(`Failed to clear seeded tables: ${result.stderr}`);
 }
 
 main().catch((err) => {
