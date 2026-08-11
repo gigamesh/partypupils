@@ -38,7 +38,7 @@ export default function CartPage() {
     try {
       const cartItems = items.map((i) => {
         if (i.catalogPurchase) return { kind: "catalog" as const };
-        if (i.bundleId) return { kind: "bundle" as const, id: i.bundleId };
+        if (i.bundleId) return { kind: "bundle" as const, bundleId: i.bundleId };
         if (i.trackId != null) return { kind: "track" as const, id: i.trackId };
         return { kind: "release" as const, id: i.releaseId };
       });

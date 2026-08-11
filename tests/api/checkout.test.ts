@@ -70,7 +70,7 @@ describe("bundle checkout", () => {
     await storeBundle({ releaseIds: [a.id, b.id], discountPercent: 20 });
     mockSession();
 
-    const res = await POST(checkoutRequest([{ kind: "bundle", id: "summer" }]));
+    const res = await POST(checkoutRequest([{ kind: "bundle", bundleId: "summer" }]));
     expect(res.status).toBe(200);
 
     const params = lastSessionParams();
@@ -98,7 +98,7 @@ describe("bundle checkout", () => {
 
     const res = await POST(
       checkoutRequest([
-        { kind: "bundle", id: "summer" },
+        { kind: "bundle", bundleId: "summer" },
         { kind: "release", id: loose.id },
         { kind: "track", id: track.id },
       ]),
@@ -123,7 +123,7 @@ describe("bundle checkout", () => {
     // A stale cart can hold both the bundle and one of its member releases.
     const res = await POST(
       checkoutRequest([
-        { kind: "bundle", id: "summer" },
+        { kind: "bundle", bundleId: "summer" },
         { kind: "release", id: a.id },
       ]),
     );
@@ -143,7 +143,7 @@ describe("bundle checkout", () => {
     await storeBundle({ releaseIds: [a.id, b.id], discountPercent: 95 });
     mockSession();
 
-    await POST(checkoutRequest([{ kind: "bundle", id: "summer" }]));
+    await POST(checkoutRequest([{ kind: "bundle", bundleId: "summer" }]));
     const params = lastSessionParams();
     expect(params.line_items[0]!.price_data.unit_amount).toBe(50);
     expect(sumAmounts(params.metadata)).toBe(50);
@@ -155,7 +155,7 @@ describe("bundle checkout", () => {
     await storeBundle({ releaseIds: [a.id, b.id], published: false });
     mockSession();
 
-    const res = await POST(checkoutRequest([{ kind: "bundle", id: "summer" }]));
+    const res = await POST(checkoutRequest([{ kind: "bundle", bundleId: "summer" }]));
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "bundle-unavailable", bundleIds: ["summer"] });
     expect(vi.mocked(stripe().checkout.sessions.create)).not.toHaveBeenCalled();
@@ -168,7 +168,7 @@ describe("bundle checkout", () => {
     mockSession();
 
     const res = await POST(
-      checkoutRequest([{ kind: "bundle", id: "summer" }, { kind: "catalog" }]),
+      checkoutRequest([{ kind: "bundle", bundleId: "summer" }, { kind: "catalog" }]),
     );
     expect(res.status).toBe(400);
     expect(vi.mocked(stripe().checkout.sessions.create)).not.toHaveBeenCalled();
@@ -218,7 +218,7 @@ describe("bundle fulfillment metadata", () => {
     await storeBundle({ releaseIds: [a.id, b.id], discountPercent: 20 });
     mockSession();
 
-    await POST(checkoutRequest([{ kind: "bundle", id: "summer" }]));
+    await POST(checkoutRequest([{ kind: "bundle", bundleId: "summer" }]));
     const { metadata } = lastSessionParams();
 
     const { fulfillCheckoutSession } = await import("@gigamusic/checkout");

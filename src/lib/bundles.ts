@@ -116,3 +116,11 @@ export const getPublishedBundles = unstable_cache(
 export async function getBundleForCheckout(id: string): Promise<PricedBundle | undefined> {
   return (await getPublishedBundles()).find((b) => b.id === id);
 }
+
+/** Stripe line-item name for a bundle — what the customer sees on the receipt. */
+export function bundleProductName(bundle: PricedBundle): string {
+  const count = `${bundle.members.length} releases`;
+  return bundle.discountPercent > 0
+    ? `${bundle.name} (${count}, ${bundle.discountPercent}% off)`
+    : `${bundle.name} (${count})`;
+}
