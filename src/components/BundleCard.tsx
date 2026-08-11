@@ -56,7 +56,10 @@ export function BundleCard({ bundle }: { bundle: BundleCardData }) {
     // @container so the card lays itself out by its own width, not the
     // viewport's — in the 2-up grid a "tablet" viewport gives it half that.
     <div className="@container rounded-lg glass-panel p-4">
-      <div className="flex flex-col gap-3 @md:flex-row @md:items-center @md:justify-between">
+      {/* h-full so content centres inside the panel the grid stretched to the
+          row height — without it a card with no description hugs the top while
+          its taller neighbour fills the row. */}
+      <div className="flex h-full flex-col gap-3 @md:flex-row @md:items-center @md:justify-between">
         <div className="flex items-center gap-3">
           <BundleCoverStack coverImageUrls={bundle.coverImageUrls} />
           <div>

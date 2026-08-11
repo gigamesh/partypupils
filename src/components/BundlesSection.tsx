@@ -41,7 +41,10 @@ export function BundlesSection({ bundles, catalog }: BundlesSectionProps) {
   if (catalog) {
     cards.push({
       kind: "catalog",
-      name: "Buy the Complete Catalog",
+      // A title, like the bundle names beside it — the old banner's
+      // "Buy the Complete Catalog" read as a CTA and made this card look
+      // like a different kind of thing from the cards next to it.
+      name: "Complete Catalog",
       originalPrice: catalog.originalPrice,
       discountedPrice: catalog.discountedPrice,
       discountPercent: catalog.discountPercent,
