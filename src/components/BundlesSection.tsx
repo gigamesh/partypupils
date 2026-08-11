@@ -54,7 +54,7 @@ export function BundlesSection({ bundles, catalog }: BundlesSectionProps) {
   if (cards.length === 0) return null;
 
   return (
-    <div className="mb-8 space-y-3">
+    <div className="mb-8 grid gap-3 md:grid-cols-2">
       {cards.map((card) => (
         <BundleCard key={card.kind === "catalog" ? "catalog" : card.id} bundle={card} />
       ))}

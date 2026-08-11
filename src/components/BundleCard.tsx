@@ -53,8 +53,10 @@ export function BundleCard({ bundle }: { bundle: BundleCardData }) {
   const discounted = bundle.discountPercent > 0 && bundle.originalPrice > bundle.discountedPrice;
 
   return (
-    <div className="rounded-lg glass-panel p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    // @container so the card lays itself out by its own width, not the
+    // viewport's — in the 2-up grid a "tablet" viewport gives it half that.
+    <div className="@container rounded-lg glass-panel p-4">
+      <div className="flex flex-col gap-3 @md:flex-row @md:items-center @md:justify-between">
         <div className="flex items-center gap-3">
           <BundleCoverStack coverImageUrls={bundle.coverImageUrls} />
           <div>
