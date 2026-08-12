@@ -18,8 +18,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
-import { presignAndUpload } from "@/lib/upload-client";
-import { oversizeAudioMessage } from "@/lib/upload-limits";
+import { presignAndUpload, type UploadProgress } from "@/lib/upload-client";
+import { formatBytes, oversizeAudioMessage } from "@/lib/upload-limits";
 import { SESSION_EXPIRED_MESSAGE, throwIfSessionExpired } from "@/lib/session-expired";
 import { combinedName, deriveTrackArtistTitle } from "@/lib/track-name";
 import {
@@ -206,6 +206,21 @@ function existingAudioFormatsOf(track: TrackInput): AudioFormat[] {
   return formats;
 }
 
+/** `2m 30s` / `45s` remaining at the current rate, or null when not yet measurable. */
+function etaLabel(transfer: {
+  loaded: number;
+  total: number;
+  bytesPerSecond: number | null;
+}): string | null {
+  if (!transfer.bytesPerSecond) return null;
+  const seconds = Math.round(
+    (transfer.total - transfer.loaded) / transfer.bytesPerSecond,
+  );
+  if (seconds <= 0) return null;
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
 /** Size-limit message for a picked file, or null when it fits. */
 function oversizeMessage(file: File): string | null {
   const format = audioFormatOf(file);
@@ -313,6 +328,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  /** Byte-level state for the file currently on the wire; null between files. */
+  const [transfer, setTransfer] = useState<{
+    fileName: string;
+    loaded: number;
+    total: number;
+    bytesPerSecond: number | null;
+  } | null>(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [unpublishConfirmOpen, setUnpublishConfirmOpen] = useState(false);
@@ -551,7 +573,10 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     artUrl: string | null,
   ): Promise<{ url: string; mp3Url: string }> {
     const key = `${prefix}/${file.name}`;
-    const url = await presignAndUpload(file, key);
+    const url = await presignAndUpload(file, key, setTransferFor(file));
+    // Transcoding gives no progress signal of its own, so the bar switches to
+    // indeterminate rather than sitting at a misleading 100%.
+    setTransfer(null);
 
     const processRes = await fetch("/api/admin/upload/process", {
       method: "POST",
@@ -578,7 +603,29 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
   async function uploadFile(file: File, prefix: string): Promise<string> {
     const key = `${prefix}/${file.name}`;
-    return presignAndUpload(file, key);
+    const url = await presignAndUpload(file, key, setTransferFor(file));
+    setTransfer(null);
+    return url;
+  }
+
+  /**
+   * Progress sink for one file's transfer. Rate is measured from the first
+   * callback rather than the click, so it reflects the transfer itself and
+   * isn't dragged down by the presign round-trip that precedes it.
+   */
+  function setTransferFor(file: File) {
+    let startedAt = 0;
+    return ({ loaded, total }: UploadProgress) => {
+      const now = performance.now();
+      if (!startedAt) startedAt = now;
+      const elapsed = (now - startedAt) / 1000;
+      setTransfer({
+        fileName: file.name,
+        loaded,
+        total,
+        bytesPerSecond: elapsed > 0.5 ? loaded / elapsed : null,
+      });
+    };
   }
 
   const missingWavMaster = tracksMissingWavMaster(buildFormState());
@@ -863,6 +910,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       setLoading(false);
       setStatus("");
       setProgress({ current: 0, total: 0 });
+      setTransfer(null);
       router.push(`/admin/releases/${saved.id}/edit`);
       router.refresh();
     } catch (err) {
@@ -870,6 +918,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
       setStatus("");
+      setTransfer(null);
     }
   }
 
@@ -1421,6 +1470,34 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 className="h-full bg-neon rounded-full transition-all duration-300"
                 style={{ width: `${(progress.current / progress.total) * 100}%` }}
               />
+            </div>
+          )}
+          {/*
+            The step bar above only moves once per file. A mix is a couple
+            hundred MB, so without a byte-level bar the whole transfer looks
+            like one frozen step for minutes on end.
+          */}
+          {transfer && transfer.total > 0 && (
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="truncate pr-2">{transfer.fileName}</span>
+                <span className="whitespace-nowrap">
+                  {formatBytes(transfer.loaded)} / {formatBytes(transfer.total)}
+                  {transfer.bytesPerSecond
+                    ? ` · ${formatBytes(transfer.bytesPerSecond)}/s${
+                        etaLabel(transfer) ? ` · ${etaLabel(transfer)} left` : ""
+                      }`
+                    : ""}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-neon/70 rounded-full"
+                  style={{
+                    width: `${(transfer.loaded / transfer.total) * 100}%`,
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>

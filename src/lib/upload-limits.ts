@@ -23,10 +23,16 @@ export const AUDIO_UPLOAD_LIMITS = {
 
 export type LimitedAudioFormat = keyof typeof AUDIO_UPLOAD_LIMITS;
 
-/** Human-readable size, e.g. `1.2 GB` / `240 MB`. */
+/**
+ * Human-readable size, e.g. `1.2 GB` / `240 MB` / `3.4 MB` / `812 KB`. Also
+ * used for transfer rates, which is why sub-megabyte values still need to read
+ * sensibly rather than collapsing to `0 MB`.
+ */
 export function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  return `${Math.round(bytes / 1024 ** 2)} MB`;
+  if (bytes >= 10 * 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
 }
 
 /**

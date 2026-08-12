@@ -14,9 +14,69 @@ import { SessionExpiredError, throwIfSessionExpired } from "@/lib/session-expire
 
 const fetchMock = vi.fn();
 
+/**
+ * Minimal XMLHttpRequest stand-in. The R2 PUT moved off `fetch` because
+ * `fetch` can't report upload progress, so the bytes leg has to be stubbed
+ * separately from the presign leg.
+ */
+class FakeXhr {
+  static instances: FakeXhr[] = [];
+  /** Status the next `send()` completes with. */
+  static nextStatus = 200;
+  /** When set, `send()` fires an `error` event instead of `load`. */
+  static failWithNetworkError = false;
+
+  method = "";
+  url = "";
+  headers: Record<string, string> = {};
+  body: unknown = null;
+  status = 0;
+
+  private listeners: Record<string, ((e: unknown) => void)[]> = {};
+  private uploadListeners: Record<string, ((e: unknown) => void)[]> = {};
+
+  readonly upload = {
+    addEventListener: (type: string, fn: (e: unknown) => void) => {
+      (this.uploadListeners[type] ??= []).push(fn);
+    },
+  };
+
+  constructor() {
+    FakeXhr.instances.push(this);
+  }
+
+  open(method: string, url: string) {
+    this.method = method;
+    this.url = url;
+  }
+  setRequestHeader(name: string, value: string) {
+    this.headers[name] = value;
+  }
+  addEventListener(type: string, fn: (e: unknown) => void) {
+    (this.listeners[type] ??= []).push(fn);
+  }
+  send(body: unknown) {
+    this.body = body;
+    // Emit one progress tick so tests can observe the callback wiring.
+    for (const fn of this.uploadListeners.progress ?? []) {
+      fn({ lengthComputable: true, loaded: 3, total: 3 });
+    }
+    if (FakeXhr.failWithNetworkError) {
+      for (const fn of this.listeners.error ?? []) fn({});
+      return;
+    }
+    this.status = FakeXhr.nextStatus;
+    for (const fn of this.listeners.load ?? []) fn({});
+  }
+}
+
 beforeEach(() => {
   fetchMock.mockReset();
+  FakeXhr.instances = [];
+  FakeXhr.nextStatus = 200;
+  FakeXhr.failWithNetworkError = false;
   vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("XMLHttpRequest", FakeXhr);
 });
 
 afterEach(() => {
@@ -29,9 +89,10 @@ function wavFile(type = "audio/wav"): File {
   return new File([new Uint8Array([1, 2, 3])], "track.wav", { type });
 }
 
-/** Queue the presign response, then the R2 PUT response. */
-function mockPresignThenPut(presign: Response, put = new Response("", { status: 200 })) {
-  fetchMock.mockResolvedValueOnce(presign).mockResolvedValueOnce(put);
+/** Queue the presign response; the R2 PUT is served by `FakeXhr`. */
+function mockPresignThenPut(presign: Response, putStatus = 200) {
+  fetchMock.mockResolvedValueOnce(presign);
+  FakeXhr.nextStatus = putStatus;
 }
 
 function presignOk() {
@@ -60,10 +121,36 @@ describe("presignAndUpload", () => {
 
     // The bytes go to R2 directly — never to a function, so the request-size
     // cap that broke the transcode call can't apply to the audio itself.
-    const [putUrl, putInit] = fetchMock.mock.calls[1];
-    expect(putUrl).toBe("https://r2.example/signed?sig=abc");
-    expect(putInit.method).toBe("PUT");
-    expect(putInit.headers["Content-Type"]).toBe("audio/wav");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const put = FakeXhr.instances[0];
+    expect(put.url).toBe("https://r2.example/signed?sig=abc");
+    expect(put.method).toBe("PUT");
+    expect(put.headers["Content-Type"]).toBe("audio/wav");
+  });
+
+  it("reports upload progress so a long transfer doesn't look hung", async () => {
+    mockPresignThenPut(presignOk());
+    const seen: { loaded: number; total: number }[] = [];
+
+    await presignAndUpload(wavFile(), WAV_KEY, (p) => seen.push(p));
+
+    expect(seen).toEqual([{ loaded: 3, total: 3 }]);
+  });
+
+  it("does not require a progress callback", async () => {
+    mockPresignThenPut(presignOk());
+    await expect(presignAndUpload(wavFile(), WAV_KEY)).resolves.toBe(
+      "https://cdn.example/track.wav",
+    );
+  });
+
+  it("throws when the connection drops mid-transfer", async () => {
+    fetchMock.mockResolvedValueOnce(presignOk());
+    FakeXhr.failWithNetworkError = true;
+
+    await expect(presignAndUpload(wavFile(), WAV_KEY)).rejects.toThrow(
+      "Failed to upload file",
+    );
   });
 
   it("throws SessionExpiredError on a 401 from the auth gate", async () => {
@@ -108,7 +195,7 @@ describe("presignAndUpload", () => {
   });
 
   it("throws when the R2 PUT itself fails", async () => {
-    mockPresignThenPut(presignOk(), new Response("", { status: 403 }));
+    mockPresignThenPut(presignOk(), 403);
 
     await expect(presignAndUpload(wavFile(), WAV_KEY)).rejects.toThrow("Failed to upload file");
   });
