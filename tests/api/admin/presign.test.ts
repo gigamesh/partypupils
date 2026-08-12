@@ -86,6 +86,54 @@ describe("POST /api/admin/upload/presign", () => {
 });
 
 /**
+ * The size ceilings exist because every server-side path that touches a whole
+ * audio file does it through the 500 MB of `/tmp` a function gets. Refusing at
+ * presign is the only chance to fail fast — the bytes go straight to R2 after
+ * this, so nothing downstream sees the file until it's already uploaded.
+ */
+describe("presign audio size ceilings", () => {
+  const MB = 1024 * 1024;
+
+  it("413s a WAV over the transcode ceiling", async () => {
+    const res = await presign(
+      jsonReq({ key: "audio/x/1/t.wav", contentType: "audio/wav", size: 300 * MB }),
+    );
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/over the 200 MB limit/);
+    expect(getPresignedUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("413s an MP3 over the retag ceiling", async () => {
+    const res = await presign(
+      jsonReq({ key: "audio/x/1/mix.mp3", contentType: "audio/mpeg", size: 300 * MB }),
+    );
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/over the 240 MB limit/);
+  });
+
+  it("allows an MP3 that a WAV of the same size would fail", async () => {
+    const res = await presign(
+      jsonReq({ key: "audio/x/1/mix.mp3", contentType: "audio/mpeg", size: 220 * MB }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("ignores size on non-audio keys", async () => {
+    const res = await presign(
+      jsonReq({ key: "images/cover.jpg", contentType: "image/jpeg", size: 900 * MB }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("passes through when no size is reported", async () => {
+    const res = await presign(
+      jsonReq({ key: "audio/x/1/t.wav", contentType: "audio/wav" }),
+    );
+    expect(res.status).toBe(200);
+  });
+});
+
+/**
  * Real filenames come off a mastering engineer's drive untouched — the form
  * uses `file.name` verbatim — so the key allowlist has to survive spaces,
  * parens, apostrophes and ampersands. A rejection here reads as a generic

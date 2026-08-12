@@ -50,9 +50,12 @@ describe("presignAndUpload", () => {
 
     const [presignUrl, presignInit] = fetchMock.mock.calls[0];
     expect(presignUrl).toBe("/api/admin/upload/presign");
+    // `size` lets the presign route reject an oversized audio file up front,
+    // before the client spends minutes pushing bytes at R2.
     expect(JSON.parse(presignInit.body)).toEqual({
       key: WAV_KEY,
       contentType: "audio/wav",
+      size: 3,
     });
 
     // The bytes go to R2 directly — never to a function, so the request-size

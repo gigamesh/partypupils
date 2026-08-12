@@ -213,6 +213,44 @@ function oversizeMessage(file: File): string | null {
   return oversizeAudioMessage(file.name, file.size, format);
 }
 
+/**
+ * Turn a failed `/upload/process` response into something an admin can act on.
+ *
+ * Transcoding runs in a function with 500 MB of `/tmp` and a 300s ceiling, and
+ * it writes ~2.2x the source size before cleaning up. Both limits are reached
+ * by the same thing — a WAV that's too long — but they surface as completely
+ * different errors (a disk-full ffmpeg exit vs. a gateway timeout with no JSON
+ * body at all). Naming the cause beats echoing "Transcoding failed".
+ */
+function transcodeFailureMessage(
+  file: File,
+  status: number,
+  data: Record<string, unknown>,
+): string {
+  const detail = String(data.mp3Error || data.error || "");
+
+  if (status === 504 || status === 408) {
+    return (
+      `Transcoding "${file.name}" timed out. The file is long enough that ` +
+      `encoding exceeds the server's time limit — bounce a shorter master, or ` +
+      `upload a 320kbps MP3 instead.`
+    );
+  }
+  if (/ENOSPC|no space left/i.test(detail)) {
+    return (
+      `Transcoding "${file.name}" ran out of disk. The file is too large to ` +
+      `transcode server-side — upload a 320kbps MP3 instead.`
+    );
+  }
+  if (/heap|out of memory|ENOMEM/i.test(detail)) {
+    return (
+      `Transcoding "${file.name}" ran out of memory. Upload a 320kbps MP3 ` +
+      `instead, or bounce a shorter master.`
+    );
+  }
+  return `Transcoding "${file.name}" failed: ${detail || "Unknown error"}`;
+}
+
 /** Read a Blob into a base64 `data:` URL — used for inline artwork preview and transport. */
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -528,8 +566,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     const data = await readJsonBody(processRes);
 
     if (!processRes.ok) {
-      const detail = data.mp3Error || data.error || "Unknown error";
-      throw new Error(`Transcoding ${file.name} failed: ${String(detail)}`);
+      throw new Error(transcodeFailureMessage(file, processRes.status, data));
     }
     const mp3Url = typeof data.mp3Url === "string" ? data.mp3Url : "";
     if (!mp3Url) {
