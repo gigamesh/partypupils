@@ -3,6 +3,24 @@
 Goal: sell full DJ mixes (~60–120 min) alongside the existing track catalog,
 with an upload UX that doesn't feel broken.
 
+## Status
+
+| Section | State |
+|---|---|
+| §3.1 Allow MP3-only releases | **Done** — `ae8bcd8` |
+| §3.4 Guardrails | **Done** — `2bb2dc7` |
+| §3.5 Download paths | **Done** — `2bb2dc7`; every download surface already derived formats from actual files, so only the admin zip's misleading 404 needed fixing |
+| §3.3 Byte-level upload progress | **Done** — `bb051e0` |
+| §3.3 Multipart resume/retry | **Blocked** — needs R2 bucket CORS to expose `ETag` |
+| §3.2 Buffer-only MP3 retag | **Not started** — lives in the `gigamusic` repo, needs a publish |
+
+Mixes up to **240 MB (~100 min at 320 kbps)** are shippable today. Lifting that
+ceiling is §3.2.
+
+Two design decisions changed during the build, both recorded in place below:
+the "mix" release type was dropped (§3.1), and multipart was deferred behind
+byte progress (§3.3).
+
 ## Decisions (locked)
 
 | Question | Decision |
@@ -83,10 +101,16 @@ real mix.
 ### 3.1 Allow MP3-only releases — `party-pupils`
 
 - **`src/lib/release-validation.ts:56-61`** — `publishedTrackSchema` hard-requires
-  a WAV (`"A WAV file is required"`). Needs to accept an MP3-only track. Decide
-  whether this is a per-release flag (a "mix" release type) or a blanket
-  relaxation to "at least one audio file". A flag is safer — it keeps the
-  existing guarantee that normal releases ship a lossless master.
+  a WAV (`"A WAV file is required"`). Needs to accept an MP3-only track.
+
+  **Decided: blanket relaxation to "at least one audio file", not a "mix"
+  release type.** The flag looked safer on paper, but `releases.type` is a
+  Postgres enum (`ReleaseType`) defined in `@gigamusic/db`
+  (`schema/releases.ts:14`) and shared by every artist site — a new value means
+  a package change, a publish, *and* a migration. The lost guarantee (normal
+  releases ship a master) is recovered by warning instead of blocking:
+  `tracksMissingWavMaster` flags MP3-only tracks in the form. A real `mix` type
+  stays additive if it's ever wanted.
 - **`src/app/admin/releases/ReleaseForm.tsx:1155`** — the file input is
   `accept=".wav"`. Needs to accept `.mp3` for mix releases.
 - **Upload flow** — mixes skip `/api/admin/upload/process` entirely (it rejects
@@ -119,23 +143,34 @@ Together these lift the MP3 ceiling from ~250 MB to memory-bound.
 Independent of everything above, and the biggest UX win. A 250 MB MP3 over a
 typical upstream connection is several minutes on a single non-resumable PUT.
 
-- **`src/lib/upload-client.ts`** — replace the single `fetch` PUT with chunked R2
-  multipart: per-part upload, per-part retry with backoff, byte-level progress,
-  resume from last completed part. 8–16 MB parts.
-- **Progress requires XHR.** `fetch` has no upload-progress hook (`response.body`
-  is download-only; `duplex: 'half'` is Chromium-only). Use
-  `xhr.upload.addEventListener("progress", …)` per part, or derive coarse
-  progress from completed part count.
-- **Multipart presign routes** — create / sign-part / complete / abort. Extend
-  `createAdminUploadPresignHandler` (`packages/admin/src/handlers/upload.ts`),
-  exposed here under `src/app/api/admin/upload/`. Keep the existing single-PUT
-  path for images and small audio.
-- **R2 CORS** — must allow the part PUTs and **expose `ETag`**; multipart
-  completion fails without it. Easy to miss, fails late.
-- **`ReleaseForm.tsx:1280-1291`** — the current bar is a step counter that sits
-  frozen for the whole transfer. Add a per-file byte bar with rate + ETA; keep
-  the step counter as the outer track-level indicator.
-- **R2 lifecycle rule** to abort incomplete multipart uploads after ~7 days.
+**Split into two shippable halves.** Progress needs nothing but a client
+change; resume needs bucket configuration this repo can't make. Shipping them
+together would have meant shipping a broken upload path that only works once
+someone updates CORS, so progress went first.
+
+Done (`bb051e0`):
+
+- **`src/lib/upload-client.ts`** — the R2 PUT moved from `fetch` to
+  `XMLHttpRequest` with an `onProgress` callback. `fetch` has no
+  upload-progress hook at all: `Response.body` covers the download direction
+  only, and request streaming (`duplex: "half"`) is Chromium-only. `xhr.upload`
+  is the one portable way to watch bytes leave the browser.
+- **`ReleaseForm.tsx`** — per-file byte bar with size, rate and ETA under the
+  existing step counter. Goes indeterminate during transcode rather than
+  parking at a misleading 100%.
+
+Remaining, blocked on bucket config:
+
+- **Chunked multipart** for per-part retry and resume from the last completed
+  part — 8–16 MB parts, via create / sign-part / complete / abort routes.
+  `@aws-sdk/client-s3` is already a direct dependency here, so these can be
+  local routes rather than a `packages/admin` change.
+- **R2 CORS must expose `ETag`** — multipart completion needs the per-part
+  ETags, and a browser can't read that header without it. This is the actual
+  blocker: without it the upload fails at the completion step, after
+  transferring every byte.
+- **R2 lifecycle rule** to abort incomplete multipart uploads after ~7 days,
+  or abandoned parts accrue storage cost silently.
 
 ### 3.4 Guardrails — `party-pupils`
 
