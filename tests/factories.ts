@@ -33,6 +33,7 @@ export async function makeRelease(overrides: Partial<{
 
 export async function makeTrackWithFile(releaseId: number, overrides: Partial<{
   name: string;
+  slug: string;
   trackNumber: number;
   price: number;
   storageKey: string;
@@ -44,7 +45,7 @@ export async function makeTrackWithFile(releaseId: number, overrides: Partial<{
       .values({
         releaseId,
         name: overrides.name ?? "Test Track",
-        slug: `track-${Math.random().toString(36).slice(2, 10)}`,
+        slug: overrides.slug ?? `track-${Math.random().toString(36).slice(2, 10)}`,
         trackNumber: overrides.trackNumber ?? 1,
         price: overrides.price ?? 150,
       })
