@@ -3,7 +3,7 @@ import { PlayButton } from "@/components/PlayButton";
 import { TrackProgress } from "@/components/TrackProgress";
 import { TracklistRowLink } from "@/components/TracklistRowLink";
 import type { PlayerTrack } from "@/lib/player-types";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 export interface TrackRowTrack {
   id: number;
@@ -27,6 +27,8 @@ interface Props {
   playerTrack: PlayerTrack | null;
   /** Renders the row in neon and drops the link, for the track's own page. */
   highlighted?: boolean;
+  /** Extra classes on the row container — the search results add `glass-panel`. */
+  className?: string;
 }
 
 /**
@@ -34,10 +36,19 @@ interface Props {
  * progress bar. Shared by the release tracklist, the song page and the /music
  * search results.
  */
-export function TrackRow({ track, release, playerTrack, highlighted = false }: Props) {
-  const rowClass = highlighted
-    ? "rounded-lg border border-neon bg-neon/10 p-3"
-    : "rounded-lg border border-border p-3";
+export function TrackRow({
+  track,
+  release,
+  playerTrack,
+  highlighted = false,
+  className,
+}: Props) {
+  const rowClass = cn(
+    highlighted
+      ? "rounded-lg border border-neon bg-neon/10 p-3"
+      : "rounded-lg border border-border p-3",
+    className,
+  );
   const numberClass = highlighted
     ? "text-sm text-neon w-6 text-right"
     : "text-sm text-muted-foreground w-6 text-right";

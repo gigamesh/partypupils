@@ -35,7 +35,11 @@ export function MusicSearch({ index, children }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search songs..."
           aria-label="Search songs"
-          className="h-10"
+          // `glass-panel` fills near-black; the white overlay lifts the box off
+          // the result cards below it. Both halves of the pair are needed —
+          // Input's base `dark:bg-input/30` is variant-scoped, so it outranks a
+          // plain `bg-white/*` on specificity.
+          className="glass-panel h-10 bg-white/10 dark:bg-white/10"
         />
       </div>
 
@@ -53,6 +57,7 @@ export function MusicSearch({ index, children }: Props) {
               track={result.track}
               release={result.release}
               playerTrack={result.playerTrack}
+              className="glass-panel"
             />
           ))}
         </div>
