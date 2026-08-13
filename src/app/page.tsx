@@ -28,8 +28,8 @@ export default async function HomePage() {
   return (
     <div>
       <HashScroll />
-      <section className="relative min-h-[85dvh] flex items-center justify-center px-4 pt-16 pb-32">
-        <div className="relative w-full max-w-5xl min-h-[75dvh] flex items-center justify-center glass-panel backdrop-blur-none overflow-hidden">
+      <section className="relative min-h-[70dvh] md:min-h-[85dvh] flex items-center justify-center px-4 pt-4 pb-20 md:pt-16 md:pb-32">
+        <div className="relative w-full max-w-5xl min-h-[60dvh] md:min-h-[75dvh] flex items-center justify-center glass-panel backdrop-blur-none overflow-hidden">
           <div className="relative z-10 flex w-full max-w-5xl items-center justify-center">
             <div className="flex-1 flex justify-center md:-translate-x-[15%]">
               <Image
