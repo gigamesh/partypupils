@@ -1,10 +1,12 @@
 import { BundlesSection } from "@/components/BundlesSection";
+import { FeaturedSongCard } from "@/components/FeaturedSongCard";
 import { MusicSearch } from "@/components/MusicSearch";
 import { PartyPupilsRadioButton } from "@/components/PartyPupilsRadioButton";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { Button } from "@/components/ui/button";
 import { getPublishedBundles } from "@/lib/bundles";
 import { getCatalogPrice } from "@/lib/catalog";
+import { findFeaturedSong, getFeaturedSongTrackId } from "@/lib/featured-song";
 import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import { getPublishedReleases } from "@/lib/release-reads";
 import { buildTrackSearchIndex } from "@/lib/track-search";
@@ -22,10 +24,11 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function MusicPage() {
-  const [releases, catalog, bundles] = await Promise.all([
+  const [releases, catalog, bundles, featuredSongTrackId] = await Promise.all([
     getPublishedReleases(),
     getCatalogPrice(),
     getPublishedBundles(),
+    getFeaturedSongTrackId(),
   ]);
 
   const releasesWithTracks = releases.map((r) => ({
@@ -35,6 +38,7 @@ export default async function MusicPage() {
   // The catalog is small enough to ship whole, so search runs client-side with
   // no round-trip and no pagination.
   const searchIndex = buildTrackSearchIndex(releases);
+  const featuredSong = findFeaturedSong(searchIndex, featuredSongTrackId);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -53,6 +57,12 @@ export default async function MusicPage() {
           bundles={bundles}
           catalog={catalog.releaseCount > 1 ? catalog : null}
         />
+
+        {featuredSong && (
+          <div className="mb-8">
+            <FeaturedSongCard song={featuredSong} />
+          </div>
+        )}
 
         {releases.length === 0 ? (
           <p className="text-muted-foreground">
