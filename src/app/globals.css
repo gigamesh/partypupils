@@ -223,6 +223,18 @@ body.has-player {
   }
 }
 
+/* On mobile the keyboard leaves too little room to share with the player bar,
+   so it steps aside (and gives its reserved space back) while a search box is
+   focused. Desktop keeps the bar — there's no keyboard competing for space. */
+@media (max-width: 767px) {
+  body.search-focus .player-bar {
+    display: none;
+  }
+  body.search-focus.has-player {
+    padding-bottom: 0;
+  }
+}
+
 /* Neon link hover */
 .neon-link {
   @apply text-neon/90 transition-colors cursor-pointer;
