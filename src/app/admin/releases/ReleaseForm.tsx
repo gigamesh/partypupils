@@ -18,11 +18,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { slugify } from "@/lib/utils";
-import { presignAndUpload } from "@/lib/upload-client";
+import { presignAndUpload, type UploadProgress } from "@/lib/upload-client";
+import { formatBytes, oversizeAudioMessage } from "@/lib/upload-limits";
 import { SESSION_EXPIRED_MESSAGE, throwIfSessionExpired } from "@/lib/session-expired";
 import { combinedName, deriveTrackArtistTitle } from "@/lib/track-name";
 import {
+  tracksMissingWavMaster,
   validateReleaseFormState,
+  type AudioFormat,
   type ReleaseFormState,
 } from "@/lib/release-validation";
 import {
@@ -78,11 +81,17 @@ interface TrackInput {
   priceStr: string;
   trackNumber: number;
   inRadio: boolean;
-  wavFile: File | null;
-  /** Embedded tags read from the selected WAV — kept so the UI can flag overrides. */
-  wavTags?: { artist?: string; title?: string; genre?: string };
-  /** Cover art embedded in the selected WAV as a `data:` URL — `null` if the WAV has none. */
-  wavArtDataUrl?: string | null;
+  /**
+   * The freshly-picked audio file, WAV or MP3. A WAV is the normal path: it's
+   * uploaded and server-side transcoded to a companion 320kbps MP3. An MP3 is
+   * uploaded as-is with no transcode — the DJ-mix case, where the file is
+   * already the deliverable and no lossless master exists.
+   */
+  audioFile: File | null;
+  /** Embedded tags read from the selected file — kept so the UI can flag overrides. */
+  audioTags?: { artist?: string; title?: string; genre?: string };
+  /** Cover art embedded in the selected file as a `data:` URL — `null` if it has none. */
+  audioArtDataUrl?: string | null;
   existingWavName?: string;
   existingWavStorageKey?: string;
   existingWavFileSize?: number;
@@ -162,7 +171,7 @@ const TRACK_FIELD_LABELS: Record<string, string> = {
   artist: "Artist",
   slug: "Slug",
   price: "Price",
-  files: "WAV file",
+  files: "Audio file",
 };
 
 // Suffix mapping for the per-track DOM ids the form renders below
@@ -175,6 +184,87 @@ const TRACK_FIELD_DOM_SUFFIX: Record<string, string> = {
   price: "price",
   files: "wav",
 };
+
+/**
+ * Audio format implied by a picked file's extension. Returns null for anything
+ * else, which the pickers treat as "no audio selected" — the `accept` attribute
+ * is a hint, not a guarantee, so an unrecognized file must not silently upload
+ * under a key the presign handler would reject anyway.
+ */
+function audioFormatOf(file: File | null | undefined): AudioFormat | null {
+  if (!file) return null;
+  if (/\.wav$/i.test(file.name)) return "wav";
+  if (/\.mp3$/i.test(file.name)) return "mp3";
+  return null;
+}
+
+/** Formats already persisted for a track on an existing release. */
+function existingAudioFormatsOf(track: TrackInput): AudioFormat[] {
+  const formats: AudioFormat[] = [];
+  if (track.existingWavStorageKey) formats.push("wav");
+  if (track.existingMp3StorageKey) formats.push("mp3");
+  return formats;
+}
+
+/** `2m 30s` / `45s` remaining at the current rate, or null when not yet measurable. */
+function etaLabel(transfer: {
+  loaded: number;
+  total: number;
+  bytesPerSecond: number | null;
+}): string | null {
+  if (!transfer.bytesPerSecond) return null;
+  const seconds = Math.round(
+    (transfer.total - transfer.loaded) / transfer.bytesPerSecond,
+  );
+  if (seconds <= 0) return null;
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+/** Size-limit message for a picked file, or null when it fits. */
+function oversizeMessage(file: File): string | null {
+  const format = audioFormatOf(file);
+  if (!format) return null;
+  return oversizeAudioMessage(file.name, file.size, format);
+}
+
+/**
+ * Turn a failed `/upload/process` response into something an admin can act on.
+ *
+ * Transcoding runs in a function with 500 MB of `/tmp` and a 300s ceiling, and
+ * it writes ~2.2x the source size before cleaning up. Both limits are reached
+ * by the same thing — a WAV that's too long — but they surface as completely
+ * different errors (a disk-full ffmpeg exit vs. a gateway timeout with no JSON
+ * body at all). Naming the cause beats echoing "Transcoding failed".
+ */
+function transcodeFailureMessage(
+  file: File,
+  status: number,
+  data: Record<string, unknown>,
+): string {
+  const detail = String(data.mp3Error || data.error || "");
+
+  if (status === 504 || status === 408) {
+    return (
+      `Transcoding "${file.name}" timed out. The file is long enough that ` +
+      `encoding exceeds the server's time limit — bounce a shorter master, or ` +
+      `upload a 320kbps MP3 instead.`
+    );
+  }
+  if (/ENOSPC|no space left/i.test(detail)) {
+    return (
+      `Transcoding "${file.name}" ran out of disk. The file is too large to ` +
+      `transcode server-side — upload a 320kbps MP3 instead.`
+    );
+  }
+  if (/heap|out of memory|ENOMEM/i.test(detail)) {
+    return (
+      `Transcoding "${file.name}" ran out of memory. Upload a 320kbps MP3 ` +
+      `instead, or bounce a shorter master.`
+    );
+  }
+  return `Transcoding "${file.name}" failed: ${detail || "Unknown error"}`;
+}
 
 /** Read a Blob into a base64 `data:` URL — used for inline artwork preview and transport. */
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -238,6 +328,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  /** Byte-level state for the file currently on the wire; null between files. */
+  const [transfer, setTransfer] = useState<{
+    fileName: string;
+    loaded: number;
+    total: number;
+    bytesPerSecond: number | null;
+  } | null>(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [unpublishConfirmOpen, setUnpublishConfirmOpen] = useState(false);
@@ -290,7 +387,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           priceStr: (t.price / 100).toFixed(2),
           trackNumber: t.trackNumber,
           inRadio: t.inRadio,
-          wavFile: null,
+          audioFile: null,
           existingWavName: wav?.fileName,
           existingWavStorageKey: wav?.storageKey,
           existingWavFileSize: wav?.fileSize ?? undefined,
@@ -300,13 +397,13 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         };
       });
     }
-    return [{ artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, wavFile: null }];
+    return [{ artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: 1, inRadio: true, audioFile: null }];
   });
 
   function addTrack() {
     setTracks((prev) => [
       ...prev,
-      { artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, wavFile: null },
+      { artist: "", title: "", genre: "", slug: "", priceStr: "1.99", trackNumber: prev.length + 1, inRadio: true, audioFile: null },
     ]);
   }
 
@@ -364,23 +461,40 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
   }
 
   /**
-   * Read embedded ID3/RIFF tags and cover art from a freshly selected WAV and
-   * auto-fill the track's still-empty fields. The parsed tags and artwork are
-   * retained on the track so the UI can flag overrides and preview the art that
-   * will be embedded in the MP3. Release-level fields (name, slug) are
-   * deliberately never touched here.
+   * Read embedded ID3/RIFF tags and cover art from a freshly selected audio
+   * file (WAV or MP3) and auto-fill the track's still-empty fields. The parsed
+   * tags and artwork are retained on the track so the UI can flag overrides and
+   * preview the art that will be embedded. Release-level fields (name, slug)
+   * are deliberately never touched here.
+   *
+   * Rejects anything that isn't a WAV or MP3 outright — `accept` on the input
+   * is only a hint, and an unrecognized extension would otherwise be uploaded
+   * under a key the presign handler rejects, failing deep into the save.
    */
-  async function handleWavSelect(index: number, file: File | null) {
-    updateTrack(index, "wavFile", file);
+  async function handleAudioSelect(index: number, file: File | null) {
+    if (file && !audioFormatOf(file)) {
+      setError(`"${file.name}" isn't a WAV or MP3.`);
+      updateTrack(index, "audioFile", null);
+      return;
+    }
+    if (file) {
+      const tooBig = oversizeMessage(file);
+      if (tooBig) {
+        setError(tooBig);
+        updateTrack(index, "audioFile", null);
+        return;
+      }
+    }
+    updateTrack(index, "audioFile", file);
     if (!file) return;
     try {
       const { parseBlob } = await import("music-metadata");
       const { common } = await parseBlob(file);
-      const wavArtist = common.artist?.trim() || undefined;
-      const wavTitle = common.title?.trim() || undefined;
-      const wavGenre = common.genre?.[0]?.trim() || undefined;
+      const fileArtist = common.artist?.trim() || undefined;
+      const fileTitle = common.title?.trim() || undefined;
+      const fileGenre = common.genre?.[0]?.trim() || undefined;
       const picture = common.picture?.[0];
-      const wavArtDataUrl = picture
+      const audioArtDataUrl = picture
         ? await blobToDataUrl(
             new Blob([new Uint8Array(picture.data)], {
               type: picture.format || "image/jpeg",
@@ -391,22 +505,22 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       setTracks((prev) =>
         prev.map((t, i) => {
           if (i !== index) return t;
-          const artist = t.artist || wavArtist || "";
-          const title = t.title || wavTitle || "";
-          const genre = t.genre || wavGenre || "";
+          const artist = t.artist || fileArtist || "";
+          const title = t.title || fileTitle || "";
+          const genre = t.genre || fileGenre || "";
           return {
             ...t,
             artist,
             title,
             genre,
             slug: trackSlugOnEdit(t, combinedName(artist, title)),
-            wavTags: { artist: wavArtist, title: wavTitle, genre: wavGenre },
-            wavArtDataUrl,
+            audioTags: { artist: fileArtist, title: fileTitle, genre: fileGenre },
+            audioArtDataUrl,
           };
         }),
       );
     } catch (err) {
-      console.warn("Could not read WAV metadata:", err);
+      console.warn("Could not read audio metadata:", err);
     }
   }
 
@@ -459,7 +573,10 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     artUrl: string | null,
   ): Promise<{ url: string; mp3Url: string }> {
     const key = `${prefix}/${file.name}`;
-    const url = await presignAndUpload(file, key);
+    const url = await presignAndUpload(file, key, setTransferFor(file));
+    // Transcoding gives no progress signal of its own, so the bar switches to
+    // indeterminate rather than sitting at a misleading 100%.
+    setTransfer(null);
 
     const processRes = await fetch("/api/admin/upload/process", {
       method: "POST",
@@ -474,8 +591,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
     const data = await readJsonBody(processRes);
 
     if (!processRes.ok) {
-      const detail = data.mp3Error || data.error || "Unknown error";
-      throw new Error(`Transcoding ${file.name} failed: ${String(detail)}`);
+      throw new Error(transcodeFailureMessage(file, processRes.status, data));
     }
     const mp3Url = typeof data.mp3Url === "string" ? data.mp3Url : "";
     if (!mp3Url) {
@@ -487,8 +603,32 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
 
   async function uploadFile(file: File, prefix: string): Promise<string> {
     const key = `${prefix}/${file.name}`;
-    return presignAndUpload(file, key);
+    const url = await presignAndUpload(file, key, setTransferFor(file));
+    setTransfer(null);
+    return url;
   }
+
+  /**
+   * Progress sink for one file's transfer. Rate is measured from the first
+   * callback rather than the click, so it reflects the transfer itself and
+   * isn't dragged down by the presign round-trip that precedes it.
+   */
+  function setTransferFor(file: File) {
+    let startedAt = 0;
+    return ({ loaded, total }: UploadProgress) => {
+      const now = performance.now();
+      if (!startedAt) startedAt = now;
+      const elapsed = (now - startedAt) / 1000;
+      setTransfer({
+        fileName: file.name,
+        loaded,
+        total,
+        bytesPerSecond: elapsed > 0.5 ? loaded / elapsed : null,
+      });
+    };
+  }
+
+  const missingWavMaster = tracksMissingWavMaster(buildFormState());
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -531,8 +671,8 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
           priceCents: trackPrice,
           trackNumber: t.trackNumber,
           inRadio: t.inRadio,
-          hasNewWav: t.wavFile != null,
-          hasExistingWav: t.existingWavStorageKey != null,
+          newAudioFormat: audioFormatOf(t.audioFile),
+          existingAudioFormats: existingAudioFormatsOf(t),
         };
       }),
     };
@@ -558,7 +698,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         return;
       }
 
-      const tracksWithFiles = tracks.filter((t) => t.wavFile);
+      const tracksWithFiles = tracks.filter((t) => audioFormatOf(t.audioFile));
       const totalSteps = (coverImage ? 1 : 0) + tracksWithFiles.length + 1;
       let currentStep = 0;
       setProgress({ current: 0, total: totalSteps });
@@ -584,58 +724,85 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
         const files: { format: string; fileName: string; storageKey: string; fileSize: number }[] = [];
         const trackName = combinedName(track.artist, track.title);
 
-        if (track.wavFile) {
+        const newAudioFormat = audioFormatOf(track.audioFile);
+
+        if (track.audioFile && newAudioFormat) {
           currentStep++;
           setProgress({ current: currentStep, total: totalSteps });
-          setStatus(`Uploading & transcoding "${trackName || track.wavFile.name}"...`);
+          setStatus(
+            newAudioFormat === "wav"
+              ? `Uploading & transcoding "${trackName || track.audioFile.name}"...`
+              : `Uploading "${trackName || track.audioFile.name}"...`,
+          );
           // A track's own embedded art wins over the release cover for its
           // tags. Store it first so the transcode request can reference it by
           // URL — art is cosmetic, so a failure here falls back to the cover
           // rather than sinking the whole save.
           let trackArtUrl: string | null = null;
-          if (track.wavArtDataUrl) {
+          if (track.audioArtDataUrl) {
             try {
               trackArtUrl = await uploadTrackArt(
-                track.wavArtDataUrl,
+                track.audioArtDataUrl,
                 `images/track-art/${slug}/${track.trackNumber}`,
               );
             } catch (err) {
               console.warn("Track art upload failed; using release cover:", err);
             }
           }
-          const result = await uploadWav(
-            track.wavFile,
-            `audio/${slug}/${track.trackNumber}`,
-            {
-              title: track.title || undefined,
-              artist: track.artist || undefined,
-              album: name || undefined,
-              genre: track.genre || undefined,
-              trackNumber: track.trackNumber,
-              trackTotal,
-              year: releaseYear,
-            },
-            trackArtUrl ?? coverImageUrl,
-          );
-          files.push({
-            format: "wav",
-            fileName: track.wavFile.name,
-            storageKey: result.url,
-            fileSize: track.wavFile.size,
-          });
-          files.push({
-            format: "mp3",
-            fileName: track.wavFile.name.replace(/\.wav$/i, ".mp3"),
-            storageKey: result.mp3Url,
-            fileSize: 0,
-          });
-        } else if (track.existingWavStorageKey) {
-          files.push({
-            format: "wav",
-            fileName: track.existingWavName || "track.wav",
-            storageKey: track.existingWavStorageKey,
-            fileSize: track.existingWavFileSize || 0,
-          });
+          const metadata = {
+            title: track.title || undefined,
+            artist: track.artist || undefined,
+            album: name || undefined,
+            genre: track.genre || undefined,
+            trackNumber: track.trackNumber,
+            trackTotal,
+            year: releaseYear,
+          };
+          const prefix = `audio/${slug}/${track.trackNumber}`;
+
+          if (newAudioFormat === "wav") {
+            const result = await uploadWav(
+              track.audioFile,
+              prefix,
+              metadata,
+              trackArtUrl ?? coverImageUrl,
+            );
+            files.push({
+              format: "wav",
+              fileName: track.audioFile.name,
+              storageKey: result.url,
+              fileSize: track.audioFile.size,
+            });
+            files.push({
+              format: "mp3",
+              fileName: track.audioFile.name.replace(/\.wav$/i, ".mp3"),
+              storageKey: result.mp3Url,
+              fileSize: 0,
+            });
+          } else {
+            // An MP3 is already the deliverable — there's nothing to transcode,
+            // so it skips /upload/process entirely (which only accepts .wav
+            // keys). The save-time retag stamps the authoritative tags and
+            // cover art onto it once the release row exists.
+            const url = await uploadFile(track.audioFile, prefix);
+            files.push({
+              format: "mp3",
+              fileName: track.audioFile.name,
+              storageKey: url,
+              fileSize: track.audioFile.size,
+            });
+          }
+        } else {
+          if (track.existingWavStorageKey) {
+            files.push({
+              format: "wav",
+              fileName: track.existingWavName || "track.wav",
+              storageKey: track.existingWavStorageKey,
+              fileSize: track.existingWavFileSize || 0,
+            });
+          }
+          // Kept outside the WAV branch so an MP3-only track (a mix) doesn't
+          // lose its only file when the release is re-saved.
           if (track.existingMp3StorageKey) {
             files.push({
               format: "mp3",
@@ -729,7 +896,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               // Re-seed from what was persisted so continuing to edit after a
               // save behaves exactly like editing after a reload.
               slugTouched: slugIsOwned(savedTrack.slug),
-              wavFile: null,
+              audioFile: null,
               existingWavName: wav?.fileName,
               existingWavStorageKey: wav?.storageKey,
               existingWavFileSize: wav?.fileSize ?? undefined,
@@ -743,6 +910,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       setLoading(false);
       setStatus("");
       setProgress({ current: 0, total: 0 });
+      setTransfer(null);
       router.push(`/admin/releases/${saved.id}/edit`);
       router.refresh();
     } catch (err) {
@@ -750,6 +918,7 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
       setStatus("");
+      setTransfer(null);
     }
   }
 
@@ -1011,11 +1180,11 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 {fieldErrors[`tracks[${index}].artist`] && (
                   <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].artist`]}</p>
                 )}
-                {track.wavTags?.artist &&
+                {track.audioTags?.artist &&
                   track.artist.trim() &&
-                  track.artist.trim() !== track.wavTags.artist && (
+                  track.artist.trim() !== track.audioTags.artist && (
                     <p className="text-xs text-amber-500">
-                      Overrides WAV tag: «{track.wavTags.artist}»
+                      Overrides tag: «{track.audioTags.artist}»
                     </p>
                   )}
               </div>
@@ -1041,11 +1210,11 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 {fieldErrors[`tracks[${index}].name`] && (
                   <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].name`]}</p>
                 )}
-                {track.wavTags?.title &&
+                {track.audioTags?.title &&
                   track.title.trim() &&
-                  track.title.trim() !== track.wavTags.title && (
+                  track.title.trim() !== track.audioTags.title && (
                     <p className="text-xs text-amber-500">
-                      Overrides WAV tag: «{track.wavTags.title}»
+                      Overrides tag: «{track.audioTags.title}»
                     </p>
                   )}
               </div>
@@ -1091,11 +1260,11 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
                 value={track.genre}
                 onChange={(e) => updateTrack(index, "genre", e.target.value)}
               />
-              {track.wavTags?.genre &&
+              {track.audioTags?.genre &&
                 track.genre.trim() &&
-                track.genre.trim() !== track.wavTags.genre && (
+                track.genre.trim() !== track.audioTags.genre && (
                   <p className="text-xs text-amber-500">
-                    Overrides WAV tag: «{track.wavTags.genre}»
+                    Overrides tag: «{track.audioTags.genre}»
                   </p>
                 )}
             </div>
@@ -1146,35 +1315,47 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
             })()}
             <div className="space-y-1">
               <Label htmlFor={`track-${index}-wav`}>
-                WAV File
-                {isPublished && !track.existingWavName && " (required to publish)"}
+                Audio File
+                {isPublished &&
+                  !track.existingWavName &&
+                  !track.existingMp3Name &&
+                  " (required to publish)"}
               </Label>
               <Input
                 id={`track-${index}-wav`}
                 type="file"
-                accept=".wav"
-                onChange={(e) => void handleWavSelect(index, e.target.files?.[0] || null)}
-                required={isPublished && !track.existingWavName}
+                accept=".wav,.mp3"
+                onChange={(e) => void handleAudioSelect(index, e.target.files?.[0] || null)}
+                required={
+                  isPublished && !track.existingWavName && !track.existingMp3Name
+                }
               />
               {fieldErrors[`tracks[${index}].files`] && (
                 <p className="text-xs text-destructive">{fieldErrors[`tracks[${index}].files`]}</p>
               )}
-              {track.existingWavName && !track.wavFile && (
+              {track.existingWavName && !track.audioFile && (
                 <p className="text-xs text-muted-foreground">
                   Current: {track.existingWavName}
                   {track.existingMp3StorageKey && " (320k mp3 generated)"}
                 </p>
               )}
-              {!track.existingWavName && (
+              {!track.existingWavName && track.existingMp3Name && !track.audioFile && (
                 <p className="text-xs text-muted-foreground">
-                  A 320kbps MP3 will be auto-generated from the WAV with embedded ID3 tags.
+                  Current: {track.existingMp3Name} — MP3 only, no WAV master.
                 </p>
               )}
-              {track.wavFile && (
+              {!track.existingWavName && !track.existingMp3Name && (
                 <p className="text-xs text-muted-foreground">
-                  {track.wavTags
-                    ? "Empty fields were filled from the file's tags. The MP3 is tagged from the form fields above — any “Overrides WAV tag” note means the file's own value won't be used."
-                    : "New file selected — the MP3 will be tagged from the form fields above."}
+                  Upload a WAV and a 320kbps MP3 is auto-generated from it. Upload
+                  an MP3 on its own — for a DJ mix — and it ships as-is, with no
+                  WAV master.
+                </p>
+              )}
+              {track.audioFile && (
+                <p className="text-xs text-muted-foreground">
+                  {track.audioTags
+                    ? "Empty fields were filled from the file's tags. The delivered file is tagged from the form fields above — any “Overrides tag” note means the file's own value won't be used."
+                    : "New file selected — the delivered file will be tagged from the form fields above."}
                 </p>
               )}
             </div>
@@ -1182,11 +1363,11 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               <Label>Artwork</Label>
               {(() => {
                 const releaseCover = coverPreviewSrc || release?.coverImageUrl || null;
-                const src = track.wavArtDataUrl || releaseCover;
-                const caption = track.wavArtDataUrl
-                  ? "From the WAV file — embedded in the generated MP3."
+                const src = track.audioArtDataUrl || releaseCover;
+                const caption = track.audioArtDataUrl
+                  ? "From the selected file — embedded in the delivered audio."
                   : releaseCover
-                    ? "Release cover shown. A track's own embedded art previews here only right after you select its WAV."
+                    ? "Release cover shown. A track's own embedded art previews here only right after you select its audio file."
                     : "No artwork — add a release cover image above.";
                 return (
                   <div className="flex items-center gap-3">
@@ -1291,7 +1472,49 @@ export function ReleaseForm({ release, linkPages }: ReleaseFormProps) {
               />
             </div>
           )}
+          {/*
+            The step bar above only moves once per file. A mix is a couple
+            hundred MB, so without a byte-level bar the whole transfer looks
+            like one frozen step for minutes on end.
+          */}
+          {transfer && transfer.total > 0 && (
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="truncate pr-2">{transfer.fileName}</span>
+                <span className="whitespace-nowrap">
+                  {formatBytes(transfer.loaded)} / {formatBytes(transfer.total)}
+                  {transfer.bytesPerSecond
+                    ? ` · ${formatBytes(transfer.bytesPerSecond)}/s${
+                        etaLabel(transfer) ? ` · ${etaLabel(transfer)} left` : ""
+                      }`
+                    : ""}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-neon/70 rounded-full"
+                  style={{
+                    width: `${(transfer.loaded / transfer.total) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
+      )}
+      {/*
+        MP3-only tracks are valid — that's how a DJ mix ships — but on a normal
+        release it nearly always means the wrong file got picked, and the
+        mistake is invisible until a customer downloads a release with no
+        lossless master. Warn, don't block.
+      */}
+      {missingWavMaster.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {missingWavMaster.length === 1
+            ? `Track ${missingWavMaster[0] + 1} has no WAV master and will ship as MP3 only.`
+            : `Tracks ${missingWavMaster.map((i) => i + 1).join(", ")} have no WAV master and will ship as MP3 only.`}{" "}
+          Expected for a DJ mix; otherwise upload the WAV.
+        </p>
       )}
       {error && (
         <div role="alert" className="space-y-1 text-sm text-destructive">

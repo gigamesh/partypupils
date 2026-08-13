@@ -4,6 +4,7 @@ import {
   draftReleaseSchema,
   generateDraftSlug,
   publishedReleaseSchema,
+  tracksMissingWavMaster,
   validateReleaseFormState,
   validateReleasePayload,
   type ReleaseFormState,
@@ -89,7 +90,10 @@ describe("publishedReleaseSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("rejects a track with only an mp3 file", () => {
+  // MP3-only tracks were rejected until DJ mixes needed to ship: a mix is
+  // bounced straight to 320kbps and never gets a WAV master. The form warns
+  // about a missing master (`tracksMissingWavMaster`) rather than blocking.
+  it("accepts a track with only an mp3 file", () => {
     const r = publishedReleaseSchema.safeParse({
       ...baseValid,
       tracks: [
@@ -97,6 +101,21 @@ describe("publishedReleaseSchema", () => {
           ...baseValid.tracks[0],
           files: [
             { format: "mp3", fileName: "t.mp3", storageKey: "https://r2/t.mp3", fileSize: 100 },
+          ],
+        },
+      ],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects a track whose only file is not audio", () => {
+    const r = publishedReleaseSchema.safeParse({
+      ...baseValid,
+      tracks: [
+        {
+          ...baseValid.tracks[0],
+          files: [
+            { format: "jpg", fileName: "t.jpg", storageKey: "https://r2/t.jpg", fileSize: 100 },
           ],
         },
       ],
@@ -214,8 +233,8 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
         priceCents: 200,
         trackNumber: 1,
         inRadio: true,
-        hasNewWav: true,
-        hasExistingWav: false,
+        newAudioFormat: "wav",
+        existingAudioFormats: [],
       },
     ],
   };
@@ -225,28 +244,56 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("accepts a track that has no new WAV but does have an existing one", () => {
+  it("accepts a track that has no new audio but does have an existing WAV", () => {
     const result = validateReleaseFormState({
       ...validPublishedState,
       tracks: [
         {
           ...validPublishedState.tracks[0],
-          hasNewWav: false,
-          hasExistingWav: true,
+          newAudioFormat: null,
+          existingAudioFormats: ["wav"],
         },
       ],
     });
     expect(result.ok).toBe(true);
   });
 
-  it("rejects a track that has neither a new nor existing WAV (the screenshot bug)", () => {
+  it("accepts a freshly-picked MP3 with no WAV master (a DJ mix)", () => {
     const result = validateReleaseFormState({
       ...validPublishedState,
       tracks: [
         {
           ...validPublishedState.tracks[0],
-          hasNewWav: false,
-          hasExistingWav: false,
+          newAudioFormat: "mp3",
+          existingAudioFormats: [],
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts an existing MP3-only track", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      tracks: [
+        {
+          ...validPublishedState.tracks[0],
+          newAudioFormat: null,
+          existingAudioFormats: ["mp3"],
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a track that has neither new nor existing audio (the screenshot bug)", () => {
+    const result = validateReleaseFormState({
+      ...validPublishedState,
+      tracks: [
+        {
+          ...validPublishedState.tracks[0],
+          newAudioFormat: null,
+          existingAudioFormats: [],
         },
       ],
     });
@@ -346,8 +393,8 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
           ...validPublishedState.tracks[0],
           artist: "",
           priceCents: 0,
-          hasNewWav: false,
-          hasExistingWav: false,
+          newAudioFormat: null,
+          existingAudioFormats: [],
         },
       ],
     });
@@ -358,5 +405,74 @@ describe("validateReleaseFormState (client-side pre-flight)", () => {
       expect(result.errors.fieldErrors["tracks[0].price"]).toBeDefined();
       expect(result.errors.fieldErrors["tracks[0].files"]).toBeDefined();
     }
+  });
+});
+
+describe("tracksMissingWavMaster", () => {
+  const state = (
+    tracks: ReleaseFormState["tracks"][number][],
+  ): ReleaseFormState => ({
+    name: "Release",
+    slug: "release",
+    description: "",
+    priceCents: 1000,
+    type: "single",
+    coverImageUrl: "https://r2/cover.jpg",
+    hasNewCover: false,
+    releasedAt: null,
+    isPublished: true,
+    inRadio: true,
+    tracks,
+  });
+
+  const track = (
+    overrides: Partial<ReleaseFormState["tracks"][number]>,
+  ): ReleaseFormState["tracks"][number] => ({
+    name: "Artist - Title",
+    artist: "Artist",
+    genre: "",
+    slug: "artist-title",
+    priceCents: 200,
+    trackNumber: 1,
+    inRadio: true,
+    newAudioFormat: null,
+    existingAudioFormats: [],
+    ...overrides,
+  });
+
+  it("flags an MP3-only track", () => {
+    expect(
+      tracksMissingWavMaster(state([track({ newAudioFormat: "mp3" })])),
+    ).toEqual([0]);
+  });
+
+  it("does not flag a track with a WAV master", () => {
+    expect(
+      tracksMissingWavMaster(state([track({ newAudioFormat: "wav" })])),
+    ).toEqual([]);
+  });
+
+  it("does not flag a track with an existing WAV alongside an MP3", () => {
+    expect(
+      tracksMissingWavMaster(
+        state([track({ existingAudioFormats: ["wav", "mp3"] })]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not flag a track with no audio at all — that is the schema's job", () => {
+    expect(tracksMissingWavMaster(state([track({})]))).toEqual([]);
+  });
+
+  it("returns every offending index", () => {
+    expect(
+      tracksMissingWavMaster(
+        state([
+          track({ newAudioFormat: "wav" }),
+          track({ newAudioFormat: "mp3" }),
+          track({ existingAudioFormats: ["mp3"] }),
+        ]),
+      ),
+    ).toEqual([1, 2]);
   });
 });

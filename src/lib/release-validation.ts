@@ -9,7 +9,8 @@
  *     and gets sentinel defaults via `applyDraftDefaults` before persistence.
  *     Lets admins gradually build a release out.
  *   - `publishedReleaseSchema` — strict floor: real slug, price > 0, at least
- *     one track, each track has name + artist + price > 0 + a WAV file.
+ *     one track, each track has name + artist + price > 0 + an audio file
+ *     (WAV or MP3 — see `AUDIO_FORMATS`).
  *
  * Storage logic stays in `release-tracks.ts`; this module only validates
  * shape and supplies defaults.
@@ -44,6 +45,15 @@ const draftTrackSchema = z.object({
   files: z.array(draftFileSchema).optional(),
 });
 
+/**
+ * Formats that satisfy the published-track audio requirement. WAV is the
+ * lossless master a normal release ships; MP3 alone is accepted so DJ mixes —
+ * which are bounced straight to 320kbps and never transcoded server-side — can
+ * be published. `hasWavMaster` below flags the MP3-only case for the UI so an
+ * admin doesn't ship a normal release without its master by accident.
+ */
+const AUDIO_FORMATS = ["wav", "mp3"] as const;
+
 const publishedTrackSchema = z.object({
   id: z.number().int().optional(),
   name: z.string().trim().min(1, "Track title is required"),
@@ -56,8 +66,11 @@ const publishedTrackSchema = z.object({
   files: z
     .array(fileSchema)
     .refine(
-      (files) => files.some((f) => f.format === "wav"),
-      "A WAV file is required",
+      (files) =>
+        files.some((f) =>
+          (AUDIO_FORMATS as readonly string[]).includes(f.format),
+        ),
+      "An audio file is required",
     ),
 });
 
@@ -164,8 +177,8 @@ export function generateDraftSlug(): string {
 /**
  * Form-state projection used by `validateReleaseFormState`. Mirrors the
  * subset of `ReleaseForm.tsx` state the validator needs: the user-typed
- * scalars plus, per track, whether a WAV will be present after upload
- * (`hasNewWav` for a freshly-picked File, `hasExistingWav` for a key
+ * scalars plus, per track, which audio formats will be present after upload
+ * (`newAudioFormat` for a freshly-picked File, `existingAudioFormats` for keys
  * already persisted on the existing release).
  */
 export interface ReleaseFormState {
@@ -192,27 +205,46 @@ export interface ReleaseFormState {
     priceCents: number;
     trackNumber: number;
     inRadio: boolean;
-    /** True when the user has selected a fresh WAV File for this track. */
-    hasNewWav: boolean;
-    /** True when the track already has a WAV persisted (existing release). */
-    hasExistingWav: boolean;
+    /** Format of a freshly-selected audio File not uploaded yet, or null. */
+    newAudioFormat: AudioFormat | null;
+    /** Formats already persisted for this track on an existing release. */
+    existingAudioFormats: AudioFormat[];
   }>;
+}
+
+/** Audio formats a track can ship. */
+export type AudioFormat = (typeof AUDIO_FORMATS)[number];
+
+/**
+ * Indices of tracks that will publish without a lossless WAV master. Valid —
+ * the schema accepts MP3-only tracks so mixes can ship — but worth surfacing
+ * in the form, since for a normal release it almost always means the admin
+ * picked the wrong file.
+ */
+export function tracksMissingWavMaster(state: ReleaseFormState): number[] {
+  return state.tracks.flatMap((t, i) => {
+    const hasAudio = t.newAudioFormat != null || t.existingAudioFormats.length > 0;
+    const hasWav =
+      t.newAudioFormat === "wav" || t.existingAudioFormats.includes("wav");
+    return hasAudio && !hasWav ? [i] : [];
+  });
 }
 
 /**
  * Client-side pre-flight: validate the form's current state against the same
  * server schema *before* any uploads begin. Lets the form fail fast on
  * missing scalars (artist, title, slug, price) and on tracks that lack any
- * WAV — historically the form only learned about these failures after
+ * audio — historically the form only learned about these failures after
  * minutes of waiting for transcoding to finish on the server round-trip.
  *
  * Projects the form state into the API body shape, substituting a placeholder
  * `pending://upload` storage key for assets that will be uploaded but don't
- * exist yet — both per-track WAVs and the release cover. The schemas only
- * check for presence (a `format: "wav"` entry, a non-empty cover string) and
- * never that the URL resolves, so the placeholder short-circuits the spurious
- * "missing WAV" / "missing cover" errors that would otherwise fire on a new
- * release where nothing has been uploaded at submit time yet.
+ * exist yet — both per-track audio and the release cover. The schemas only
+ * check for presence (an entry whose `format` is in `AUDIO_FORMATS`, a
+ * non-empty cover string) and never that the URL resolves, so the placeholder
+ * short-circuits the spurious "missing audio" / "missing cover" errors that
+ * would otherwise fire on a new release where nothing has been uploaded at
+ * submit time yet.
  */
 export function validateReleaseFormState(state: ReleaseFormState): ValidationResult {
   const body = projectFormStateToApiBody(state);
@@ -239,14 +271,22 @@ function projectFormStateToApiBody(state: ReleaseFormState): unknown {
       price: t.priceCents,
       trackNumber: t.trackNumber,
       inRadio: t.inRadio,
-      files: filesForTrack(t.hasNewWav, t.hasExistingWav),
+      files: filesForTrack(t.newAudioFormat, t.existingAudioFormats),
     })),
   };
 }
 
-function filesForTrack(hasNewWav: boolean, hasExistingWav: boolean) {
-  if (!hasNewWav && !hasExistingWav) return [];
-  return [{ format: "wav", fileName: "pending.wav", storageKey: PENDING_UPLOAD }];
+function filesForTrack(
+  newAudioFormat: AudioFormat | null,
+  existingAudioFormats: AudioFormat[],
+) {
+  const formats = new Set<AudioFormat>(existingAudioFormats);
+  if (newAudioFormat) formats.add(newAudioFormat);
+  return Array.from(formats, (format) => ({
+    format,
+    fileName: `pending.${format}`,
+    storageKey: PENDING_UPLOAD,
+  }));
 }
 
 /**

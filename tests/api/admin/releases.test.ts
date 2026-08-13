@@ -489,7 +489,10 @@ describe("Draft / publish validation flows", () => {
     expect(body.fieldErrors.price).toBeDefined();
   });
 
-  it("POST with isPublished:true rejects a track that lacks a WAV", async () => {
+  // A track with only an MP3 used to be rejected. DJ mixes are bounced
+  // straight to 320kbps and never get a WAV master, so the floor is now "some
+  // audio file"; the admin form warns about a missing master instead.
+  it("POST with isPublished:true accepts a track with only an MP3", async () => {
     const payload = validPublishedPayload({
       tracks: [
         {
@@ -500,6 +503,22 @@ describe("Draft / publish validation flows", () => {
           files: [
             { format: "mp3", fileName: "t.mp3", storageKey: "https://r2/t.mp3", fileSize: 10 },
           ],
+        },
+      ],
+    });
+    const res = await createRelease(jsonRequest("POST", payload));
+    expect(res.status).toBe(201);
+  });
+
+  it("POST with isPublished:true rejects a track with no audio file at all", async () => {
+    const payload = validPublishedPayload({
+      tracks: [
+        {
+          name: "T",
+          artist: "A",
+          price: 200,
+          trackNumber: 1,
+          files: [],
         },
       ],
     });

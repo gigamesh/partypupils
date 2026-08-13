@@ -24,9 +24,14 @@ export async function GET(req: NextRequest) {
   if (!bundle) {
     return NextResponse.json({ error: "Release not found" }, { status: 404 });
   }
+  // An empty bundle means no file matched `format`, which is a different
+  // situation from an empty release now that MP3-only releases exist: asking a
+  // DJ mix for its WAVs is a miss, not a release that's missing its uploads.
   if (bundle.files.length === 0) {
     return NextResponse.json(
-      { error: "No audio files have been uploaded for this release yet." },
+      {
+        error: `No ${format.toUpperCase()} files exist for this release.`,
+      },
       { status: 404 },
     );
   }
