@@ -132,7 +132,7 @@ export function PlayerBar() {
   return (
     <div
       data-expanded={expanded ? "true" : "false"}
-      className="fixed bottom-0 left-0 right-0 z-40 glass-panel rounded-none border-x-0 border-b-0 border-t border-white/10"
+      className="player-bar fixed bottom-0 left-0 right-0 z-40 glass-panel rounded-none border-x-0 border-b-0 border-t border-white/10"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {/* Brand strip */}
