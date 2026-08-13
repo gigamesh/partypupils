@@ -1,8 +1,8 @@
 /**
  * Global test setup. Tests are launched via `scripts/run-tests.ts`, which:
  *   - guarantees DATABASE_URL points to localhost
- *   - rewrites the URL onto an isolated Postgres `schema=test`
- *   - has already run `drizzle-kit push` against that schema
+ *   - redirects it onto a sibling `*_test` database, creating it if needed
+ *   - has already run `drizzle-kit push` against that database
  *
  * This file therefore only handles per-test data isolation and module mocks.
  */
@@ -10,6 +10,7 @@ import "@dotenvx/dotenvx/config";
 import { afterAll, beforeAll, beforeEach, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { TEST_DATABASE_SUFFIX, databaseNameFromUrl } from "../scripts/test-db-url";
 import {
   downloadTokens,
   linkPageItems,
@@ -27,7 +28,22 @@ import {
 // Belt-and-suspenders: never run against a Neon URL even if invoked outside the wrapper.
 if (process.env.DATABASE_URL?.includes("neon.tech")) {
   throw new Error(
-    "Refusing to run tests against a Neon database. Use `npm test` so the wrapper isolates onto schema=test.",
+    "Refusing to run tests against a Neon database. Use `pnpm test` so the wrapper isolates onto the *_test database.",
+  );
+}
+
+// The `beforeEach` below deletes every row in the catalog, so the one thing
+// that must never be wrong is *which* database we are pointed at. Running
+// `npx vitest` directly skips the wrapper and inherits the dev DATABASE_URL —
+// which is exactly how the dev catalog got wiped before this guard existed.
+const targetDatabase = databaseNameFromUrl(process.env.DATABASE_URL ?? "");
+if (!targetDatabase.endsWith(TEST_DATABASE_SUFFIX)) {
+  throw new Error(
+    `Refusing to run tests against database "${targetDatabase || "(none)"}": the name must end in ` +
+      `"${TEST_DATABASE_SUFFIX}". Tests truncate every table between cases, so they only ever run on ` +
+      `the dedicated test database. Use \`pnpm test\` (or \`pnpm test:watch\`), which points ` +
+      `DATABASE_URL at it — running \`npx vitest\` directly inherits the dev database and would ` +
+      `destroy your local catalog.`,
   );
 }
 
