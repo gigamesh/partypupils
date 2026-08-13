@@ -15,6 +15,9 @@ export const DEFAULT_DISCOUNT_PERCENT = 15;
 // Admin-defined discounted bundles, stored as one JSON `site_settings` row.
 export const BUNDLES_SETTING_KEY = "custom_bundles";
 
+// The admin-chosen featured song, stored as a bare track id (empty string = none).
+export const FEATURED_SONG_KEY = "featured_song_track_id";
+
 export const SEATED_ARTIST_ID = "f5bd3ef2-2234-4972-8124-93f835758465";
 export const SEATED_WIDGET_ID = "seated-55fdf2c0";
 

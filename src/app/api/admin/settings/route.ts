@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { siteSettings } from "@/db/schema";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { RELEASES_TAG } from "@/lib/cache-tags";
-import { CATALOG_DISCOUNT_KEY } from "@/lib/constants";
+import { CATALOG_DISCOUNT_KEY, FEATURED_SONG_KEY } from "@/lib/constants";
 import { FAQ_SETTING_KEY } from "@/lib/faq-defaults";
 import { FaqContentSchema } from "@/lib/faq-schema";
 
@@ -15,7 +15,7 @@ type ValidationResult = { ok: true } | { ok: false; error: string };
  * catalog discount could take up to an hour (the ISR window on `/music`) to
  * reach the storefront.
  */
-const RELEASE_TAGGED_KEYS = new Set([CATALOG_DISCOUNT_KEY]);
+const RELEASE_TAGGED_KEYS = new Set([CATALOG_DISCOUNT_KEY, FEATURED_SONG_KEY]);
 
 /** Per-key validators run before persisting site settings. Keys not listed here accept any string. */
 const VALIDATORS: Record<string, (raw: string) => ValidationResult> = {
@@ -29,6 +29,12 @@ const VALIDATORS: Record<string, (raw: string) => ValidationResult> = {
     const result = FaqContentSchema.safeParse(parsed);
     return result.success ? { ok: true } : { ok: false, error: result.error.message };
   },
+  // A bare track id, or "" for "nothing featured". Anything else would read
+  // back as null and silently drop the card.
+  [FEATURED_SONG_KEY]: (raw) =>
+    raw === "" || /^\d+$/.test(raw)
+      ? { ok: true }
+      : { ok: false, error: "Value must be a track id or empty" },
 };
 
 export async function PUT(req: NextRequest) {
