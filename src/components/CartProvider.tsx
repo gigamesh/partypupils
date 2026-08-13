@@ -9,12 +9,13 @@ import {
   hasCatalog as hasCatalogItem,
   isItemInCart,
   removeCartItem,
+  type BundleRef,
   type CartItem,
   type CartItemRef,
   type Coverage,
 } from "@/lib/cart-rules";
 
-export type { CartItem, CartItemRef, Coverage };
+export type { BundleRef, CartItem, CartItemRef, Coverage };
 
 interface CartContextType {
   items: CartItem[];
@@ -27,7 +28,7 @@ interface CartContextType {
   /** Why an item already counts as bought — lets the UI distinguish "in your cart" from "included in a bundle". */
   coverage: (item: CartItemRef) => Coverage | null;
   /** Why a bundle can't be added right now, or null if it can. */
-  conflictFor: (bundle: { bundleId: string; bundleReleaseIds: number[] }) => "catalog" | "overlap" | null;
+  conflictFor: (bundle: BundleRef) => "catalog" | "overlap" | null;
   hasCatalog: boolean;
 }
 
@@ -82,7 +83,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const coverage = useCallback((item: CartItemRef) => coverageOf(items, item), [items]);
 
   const conflictFor = useCallback(
-    (bundle: { bundleId: string; bundleReleaseIds: number[] }) => bundleConflict(items, bundle),
+    (bundle: BundleRef) => bundleConflict(items, bundle),
     [items],
   );
 

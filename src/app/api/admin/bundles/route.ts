@@ -1,46 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { eq } from "drizzle-orm";
-import { db, queries } from "@/lib/db";
-import { releases } from "@/db/schema";
+import { queries } from "@/lib/db";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { RELEASES_TAG } from "@/lib/cache-tags";
 import { BUNDLES_SETTING_KEY } from "@/lib/constants";
 import { BundlesConfigSchema } from "@/lib/bundle-schema";
-import { getBundlesConfig, getPublishedBundles } from "@/lib/bundles";
+import {
+  getBundlesConfig,
+  getPublishedBundles,
+  listPickerReleases,
+  listPickerTracks,
+} from "@/lib/bundles";
 
 /**
  * Bundles get their own route rather than riding `PUT /api/admin/settings`
  * because that route's validator contract is synchronous, and checking that
- * every member id refers to a published release needs a DB round-trip.
+ * every member id refers to a published release or song needs a DB round-trip.
  */
-
-/** Published releases in the shape the bundle editor's picker needs. */
-async function listPickerReleases() {
-  return db
-    .select({
-      id: releases.id,
-      name: releases.name,
-      slug: releases.slug,
-      price: releases.price,
-      coverImageUrl: releases.coverImageUrl,
-    })
-    .from(releases)
-    .where(eq(releases.isPublished, true))
-    .orderBy(releases.name);
-}
 
 export async function GET() {
   if (!(await verifyAdminSession())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [config, pickerReleases] = await Promise.all([
+  const [config, pickerReleases, pickerTracks] = await Promise.all([
     getBundlesConfig(),
     listPickerReleases(),
+    listPickerTracks(),
   ]);
 
-  return NextResponse.json({ config, releases: pickerReleases });
+  return NextResponse.json({
+    config,
+    releases: pickerReleases,
+    tracks: pickerTracks,
+  });
 }
 
 export async function PUT(req: NextRequest) {
@@ -63,16 +56,26 @@ export async function PUT(req: NextRequest) {
   // The storefront silently drops unresolvable members at read time, which is
   // right for a release unpublished after the fact — but saving a bundle that
   // already points at one is an authoring mistake worth surfacing.
-  const publishedIds = new Set((await listPickerReleases()).map((r) => r.id));
+  const [pickerReleases, pickerTracks] = await Promise.all([
+    listPickerReleases(),
+    listPickerTracks(),
+  ]);
+  const publishedReleaseIds = new Set(pickerReleases.map((r) => r.id));
+  const publishedTrackIds = new Set(pickerTracks.map((t) => t.id));
+
   const unknownIds = [
     ...new Set(
-      parsed.data.bundles.flatMap((b) => b.releaseIds.filter((id) => !publishedIds.has(id))),
+      parsed.data.bundles.flatMap((b) =>
+        b.kind === "tracks"
+          ? b.trackIds.filter((id) => !publishedTrackIds.has(id))
+          : b.releaseIds.filter((id) => !publishedReleaseIds.has(id)),
+      ),
     ),
   ];
   if (unknownIds.length > 0) {
     return NextResponse.json(
       {
-        error: `Bundles reference releases that are not published: ${unknownIds.join(", ")}`,
+        error: `Bundles reference releases or songs that are not published: ${unknownIds.join(", ")}`,
         unknownIds,
       },
       { status: 400 },

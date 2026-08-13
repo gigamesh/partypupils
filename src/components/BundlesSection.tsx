@@ -17,21 +17,27 @@ interface BundlesSectionProps {
 }
 
 function toCardData(bundle: PricedBundle): BundleCardData {
-  return {
-    kind: "bundle",
+  const common = {
+    kind: "bundle" as const,
     id: bundle.id,
     name: bundle.name,
     description: bundle.description,
     originalPrice: bundle.originalPrice,
     discountedPrice: bundle.discountedPrice,
     discountPercent: bundle.discountPercent,
-    releaseCount: bundle.members.length,
-    releaseIds: bundle.releaseIds,
-    coverImageUrls: bundle.members
-      .map((m) => m.coverImageUrl)
-      .filter((url): url is string => url !== null)
-      .slice(0, 4),
+    memberCount: bundle.members.length,
+    coverImageUrls: bundle.coverImageUrls,
   };
+
+  return bundle.kind === "tracks"
+    ? {
+        ...common,
+        memberKind: "tracks",
+        releaseIds: [],
+        trackIds: bundle.trackIds,
+        trackReleaseIds: bundle.trackReleaseIds,
+      }
+    : { ...common, memberKind: "releases", releaseIds: bundle.releaseIds };
 }
 
 /** Discounted packs above the release grid: admin-defined bundles first, whole catalog last. */
@@ -48,7 +54,8 @@ export function BundlesSection({ bundles, catalog }: BundlesSectionProps) {
       originalPrice: catalog.originalPrice,
       discountedPrice: catalog.discountedPrice,
       discountPercent: catalog.discountPercent,
-      releaseCount: catalog.releaseCount,
+      memberKind: "releases",
+      memberCount: catalog.releaseCount,
       releaseIds: catalog.releaseIds,
       coverImageUrls: catalog.coverImageUrls,
     });

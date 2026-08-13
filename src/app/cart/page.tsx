@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/components/CartProvider";
 import { BundleCoverStack } from "@/components/BundleCoverStack";
 import { Button } from "@/components/ui/button";
+import { memberNoun } from "@/lib/bundle-schema";
 import { cartItemKey } from "@/lib/cart-rules";
 import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -114,11 +115,15 @@ export default function CartPage() {
                 {isBundle ? (
                   <div>
                     <span className="font-medium text-sm">{item.name}</span>
-                    {item.bundleReleaseIds && (
+                    {item.bundleTrackIds ? (
                       <p className="text-xs text-muted-foreground">
-                        {item.bundleReleaseIds.length} releases
+                        {memberNoun("tracks", item.bundleTrackIds.length)}
                       </p>
-                    )}
+                    ) : item.bundleReleaseIds ? (
+                      <p className="text-xs text-muted-foreground">
+                        {memberNoun("releases", item.bundleReleaseIds.length)}
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <Link

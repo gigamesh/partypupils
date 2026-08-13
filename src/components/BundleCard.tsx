@@ -3,10 +3,11 @@
 import { useCart } from "./CartProvider";
 import { BundleCoverStack } from "./BundleCoverStack";
 import { Button } from "@/components/ui/button";
-import type { CartItem } from "@/lib/cart-rules";
+import { memberNoun, type BundleKind } from "@/lib/bundle-schema";
+import type { BundleRef, CartItem } from "@/lib/cart-rules";
 import { formatCurrency } from "@/lib/utils";
 
-/** Normalized shape covering both admin-defined bundles and the whole-catalog bundle. */
+/** Normalized shape covering admin-defined bundles and the whole-catalog bundle. */
 export interface BundleCardData {
   kind: "bundle" | "catalog";
   /** Present for admin-defined bundles only. */
@@ -16,8 +17,14 @@ export interface BundleCardData {
   originalPrice: number;
   discountedPrice: number;
   discountPercent: number;
-  releaseCount: number;
+  /** What the card is counting — whole releases (the catalog included) or songs. */
+  memberKind: BundleKind;
+  memberCount: number;
+  /** Releases the bundle grants whole. Empty for a bundle of songs. */
   releaseIds: number[];
+  /** Songs the bundle grants, and the releases they came from. Bundles of songs only. */
+  trackIds?: number[];
+  trackReleaseIds?: number[];
   coverImageUrls: string[];
 }
 
@@ -36,7 +43,9 @@ export function BundleCard({ bundle }: { bundle: BundleCardData }) {
         }
       : {
           bundleId: bundle.id,
-          bundleReleaseIds: bundle.releaseIds,
+          bundleReleaseIds: bundle.memberKind === "tracks" ? undefined : bundle.releaseIds,
+          bundleTrackIds: bundle.trackIds,
+          bundleTrackReleaseIds: bundle.trackReleaseIds,
           bundleCoverImageUrls: bundle.coverImageUrls,
           name: bundle.name,
           slug: "",
@@ -47,7 +56,7 @@ export function BundleCard({ bundle }: { bundle: BundleCardData }) {
   const covered = coverage(item);
   const conflict =
     bundle.kind === "bundle" && !covered
-      ? conflictFor({ bundleId: bundle.id!, bundleReleaseIds: bundle.releaseIds })
+      ? conflictFor({ ...(item as BundleRef), bundleId: bundle.id! })
       : null;
 
   const discounted = bundle.discountPercent > 0 && bundle.originalPrice > bundle.discountedPrice;
@@ -65,7 +74,7 @@ export function BundleCard({ bundle }: { bundle: BundleCardData }) {
           <div>
             <h3 className="text-base font-semibold">{bundle.name}</h3>
             <p className="text-sm text-muted-foreground">
-              {bundle.releaseCount} release{bundle.releaseCount === 1 ? "" : "s"}
+              {memberNoun(bundle.memberKind, bundle.memberCount)}
               {discounted && ` — ${bundle.discountPercent}% off`}
             </p>
             {bundle.description && (
