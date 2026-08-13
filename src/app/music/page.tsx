@@ -1,4 +1,5 @@
 import { BundlesSection } from "@/components/BundlesSection";
+import { MusicSearch } from "@/components/MusicSearch";
 import { PartyPupilsRadioButton } from "@/components/PartyPupilsRadioButton";
 import { ReleaseCard } from "@/components/ReleaseCard";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { getPublishedBundles } from "@/lib/bundles";
 import { getCatalogPrice } from "@/lib/catalog";
 import { buildPlayerTracksForRelease } from "@/lib/player-data";
 import { getPublishedReleases } from "@/lib/release-reads";
+import { buildTrackSearchIndex } from "@/lib/track-search";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -30,6 +32,9 @@ export default async function MusicPage() {
     ...r,
     playerTracks: buildPlayerTracksForRelease(r),
   }));
+  // The catalog is small enough to ship whole, so search runs client-side with
+  // no round-trip and no pagination.
+  const searchIndex = buildTrackSearchIndex(releases);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -43,32 +48,33 @@ export default async function MusicPage() {
         </div>
       </div>
 
-      <BundlesSection
-        bundles={bundles}
-        catalog={catalog.releaseCount > 1 ? catalog : null}
-      />
+      <MusicSearch index={searchIndex}>
+        <BundlesSection
+          bundles={bundles}
+          catalog={catalog.releaseCount > 1 ? catalog : null}
+        />
 
-
-      {releases.length === 0 ? (
-        <p className="text-muted-foreground">
-          No music available yet. Check back soon!
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {releasesWithTracks.map((release) => (
-            <ReleaseCard
-              key={release.id}
-              id={release.id}
-              name={release.name}
-              slug={release.slug}
-              price={release.price}
-              type={release.type}
-              coverImageUrl={release.coverImageUrl}
-              tracks={release.playerTracks}
-            />
-          ))}
-        </div>
-      )}
+        {releases.length === 0 ? (
+          <p className="text-muted-foreground">
+            No music available yet. Check back soon!
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {releasesWithTracks.map((release) => (
+              <ReleaseCard
+                key={release.id}
+                id={release.id}
+                name={release.name}
+                slug={release.slug}
+                price={release.price}
+                type={release.type}
+                coverImageUrl={release.coverImageUrl}
+                tracks={release.playerTracks}
+              />
+            ))}
+          </div>
+        )}
+      </MusicSearch>
     </div>
   );
 }
