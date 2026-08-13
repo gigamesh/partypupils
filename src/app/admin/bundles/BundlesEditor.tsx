@@ -5,14 +5,23 @@ import Image from "@/components/Image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { BundlesConfigSchema, type Bundle } from "@/lib/bundle-schema";
-import type { BundleMember } from "@/lib/bundles";
+import {
+  BundlesConfigSchema,
+  bundleMemberIds,
+  memberNoun,
+  withKind,
+  withMemberIds,
+  type Bundle,
+  type BundleKind,
+} from "@/lib/bundle-schema";
+import type { BundlePickerItem } from "@/lib/bundles";
 import { applyBundleDiscount } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/utils";
 
 interface BundlesEditorProps {
   initialBundles: Bundle[];
-  releases: BundleMember[];
+  releases: BundlePickerItem[];
+  tracks: BundlePickerItem[];
 }
 
 type SaveStatus =
@@ -21,6 +30,14 @@ type SaveStatus =
   | { kind: "saved" }
   | { kind: "error"; message: string };
 
+/** The fields every bundle has, whichever kind it is. */
+type BundleCommon = Pick<Bundle, "name" | "description" | "discountPercent" | "published">;
+
+const KIND_LABELS: Record<BundleKind, string> = {
+  releases: "Releases",
+  tracks: "Songs",
+};
+
 /** Generates a stable id for newly-added bundles. Stays fixed across renames so carts survive edits. */
 function newId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -28,18 +45,25 @@ function newId(): string {
     : `bundle-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) {
+export function BundlesEditor({ initialBundles, releases, tracks }: BundlesEditorProps) {
   const [bundles, setBundles] = useState<Bundle[]>(initialBundles);
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
 
-  const releaseById = new Map(releases.map((r) => [r.id, r]));
+  const optionsByKind: Record<BundleKind, BundlePickerItem[]> = {
+    releases,
+    tracks,
+  };
+  const itemById: Record<BundleKind, Map<number, BundlePickerItem>> = {
+    releases: new Map(releases.map((r) => [r.id, r])),
+    tracks: new Map(tracks.map((t) => [t.id, t])),
+  };
 
   const validation = BundlesConfigSchema.safeParse({ bundles });
   const fieldErrors = new Map<string, string>();
   let formError: string | undefined;
   if (!validation.success) {
     for (const issue of validation.error.issues) {
-      // path looks like ["bundles", index, "name" | "releaseIds" | ...]
+      // path looks like ["bundles", index, "name" | "releaseIds" | "trackIds" | ...]
       if (issue.path[0] === "bundles" && typeof issue.path[1] === "number") {
         const key = `${issue.path[1]}:${String(issue.path[2] ?? "")}`;
         if (!fieldErrors.has(key)) fieldErrors.set(key, issue.message);
@@ -49,39 +73,35 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
     }
   }
 
-  function update(index: number, patch: Partial<Bundle>) {
-    setBundles((prev) => prev.map((b, i) => (i === index ? { ...b, ...patch } : b)));
+  /** Replace one bundle, and clear any "Saved" badge left over from the last write. */
+  function replace(index: number, next: (bundle: Bundle) => Bundle) {
+    setBundles((prev) => prev.map((b, i) => (i === index ? next(b) : b)));
     setStatus({ kind: "idle" });
   }
 
-  function toggleRelease(index: number, releaseId: number) {
-    setBundles((prev) =>
-      prev.map((b, i) => {
-        if (i !== index) return b;
-        const has = b.releaseIds.includes(releaseId);
-        return {
-          ...b,
-          releaseIds: has
-            ? b.releaseIds.filter((id) => id !== releaseId)
-            : [...b.releaseIds, releaseId],
-        };
-      }),
-    );
-    setStatus({ kind: "idle" });
+  function update(index: number, patch: Partial<BundleCommon>) {
+    replace(index, (b) => ({ ...b, ...patch }));
+  }
+
+  function toggleMember(index: number, memberId: number) {
+    replace(index, (b) => {
+      const ids = bundleMemberIds(b);
+      return withMemberIds(
+        b,
+        ids.includes(memberId) ? ids.filter((id) => id !== memberId) : [...ids, memberId],
+      );
+    });
   }
 
   function moveMember(index: number, memberIndex: number, direction: "up" | "down") {
     const swap = direction === "up" ? memberIndex - 1 : memberIndex + 1;
-    setBundles((prev) =>
-      prev.map((b, i) => {
-        if (i !== index) return b;
-        if (swap < 0 || swap >= b.releaseIds.length) return b;
-        const next = [...b.releaseIds];
-        [next[memberIndex], next[swap]] = [next[swap]!, next[memberIndex]!];
-        return { ...b, releaseIds: next };
-      }),
-    );
-    setStatus({ kind: "idle" });
+    replace(index, (b) => {
+      const ids = bundleMemberIds(b);
+      if (swap < 0 || swap >= ids.length) return b;
+      const next = [...ids];
+      [next[memberIndex], next[swap]] = [next[swap]!, next[memberIndex]!];
+      return withMemberIds(b, next);
+    });
   }
 
   function moveBundle(index: number, direction: "up" | "down") {
@@ -93,6 +113,22 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
       return next;
     });
     setStatus({ kind: "idle" });
+  }
+
+  function setKind(index: number, kind: BundleKind) {
+    const bundle = bundles[index]!;
+    if (bundle.kind === kind) return;
+    // Release ids and track ids aren't interchangeable, so the selection can't
+    // carry over — say so before throwing the admin's picks away.
+    if (
+      bundleMemberIds(bundle).length > 0 &&
+      !confirm(
+        `Switch "${bundle.name || "this bundle"}" to ${KIND_LABELS[kind].toLowerCase()}? Its current selection will be cleared.`,
+      )
+    ) {
+      return;
+    }
+    replace(index, (b) => withKind(b, kind));
   }
 
   function removeBundle(index: number) {
@@ -107,7 +143,14 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
   function addBundle() {
     setBundles((prev) => [
       ...prev,
-      { id: newId(), name: "", releaseIds: [], discountPercent: 15, published: false },
+      {
+        id: newId(),
+        name: "",
+        kind: "releases",
+        releaseIds: [],
+        discountPercent: 15,
+        published: false,
+      },
     ]);
     setStatus({ kind: "idle" });
   }
@@ -140,11 +183,16 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
     <div className="space-y-6">
       <div className="space-y-4">
         {bundles.map((bundle, index) => {
-          const members = bundle.releaseIds
-            .map((id) => releaseById.get(id))
-            .filter((r): r is BundleMember => r !== undefined);
+          const memberIds = bundleMemberIds(bundle);
+          const options = optionsByKind[bundle.kind];
+          const lookup = itemById[bundle.kind];
+          const members = memberIds
+            .map((id) => lookup.get(id))
+            .filter((m): m is BundlePickerItem => m !== undefined);
           const originalPrice = members.reduce((sum, m) => sum + m.price, 0);
           const discountedPrice = applyBundleDiscount(originalPrice, bundle.discountPercent);
+          const membersError =
+            fieldErrors.get(`${index}:releaseIds`) ?? fieldErrors.get(`${index}:trackIds`);
 
           return (
             <div key={bundle.id} className="glass-panel rounded-lg p-4 space-y-4">
@@ -198,6 +246,24 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
                   />
 
                   <div className="flex flex-wrap items-center gap-4">
+                    <div
+                      className="flex items-center gap-1 text-sm"
+                      role="group"
+                      aria-label="Bundle contents"
+                    >
+                      Contains
+                      {(["releases", "tracks"] as const).map((kind) => (
+                        <Button
+                          key={kind}
+                          variant={bundle.kind === kind ? "default" : "outline"}
+                          size="sm"
+                          aria-pressed={bundle.kind === kind}
+                          onClick={() => setKind(index, kind)}
+                        >
+                          {KIND_LABELS[kind]}
+                        </Button>
+                      ))}
+                    </div>
                     <label className="flex items-center gap-2 text-sm">
                       Discount
                       <Input
@@ -238,29 +304,30 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">
-                    Releases in this bundle
+                    {bundle.kind === "tracks" ? "Songs" : "Releases"} in this bundle
                   </p>
                   <div className="max-h-64 overflow-y-auto rounded border border-border p-2 space-y-1">
-                    {releases.length === 0 && (
+                    {options.length === 0 && (
                       <p className="text-xs text-muted-foreground">
-                        No published releases to choose from.
+                        No published {bundle.kind === "tracks" ? "songs" : "releases"} to
+                        choose from.
                       </p>
                     )}
-                    {releases.map((release) => (
+                    {options.map((option) => (
                       <label
-                        key={release.id}
+                        key={option.id}
                         className="flex cursor-pointer items-center gap-2 rounded p-1 text-sm hover:bg-white/5"
                       >
                         <input
                           type="checkbox"
-                          checked={bundle.releaseIds.includes(release.id)}
-                          onChange={() => toggleRelease(index, release.id)}
+                          checked={memberIds.includes(option.id)}
+                          onChange={() => toggleMember(index, option.id)}
                           className="h-4 w-4 accent-neon"
                         />
                         <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded bg-muted">
-                          {release.coverImageUrl ? (
+                          {option.coverImageUrl ? (
                             <Image
-                              src={release.coverImageUrl}
+                              src={option.coverImageUrl}
                               alt=""
                               fill
                               className="object-cover"
@@ -272,18 +339,21 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
                             </span>
                           )}
                         </span>
-                        <span className="min-w-0 flex-1 truncate">{release.name}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {option.releaseName && (
+                            <span className="text-muted-foreground">
+                              {option.releaseName} —{" "}
+                            </span>
+                          )}
+                          {option.name}
+                        </span>
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {formatCurrency(release.price)}
+                          {formatCurrency(option.price)}
                         </span>
                       </label>
                     ))}
                   </div>
-                  {fieldErrors.get(`${index}:releaseIds`) && (
-                    <p className="text-xs text-destructive">
-                      {fieldErrors.get(`${index}:releaseIds`)}
-                    </p>
-                  )}
+                  {membersError && <p className="text-xs text-destructive">{membersError}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -327,7 +397,7 @@ export function BundlesEditor({ initialBundles, releases }: BundlesEditorProps) 
 
                   <div className="rounded border border-border p-2">
                     <p className="text-xs text-muted-foreground">
-                      {members.length} release{members.length === 1 ? "" : "s"}
+                      {memberNoun(bundle.kind, members.length)}
                     </p>
                     <div className="mt-1 flex items-center gap-3">
                       <span className="text-lg font-bold text-neon">

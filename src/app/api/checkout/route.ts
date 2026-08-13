@@ -36,7 +36,11 @@ const handler = createCheckoutHandler({
     return {
       totalCents: bundle.discountedPrice,
       productName: bundleProductName(bundle),
-      releaseIds: bundle.releaseIds,
+      // A bundle holds releases or songs, never both, so exactly one of these
+      // is sent. The package apportions the total across whichever it gets.
+      ...(bundle.kind === "tracks"
+        ? { trackIds: bundle.trackIds }
+        : { releaseIds: bundle.releaseIds }),
     };
   },
 });

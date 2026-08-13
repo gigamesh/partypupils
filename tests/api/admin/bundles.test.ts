@@ -12,7 +12,7 @@ import { verifyAdminSession } from "@/lib/admin-auth";
 import { getBundlesConfig } from "@/lib/bundles";
 import { RELEASES_TAG } from "@/lib/cache-tags";
 import { CATALOG_DISCOUNT_KEY } from "@/lib/constants";
-import { makeRelease } from "../../factories";
+import { makeRelease, makeTrackWithFile } from "../../factories";
 
 function jsonRequest(body: unknown): NextRequest {
   return new Request("http://test/api/admin/bundles", {
@@ -26,6 +26,7 @@ function validBundle(releaseIds: number[], overrides: Record<string, unknown> = 
   return {
     id: "summer",
     name: "Summer Pack",
+    kind: "releases",
     releaseIds,
     discountPercent: 20,
     published: true,
@@ -33,14 +34,31 @@ function validBundle(releaseIds: number[], overrides: Record<string, unknown> = 
   };
 }
 
+function validSongBundle(trackIds: number[], overrides: Record<string, unknown> = {}) {
+  return {
+    id: "singles",
+    name: "Club Cuts",
+    kind: "tracks",
+    trackIds,
+    discountPercent: 20,
+    published: true,
+    ...overrides,
+  };
+}
+
 describe("GET /api/admin/bundles", () => {
-  it("returns the config plus published releases for the picker", async () => {
+  it("returns the config plus published releases and songs for the pickers", async () => {
     const a = await makeRelease({ name: "Alpha", price: 1000 });
-    await makeRelease({ name: "Hidden", isPublished: false });
+    const song = await makeTrackWithFile(a.id, { name: "Opener" });
+    const hidden = await makeRelease({ name: "Hidden", isPublished: false });
+    await makeTrackWithFile(hidden.id, { name: "Unlisted" });
 
     const body = await (await GET()).json();
     expect(body.config).toEqual({ bundles: [] });
     expect(body.releases.map((r: { id: number }) => r.id)).toEqual([a.id]);
+    // Songs of unpublished releases aren't sellable, so they aren't offerable.
+    expect(body.tracks.map((t: { id: number }) => t.id)).toEqual([song.id]);
+    expect(body.tracks[0].releaseName).toBe("Alpha");
   });
 
   it("401s when unauthenticated", async () => {
@@ -104,6 +122,49 @@ describe("PUT /api/admin/bundles", () => {
 
     expect(res.status).toBe(400);
     expect((await res.json()).unknownIds).toEqual([hidden.id]);
+  });
+
+  it("saves a bundle of songs", async () => {
+    const release = await makeRelease({ price: 5000 });
+    const a = await makeTrackWithFile(release.id, { price: 200, trackNumber: 1 });
+    const b = await makeTrackWithFile(release.id, { price: 200, trackNumber: 2 });
+
+    const res = await PUT(jsonRequest({ bundles: [validSongBundle([a.id, b.id])] }));
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.bundles[0].kind).toBe("tracks");
+    // Priced off the songs ($4.00 less 20%), not the $50 release they sit on.
+    expect(body.bundles[0].discountedPrice).toBe(300);
+  });
+
+  it("rejects a bundle of songs holding a release id", async () => {
+    // Release ids and track ids share a numeric namespace, so a mixed-up save
+    // has to be caught here rather than silently resolving to nothing.
+    const release = await makeRelease();
+    const other = await makeRelease();
+    const res = await PUT(
+      jsonRequest({ bundles: [validSongBundle([release.id, other.id])] }),
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/not published/);
+  });
+
+  it("keeps a bundle to one kind, dropping the other kind's ids", async () => {
+    const release = await makeRelease();
+    const a = await makeTrackWithFile(release.id, { price: 200, trackNumber: 1 });
+    const b = await makeTrackWithFile(release.id, { price: 200, trackNumber: 2 });
+
+    const res = await PUT(
+      jsonRequest({
+        bundles: [validSongBundle([a.id, b.id], { releaseIds: [release.id] })],
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    const [stored] = (await getBundlesConfig()).bundles;
+    expect(stored).not.toHaveProperty("releaseIds");
   });
 
   it("401s when unauthenticated", async () => {

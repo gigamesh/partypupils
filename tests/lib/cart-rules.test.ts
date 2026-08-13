@@ -1,6 +1,6 @@
 /**
  * Cart semantics. The property under test throughout is that a customer can
- * never end up paying twice for the same release.
+ * never end up paying twice for the same release or song.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -9,6 +9,7 @@ import {
   cartItemKey,
   coverageOf,
   coveredReleaseIds,
+  coveredTrackIds,
   isItemInCart,
   removeCartItem,
   type CartItem,
@@ -42,6 +43,19 @@ function bundle(id: string, releaseIds: number[]): CartItem {
     name: `Bundle ${id}`,
     slug: "",
     price: 2000,
+    coverImageUrl: null,
+  };
+}
+
+/** A bundle of songs. `members` is `[trackId, parentReleaseId]` pairs. */
+function songBundle(id: string, members: [number, number][]): CartItem {
+  return {
+    bundleId: id,
+    bundleTrackIds: members.map(([trackId]) => trackId),
+    bundleTrackReleaseIds: [...new Set(members.map(([, releaseId]) => releaseId))],
+    name: `Singles ${id}`,
+    slug: "",
+    price: 500,
     coverImageUrl: null,
   };
 }
@@ -202,5 +216,100 @@ describe("coveredReleaseIds", () => {
 
   it("ignores plain releases", () => {
     expect(coveredReleaseIds([release(1)]).size).toBe(0);
+  });
+
+  it("does not count the releases a bundle of songs draws from", () => {
+    // The bundle grants songs 10 and 11, not release 1 whole.
+    const items = [songBundle("s1", [[10, 1], [11, 1]])];
+    expect(coveredReleaseIds(items).size).toBe(0);
+    expect([...coveredTrackIds(items)].sort()).toEqual([10, 11]);
+  });
+});
+
+describe("bundles of songs", () => {
+  it("absorbs member songs already in the cart", () => {
+    const items = [track(10, 1), track(11, 2), track(12, 3)];
+    const next = addCartItem(items, songBundle("s1", [[10, 1], [11, 2]]));
+
+    expect(next.map(cartItemKey)).toEqual(["track-12", "bundle-s1"]);
+  });
+
+  it("leaves the rest of a member's release for sale", () => {
+    // Only song 10 of release 1 is in the bundle, so its sibling and the
+    // release itself are still purchasable.
+    const items = addCartItem([], songBundle("s1", [[10, 1], [20, 2]]));
+    const next = addCartItem(items, track(11, 1));
+
+    expect(next.map(cartItemKey)).toEqual(["bundle-s1", "track-11"]);
+    expect(coverageOf(next, release(1))).toBeNull();
+  });
+
+  it("blocks a member song and reports which bundle grants it", () => {
+    const items = addCartItem([], songBundle("s1", [[10, 1], [20, 2]]));
+
+    expect(addCartItem(items, track(10, 1))).toBe(items);
+    expect(coverageOf(items, track(10, 1))).toEqual({
+      kind: "bundle",
+      bundleId: "s1",
+      name: "Singles s1",
+    });
+  });
+
+  it("allows two bundles of songs drawing from the same release", () => {
+    const items = addCartItem([], songBundle("s1", [[10, 1], [11, 1]]));
+    const next = addCartItem(items, songBundle("s2", [[12, 1], [13, 1]]));
+
+    expect(next.map(cartItemKey)).toEqual(["bundle-s1", "bundle-s2"]);
+  });
+
+  it("rejects two bundles of songs sharing a song", () => {
+    const items = addCartItem([], songBundle("s1", [[10, 1], [11, 1]]));
+
+    expect(addCartItem(items, songBundle("s2", [[11, 1], [12, 1]]))).toBe(items);
+  });
+
+  it("rejects a bundle of songs whose release another bundle already grants whole", () => {
+    const items = addCartItem([], bundle("b1", [1, 2]));
+    const singles = songBundle("s1", [[10, 1], [20, 9]]);
+
+    expect(addCartItem(items, singles)).toBe(items);
+    expect(
+      bundleConflict(items, {
+        bundleId: "s1",
+        bundleTrackIds: singles.bundleTrackIds,
+        bundleTrackReleaseIds: singles.bundleTrackReleaseIds,
+      }),
+    ).toBe("overlap");
+  });
+
+  it("rejects a bundle of releases when a bundle of songs holds one of their songs", () => {
+    // The mirror of the case above — order of adding shouldn't decide whether
+    // the customer gets charged twice for song 10.
+    const items = addCartItem([], songBundle("s1", [[10, 1], [20, 9]]));
+
+    expect(addCartItem(items, bundle("b1", [1, 2]))).toBe(items);
+    expect(bundleConflict(items, { bundleId: "b1", bundleReleaseIds: [1, 2] })).toBe("overlap");
+  });
+
+  it("is covered by the catalog like any other bundle", () => {
+    const items = [catalog];
+    const singles = songBundle("s1", [[10, 1], [11, 2]]);
+
+    expect(addCartItem(items, singles)).toBe(items);
+    expect(
+      bundleConflict(items, {
+        bundleId: "s1",
+        bundleTrackIds: singles.bundleTrackIds,
+        bundleTrackReleaseIds: singles.bundleTrackReleaseIds,
+      }),
+    ).toBe("catalog");
+  });
+
+  it("is not treated as covered by a release bundle it merely overlaps", () => {
+    // Overlap is a conflict, not coverage — the card says "overlaps a bundle
+    // in your cart" rather than offering an inert "included in" button.
+    const items = addCartItem([], bundle("b1", [1]));
+
+    expect(coverageOf(items, { bundleId: "s1" })).toBeNull();
   });
 });

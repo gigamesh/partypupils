@@ -6,7 +6,9 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type { NextRequest } from "next/server";
+import { eq } from "drizzle-orm";
 import { POST } from "@/app/api/checkout/route";
+import { releases } from "@/db/schema";
 import { queries, db } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 import { BUNDLES_SETTING_KEY, CATALOG_DISCOUNT_KEY, SITE_ALIAS } from "@/lib/constants";
@@ -23,13 +25,31 @@ function checkoutRequest(items: unknown[], origin = BASE_URL): NextRequest {
   }) as NextRequest;
 }
 
-async function storeBundle(bundle: Partial<Bundle> & { releaseIds: number[] }) {
+type BundleDefaults = Partial<Omit<Bundle, "kind" | "releaseIds" | "trackIds">>;
+
+async function storeBundle(bundle: BundleDefaults & { releaseIds: number[] }) {
   await queries.setSetting(BUNDLES_SETTING_KEY, {
     bundles: [
       {
         id: bundle.id ?? "summer",
         name: bundle.name ?? "Summer Pack",
+        kind: "releases",
         releaseIds: bundle.releaseIds,
+        discountPercent: bundle.discountPercent ?? 20,
+        published: bundle.published ?? true,
+      },
+    ],
+  });
+}
+
+async function storeSongBundle(bundle: BundleDefaults & { trackIds: number[] }) {
+  await queries.setSetting(BUNDLES_SETTING_KEY, {
+    bundles: [
+      {
+        id: bundle.id ?? "singles",
+        name: bundle.name ?? "Club Cuts",
+        kind: "tracks",
+        trackIds: bundle.trackIds,
         discountPercent: bundle.discountPercent ?? 20,
         published: bundle.published ?? true,
       },
@@ -172,6 +192,107 @@ describe("bundle checkout", () => {
     );
     expect(res.status).toBe(400);
     expect(vi.mocked(stripe().checkout.sessions.create)).not.toHaveBeenCalled();
+  });
+});
+
+describe("bundle-of-songs checkout", () => {
+  it("charges the discounted price and apportions it across member songs", async () => {
+    const release = await makeRelease({ price: 5000 });
+    const a = await makeTrackWithFile(release.id, { price: 100, trackNumber: 1 });
+    const b = await makeTrackWithFile(release.id, { price: 200, trackNumber: 2 });
+    await storeSongBundle({ trackIds: [a.id, b.id], discountPercent: 20 });
+    mockSession();
+
+    const res = await POST(checkoutRequest([{ kind: "bundle", bundleId: "singles" }]));
+    expect(res.status).toBe(200);
+
+    const params = lastSessionParams();
+    expect(params.line_items).toHaveLength(1);
+    // $3.00 off 20% rounds to $2.00 — `applyBundleDiscount` rounds to dollars.
+    expect(params.line_items[0]!.price_data.product_data.name).toBe(
+      "Club Cuts (2 songs, 20% off)",
+    );
+
+    // Nothing here grants the release itself, only the two songs.
+    expect(JSON.parse(params.metadata.release_ids!)).toEqual([]);
+    expect(JSON.parse(params.metadata.track_ids!).sort()).toEqual([a.id, b.id].sort());
+    expect(JSON.parse(params.metadata.bundle_ids!)).toEqual(["singles"]);
+    expect(sumAmounts(params.metadata)).toBe(sumLineItems(params));
+  });
+
+  it("dedupes and merges when a song is reachable twice", async () => {
+    const release = await makeRelease({ price: 5000 });
+    const a = await makeTrackWithFile(release.id, { price: 200, trackNumber: 1 });
+    const b = await makeTrackWithFile(release.id, { price: 200, trackNumber: 2 });
+    await storeSongBundle({ trackIds: [a.id, b.id], discountPercent: 0 });
+    mockSession();
+
+    // A stale cart can hold both the bundle and one of its member songs.
+    const res = await POST(
+      checkoutRequest([
+        { kind: "bundle", bundleId: "singles" },
+        { kind: "track", id: a.id },
+      ]),
+    );
+    expect(res.status).toBe(200);
+
+    const params = lastSessionParams();
+    const trackIds = JSON.parse(params.metadata.track_ids!) as number[];
+    expect(new Set(trackIds).size).toBe(trackIds.length);
+    expect(trackIds.sort()).toEqual([a.id, b.id].sort());
+    expect(sumAmounts(params.metadata)).toBe(sumLineItems(params));
+  });
+
+  it("409s when every member song's release was unpublished", async () => {
+    const release = await makeRelease();
+    const a = await makeTrackWithFile(release.id, { price: 150, trackNumber: 1 });
+    const b = await makeTrackWithFile(release.id, { price: 150, trackNumber: 2 });
+    await storeSongBundle({ trackIds: [a.id, b.id] });
+    await db
+      .update(releases)
+      .set({ isPublished: false })
+      .where(eq(releases.id, release.id));
+    mockSession();
+
+    const res = await POST(checkoutRequest([{ kind: "bundle", bundleId: "singles" }]));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "bundle-unavailable", bundleIds: ["singles"] });
+    expect(vi.mocked(stripe().checkout.sessions.create)).not.toHaveBeenCalled();
+  });
+
+  it("records order items summing to the charged total", async () => {
+    const release = await makeRelease({ price: 5000 });
+    const a = await makeTrackWithFile(release.id, { price: 100, trackNumber: 1 });
+    const b = await makeTrackWithFile(release.id, { price: 200, trackNumber: 2 });
+    await storeSongBundle({ trackIds: [a.id, b.id], discountPercent: 20 });
+    mockSession();
+
+    await POST(checkoutRequest([{ kind: "bundle", bundleId: "singles" }]));
+    const params = lastSessionParams();
+    const charged = params.line_items[0]!.price_data.unit_amount;
+
+    const { fulfillCheckoutSession } = await import("@gigamusic/checkout");
+    const result = await fulfillCheckoutSession(
+      {
+        id: "cs_singles_test",
+        payment_intent: "pi_singles_test",
+        payment_status: "paid",
+        amount_total: charged,
+        customer_details: { email: "buyer@test" },
+        metadata: params.metadata,
+      } as never,
+      { queries, site: SITE_ALIAS },
+    );
+
+    expect(result.status).toBe("created");
+    const order = await db.query.orders.findFirst({
+      where: (o, { eq: is }) => is(o.stripeSessionId, "cs_singles_test"),
+      with: { items: true },
+    });
+    // Two song order items, no release item — the customer bought the songs.
+    expect(order!.items).toHaveLength(2);
+    expect(order!.items.every((i) => i.trackId !== null)).toBe(true);
+    expect(order!.items.reduce((s, i) => s + i.price, 0)).toBe(order!.amountTotal);
   });
 });
 
