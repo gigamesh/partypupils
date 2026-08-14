@@ -6,6 +6,7 @@ import { orders as ordersTable } from "@/db/schema";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ReissueDownloadsButton } from "./ReissueDownloadsButton";
 import {
   Table,
   TableBody,
@@ -182,6 +183,7 @@ export default async function AdminOrdersPage({
             <TableHead className="text-right">Amount</TableHead>
             <TableHead className="text-right">Status</TableHead>
             <TableHead className="text-right">Stripe</TableHead>
+            <TableHead className="text-right">Downloads</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -231,12 +233,22 @@ export default async function AdminOrdersPage({
                   <span className="text-xs text-muted-foreground">—</span>
                 )}
               </TableCell>
+              <TableCell className="text-right">
+                {order.status === "completed" ? (
+                  <ReissueDownloadsButton
+                    orderId={order.id}
+                    orderEmail={order.email}
+                  />
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </TableCell>
             </TableRow>
           ))}
           {orders.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={7}
+                colSpan={8}
                 className="text-center text-muted-foreground py-8"
               >
                 No orders found.
