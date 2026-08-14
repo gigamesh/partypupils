@@ -65,6 +65,63 @@ export function contactEmailHtml({
   }).html;
 }
 
+// The one sentence in `renderPurchaseConfirmation`'s body that is wrong for a
+// support reissue — the customer bought this days ago and re-sending "Thank you
+// for your purchase!" reads like a second charge. Everything else in that
+// template (branding shell, item list, total, download CTA) is exactly what a
+// reissue wants, so we swap the sentence rather than fork the template.
+const CONFIRMATION_INTRO =
+  "Thank you for your purchase! Your music is ready to download.";
+
+function reissueIntro(expiryDays: number): string {
+  return `We&apos;ve refreshed the download link for your order — the one below replaces any earlier link and works for the next ${expiryDays} days.`;
+}
+
+/**
+ * Subject + HTML for the admin-initiated "reissue downloads" email.
+ *
+ * Composed from `renderPurchaseConfirmation` so the reissue can never drift
+ * from the branding, layout, and item formatting of the email the customer
+ * originally received. If the upstream intro sentence ever changes, the
+ * replacement is a no-op and the customer still gets a valid, correctly branded
+ * email carrying the new link — a stale sentence, not a broken send.
+ */
+export function renderDownloadReissue(args: {
+  verifyUrl: string;
+  itemNames: string[];
+  totalCents: number;
+  expiryDays: number;
+}): { subject: string; html: string } {
+  const { html } = renderPurchaseConfirmation({
+    branding: EMAIL_BRANDING,
+    verifyUrl: args.verifyUrl,
+    itemNames: args.itemNames,
+    totalCents: args.totalCents,
+  });
+
+  return {
+    subject: `Your ${EMAIL_BRANDING.siteName} Download Link`,
+    html: html.replace(CONFIRMATION_INTRO, reissueIntro(args.expiryDays)),
+  };
+}
+
+/** Send the reissued magic link. Throws on provider failure so the admin sees it. */
+export async function sendDownloadReissueEmail(args: {
+  to: string;
+  verifyUrl: string;
+  itemNames: string[];
+  totalCents: number;
+  expiryDays: number;
+}) {
+  const { subject, html } = renderDownloadReissue(args);
+  await emailProvider().send({
+    from: env.EMAIL_FROM(),
+    to: args.to,
+    subject,
+    html,
+  });
+}
+
 export async function sendOrderLookupEmail(email: string, verifyUrl: string) {
   const { subject, html } = renderOrderLookup({ branding: EMAIL_BRANDING, verifyUrl });
   await emailProvider().send({

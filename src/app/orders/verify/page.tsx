@@ -16,8 +16,13 @@ export const metadata: Metadata = {
 };
 
 async function getOrCreateValidToken(orderId: number): Promise<string | null> {
+  // Newest-first so an admin-reissued token is the one this page serves. An
+  // order can hold several tokens (every reissue adds one) and all of them
+  // remain valid, but the freshest is the one support just talked the customer
+  // through.
   const existing = await db.query.downloadTokens.findFirst({
     where: eq(downloadTokens.orderId, orderId),
+    orderBy: desc(downloadTokens.id),
   });
 
   if (existing) return existing.token;

@@ -79,7 +79,7 @@ const { stripeStub, emailSendStub } = vi.hoisted(() => ({
   },
   // Shared `send` mock backing `emailProvider().send(...)`. Tests can grab it
   // via the exported `emailProvider` mock to assert call counts / mockRejected.
-  emailSendStub: vi.fn(async () => {}),
+  emailSendStub: vi.fn<(message?: unknown) => Promise<void>>(async () => {}),
 }));
 export { emailSendStub };
 vi.mock("@/lib/stripe", () => ({
@@ -95,6 +95,25 @@ vi.mock("stripe", () => ({
 vi.mock("@/lib/email", () => ({
   sendOrderLookupEmail: vi.fn(async () => {}),
   sendContactEmail: vi.fn(async () => {}),
+  // Routes through the shared `emailSendStub` (rather than being its own vi.fn)
+  // so reissue tests can assert the rendered subject/recipient and simulate a
+  // provider outage the same way every other email test does.
+  sendDownloadReissueEmail: vi.fn(
+    async (args: {
+      to: string;
+      verifyUrl: string;
+      itemNames: string[];
+      totalCents: number;
+      expiryDays: number;
+    }) => {
+      await emailSendStub({
+        to: args.to,
+        subject: "Your Test Download Link",
+        html: `<html>${args.verifyUrl}</html>`,
+      });
+    },
+  ),
+  renderDownloadReissue: vi.fn(() => ({ subject: "", html: "<html></html>" })),
   emailProvider: vi.fn(() => ({
     send: emailSendStub,
   })),
