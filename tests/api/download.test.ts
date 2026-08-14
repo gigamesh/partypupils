@@ -28,6 +28,18 @@ function tokenReq(token: string, qs: string): NextRequest {
   return new NextRequest(`http://test/download/${token}?${qs}`);
 }
 
+/**
+ * Request for the manifest route, at the path it's actually mounted on.
+ *
+ * The URL matters now: `createDownloadZipHandler` derives the single-file
+ * download route from its own pathname minus the last segment, so a request
+ * forged at `/download/{token}` (as `tokenReq` builds) would yield manifest
+ * URLs pointing at `/download` and silently under-test the real shape.
+ */
+function zipReq(token: string, qs: string): NextRequest {
+  return new NextRequest(`http://test/download/${token}/zip?${qs}`);
+}
+
 function ctx(token: string) {
   return { params: Promise.resolve({ token }) };
 }
@@ -132,7 +144,7 @@ describe("GET /download/[token]", () => {
 describe("GET /download/[token]/zip (manifest endpoint)", () => {
   it("404s on an unknown token", async () => {
     const res = await downloadZip(
-      tokenReq("does-not-exist", "releaseId=1&format=mp3"),
+      zipReq("does-not-exist", "releaseId=1&format=mp3"),
       ctx("does-not-exist"),
     );
     expect(res.status).toBe(404);
@@ -146,7 +158,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     const token = order.downloadTokens[0].token;
 
     const res = await downloadZip(
-      tokenReq(token, `trackIds=${ownedTrack.id},${otherTrack.id}&format=mp3`),
+      zipReq(token, `trackIds=${ownedTrack.id},${otherTrack.id}&format=mp3`),
       ctx(token),
     );
     expect(res.status).toBe(403);
@@ -160,7 +172,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     const token = order.downloadTokens[0].token;
 
     const res = await downloadZip(
-      tokenReq(token, `releaseId=${otherRelease.id}&format=mp3`),
+      zipReq(token, `releaseId=${otherRelease.id}&format=mp3`),
       ctx(token),
     );
     expect(res.status).toBe(403);
@@ -179,7 +191,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     });
     const token = order.downloadTokens[0].token;
 
-    const res = await downloadZip(tokenReq(token, "format=mp3"), ctx(token));
+    const res = await downloadZip(zipReq(token, "format=mp3"), ctx(token));
     expect(res.status).toBe(200);
     const body = await res.json();
 
@@ -205,7 +217,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     const token = order.downloadTokens[0].token;
 
     const res = await downloadZip(
-      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      zipReq(token, `releaseId=${release.id}&format=mp3`),
       ctx(token),
     );
     expect(res.status).toBe(200);
@@ -226,7 +238,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     const token = order.downloadTokens[0].token;
 
     // Whole-order zip → release folder, with extended mixes in Extended/.
-    const orderRes = await downloadZip(tokenReq(token, "format=mp3"), ctx(token));
+    const orderRes = await downloadZip(zipReq(token, "format=mp3"), ctx(token));
     const orderBody = await orderRes.json();
     expect(orderBody.files.map((f: { fileName: string }) => f.fileName)).toEqual([
       "Yacht House/Steely Dan - Peg (Remix).mp3",
@@ -236,7 +248,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
 
     // Single-release zip → flat, but extended mixes still get an Extended/ folder.
     const relRes = await downloadZip(
-      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      zipReq(token, `releaseId=${release.id}&format=mp3`),
       ctx(token),
     );
     const relBody = await relRes.json();
@@ -259,7 +271,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
 
     // Single-release zip → flat cover, plus a copy inside Extended/.
     const relRes = await downloadZip(
-      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      zipReq(token, `releaseId=${release.id}&format=mp3`),
       ctx(token),
     );
     const relBody = await relRes.json();
@@ -271,7 +283,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     ]);
 
     // Whole-order zip → cover nested under the release folder and its Extended/.
-    const orderRes = await downloadZip(tokenReq(token, "format=mp3"), ctx(token));
+    const orderRes = await downloadZip(zipReq(token, "format=mp3"), ctx(token));
     const orderBody = await orderRes.json();
     expect(orderBody.files.map((f: { fileName: string }) => f.fileName)).toEqual([
       "Yacht House/Peg (Remix).mp3",
@@ -291,7 +303,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     const token = order.downloadTokens[0].token;
 
     const res = await downloadZip(
-      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      zipReq(token, `releaseId=${release.id}&format=mp3`),
       ctx(token),
     );
     const body = await res.json();
@@ -309,7 +321,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     const token = order.downloadTokens[0].token;
 
     const res = await downloadZip(
-      tokenReq(token, `releaseId=${release.id}&format=mp3`),
+      zipReq(token, `releaseId=${release.id}&format=mp3`),
       ctx(token),
     );
     expect(res.status).toBe(200);
@@ -321,9 +333,20 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     // Single-release zip stays flat — the zip itself is named after the release.
     expect(body.files[0].fileName).toBe("trackA_final.mp3");
     expect(body.files[1].fileName).toBe("trackB_final.mp3");
+    // Manifest entries point back at our own /download/[token] route rather
+    // than at presigned R2 URLs. That route 302s to a fresh signature, so the
+    // URL is minted when the service worker reaches the file instead of at
+    // manifest-build time — a 5-minute signature on entry 40 of a 4.5 GB
+    // archive is dead long before the SW gets there.
     body.files.forEach((f: { url: string }) => {
-      expect(f.url).toMatch(/^https:\/\/r2\/signed/);
+      const url = new URL(f.url);
+      expect(url.origin).toBe("http://test");
+      expect(url.pathname).toBe(`/download/${token}`);
+      expect(url.searchParams.get("format")).toBe("mp3");
+      expect(Number(url.searchParams.get("trackId"))).toBeGreaterThan(0);
     });
+    // Nothing is signed while building the manifest, so nothing in it expires.
+    expect(getPresignedDownloadUrl).not.toHaveBeenCalled();
     // Critical: the function must NOT have fetched any audio bytes itself.
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -338,7 +361,7 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
     // Request in reverse order — the manifest must preserve request order
     // (that's what the customer chose at checkout).
     const res = await downloadZip(
-      tokenReq(token, `trackIds=${t2.id},${t1.id}&format=mp3`),
+      zipReq(token, `trackIds=${t2.id},${t1.id}&format=mp3`),
       ctx(token),
     );
     expect(res.status).toBe(200);
@@ -349,5 +372,50 @@ describe("GET /download/[token]/zip (manifest endpoint)", () => {
       "Mix Album/beta_v2.mp3",
       "Mix Album/alpha_v2.mp3",
     ]);
+  });
+
+  /**
+   * The manifest is only useful if the URLs in it actually resolve. This walks
+   * every entry of a real bundle — audio and cover art — back through the
+   * single-file download route the way the service worker does, which is also
+   * the only local check that `getTrackFile` / `getReleaseById` (the keyed
+   * lookups @gigamusic/db 4.8.0 added) resolve against this app's schema.
+   */
+  it("produces manifest URLs that the download route can serve", async () => {
+    const release = await makeRelease({
+      name: "Yacht House",
+      coverImageUrl: "https://r2.example/covers/yacht-house.png",
+    });
+    await makeTrackWithFile(release.id, { name: "Peg", trackNumber: 1, fileName: "Peg.mp3" });
+    const order = await makeCompletedOrder({ email: "x@y", releaseIds: [release.id] });
+    const token = order.downloadTokens[0].token;
+
+    const res = await downloadZip(
+      zipReq(token, `releaseId=${release.id}&format=mp3`),
+      ctx(token),
+    );
+    const body = (await res.json()) as { files: { fileName: string; url: string }[] };
+    expect(body.files).toHaveLength(2);
+
+    for (const file of body.files) {
+      const followed = await downloadTrack(
+        new NextRequest(file.url),
+        ctx(token),
+      );
+      expect(
+        followed.status,
+        `${file.fileName} -> ${file.url} did not redirect`,
+      ).toBe(302);
+      expect(followed.headers.get("location")).toMatch(/^https:\/\/r2\/signed/);
+    }
+
+    // One signature per file, minted on the follow-up request rather than
+    // while the manifest was built.
+    expect(getPresignedDownloadUrl).toHaveBeenCalledTimes(2);
+    // The cover entry is addressed by release, not by track — it has no
+    // trackId to key off.
+    const cover = body.files.find((f) => f.fileName.endsWith("COVER ART.jpg"))!;
+    expect(new URL(cover.url).searchParams.get("asset")).toBe("cover");
+    expect(new URL(cover.url).searchParams.get("releaseId")).toBe(String(release.id));
   });
 });

@@ -76,9 +76,16 @@ async function getActiveServiceWorker(): Promise<ServiceWorker | null> {
 
 /**
  * Bulk download via Service Worker + `client-zip`. The button fetches a
- * manifest of presigned R2 URLs, hands it to the SW, then navigates the
- * browser to a SW-intercepted URL that streams the zip directly from R2 —
- * audio bytes never touch Vercel and never enter this page's heap.
+ * manifest, hands it to the SW, then navigates the browser to a
+ * SW-intercepted URL that streams the zip — audio bytes never enter this
+ * page's heap. Manifest entries are same-origin `/download/[token]` links
+ * that 302 to a freshly signed R2 URL, so each signature is minted when the
+ * SW reaches that file rather than all at once when the manifest is built.
+ *
+ * The SW reports any file it couldn't fetch back here as a `zip-failure`
+ * message; those render as a warning under the buttons, because the
+ * `_FAILED_<name>.txt` placeholder it writes instead would otherwise let a
+ * half-empty archive pass for a clean download.
  *
  * Browsers without `navigator.serviceWorker` (or where registration fails)
  * see a fallback message; per-track downloads still work via PR 1's bypass.
@@ -104,6 +111,12 @@ export function DownloadZipButtons({
   // a click that fires the interval but then leaves the page (back to the
   // order list, route change) used to leak it for the full keepalive window.
   const keepaliveRef = useRef<number | null>(null);
+  // Files the SW couldn't fetch for the download currently in flight. It
+  // substitutes a `_FAILED_<name>.txt` placeholder for each so the archive
+  // still opens, which means a half-empty zip is indistinguishable from a
+  // good one unless we say so here.
+  const [failedFiles, setFailedFiles] = useState<string[]>([]);
+  const downloadIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -111,6 +124,28 @@ export function DownloadZipButtons({
         window.clearInterval(keepaliveRef.current);
         keepaliveRef.current = null;
       }
+    };
+  }, []);
+
+  // Listen for the SW's per-file failure reports. This has to outlive the
+  // click handler: the fetches happen after we navigate to the SW-intercepted
+  // URL, and that navigation doesn't unload the page. Filtered by download id
+  // so a stale report from a previous click can't taint a fresh one.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (data?.type !== "zip-failure") return;
+      if (data.id !== downloadIdRef.current) return;
+      setFailedFiles((prev) =>
+        prev.includes(data.fileName) ? prev : [...prev, data.fileName],
+      );
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
     };
   }, []);
 
@@ -164,6 +199,7 @@ export function DownloadZipButtons({
   async function handleClick(format: string) {
     if (loading) return;
     setLoading(format);
+    setFailedFiles([]);
 
     // Re-resolve the SW now — the cached ref can be stale (see component doc).
     // If it's gone, surface the same fallback message as a never-registered
@@ -184,6 +220,7 @@ export function DownloadZipButtons({
       const manifest = (await res.json()) as Manifest;
 
       const id = crypto.randomUUID();
+      downloadIdRef.current = id;
       // Wait for the SW to ack before navigating — closes the iOS Safari
       // race where the navigation reaches the fetch handler before the
       // message has been processed.
@@ -274,24 +311,45 @@ export function DownloadZipButtons({
   }
 
   return (
-    <div className={cn("flex gap-2", className)}>
-      {orderedFormats.map((format) => (
-        <Button
-          key={format}
-          type="button"
-          size="sm"
-          onClick={() => handleClick(format)}
-          disabled={loading !== null || swState !== "ready"}
-        >
-          {loading === format ? (
-            <>
-              <Loader2Icon className="h-4 w-4 animate-spin" /> Zipping
-            </>
-          ) : (
-            `${format.toUpperCase()} ZIP`
-          )}
-        </Button>
-      ))}
-    </div>
+    // Fragment, not a wrapper: callers style this component with child
+    // selectors (`[&>*]:flex-1` in OrderDownloads) that target the buttons
+    // directly, so the row must stay their direct parent.
+    <>
+      <div className={cn("flex gap-2", className)}>
+        {orderedFormats.map((format) => (
+          <Button
+            key={format}
+            type="button"
+            size="sm"
+            onClick={() => handleClick(format)}
+            disabled={loading !== null || swState !== "ready"}
+          >
+            {loading === format ? (
+              <>
+                <Loader2Icon className="h-4 w-4 animate-spin" /> Zipping
+              </>
+            ) : (
+              `${format.toUpperCase()} ZIP`
+            )}
+          </Button>
+        ))}
+      </div>
+      {failedFiles.length > 0 && (
+        <div role="alert" className="text-xs text-destructive">
+          <p className="font-medium">
+            {failedFiles.length} {failedFiles.length === 1 ? "file" : "files"}{" "}
+            couldn&apos;t be downloaded and {failedFiles.length === 1 ? "was" : "were"}{" "}
+            replaced with a placeholder in the zip. Download{" "}
+            {failedFiles.length === 1 ? "it" : "them"} individually above, or
+            try the bulk download again.
+          </p>
+          <ul className="mt-1 list-disc pl-4">
+            {failedFiles.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
   );
 }
